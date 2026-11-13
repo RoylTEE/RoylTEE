@@ -11,10 +11,10 @@ Status: DRAFT. Nothing here has been run. Every step that creates an account, de
 
 ## Tooling (UNVERIFIED until checked on the day)
 
-- CLI: near-cli-rs (`near`), the `account`, `contract` and `tokens` command groups as in its GUIDE.en.md. Version UNVERIFIED; the repo has no deploy tooling yet and `near` is not installed on the build machine. Installing it is a separate owner yes (`cargo install near-cli-rs --locked` into the user cargo home, or a release binary; no `curl | sh`, no global install).
-- Network: `network-config testnet` with the CLI's default testnet RPC.
-- Testnet protocol version: UNVERIFIED. Rust 1.87 and newer emit bulk-memory opcodes, which need protocol 84 or newer. Step 0 checks it.
-- Faucet: `create-account sponsor-by-faucet-service` posts to the CLI's configured `faucet_url` (the docs list `https://helper.nearprotocol.com/account`). Reported amount 10 NEAR per new top-level account (third-party guides; UNVERIFIED), rate limits UNVERIFIED. Fallback faucet route: the NEAR testnet faucet web page linked from docs.near.org (UNVERIFIED, may need a sign-in, which is another owner step).
+- CLI: near-cli-rs 0.31.1 (`near`), installed from the official GitHub release tarball `near-cli-rs-x86_64-unknown-linux-gnu.tar.gz` (sha256 `8b92f4f79f324a882ad79b58d61b91dccc676dd653dc72a1f23693aa5db99e21`, matching the release's `.sha256` file and `sha256.sum`). Every command path below was checked against this version's `--help` output (2026-11-13). Verified: the command shapes. Not verified: the output of commands that make transactions.
+- Network: `network-config testnet`. The CLI's default testnet RPC in 0.31.1 is `https://archival-rpc.testnet.fastnear.com/`; the curl checks below use `https://rpc.testnet.near.org`.
+- Testnet protocol version: 88, node version 2.14.1 (read 2026-11-13 via RPC `status`; same nearcore as the sandbox). Rust 1.87 and newer emit bulk-memory opcodes, which need protocol 84 or newer: satisfied. Recheck in step 0 on the day.
+- Faucet: `create-account sponsor-by-faucet-service` posts to the CLI's configured `faucet_url`, which is `https://helper.nearprotocol.com/account` in the 0.31.1 default config. Amount per account: reported as 10 NEAR by third-party guides, UNVERIFIED. Rate limits: UNVERIFIED. Fallback faucet route: the NEAR testnet faucet web page linked from docs.near.org (UNVERIFIED, may need a sign-in, which is another owner step).
 - Storage price: 1e19 yoctoNEAR per byte (0.00001 NEAR per byte), as in the sandbox (UNVERIFIED on testnet).
 
 ## Accounts (fresh, this project only)
@@ -72,12 +72,15 @@ Note: `REG` and `USDC` NEAR becomes permanently locked when their keys are delet
 ### Step 0. Read-only checks (no transaction)
 
 ```bash
-near --version                                   # record the CLI version
+near --version                                   # near-cli-rs 0.31.1 expected
 git status --short && git rev-parse HEAD         # clean tree, record the commit
 npm run build:wasm && sha256sum contracts/res/registry.wasm contracts/res/mock_usdc.wasm contracts/res/vault.wasm
 ls -l contracts/res/                             # sizes match the budget above
-curl -s https://rpc.testnet.near.org/status | jq '.protocol_version, .version'   # needs protocol >= 84
-near account view-account-summary $ROOT $NET now  # must say the account does not exist
+curl -s https://rpc.testnet.near.org/status | jq '.protocol_version, .version'   # needs protocol >= 84 (88 on 2026-11-13)
+for a in $ROOT $FUND1 $FUND2; do                  # each must print UNKNOWN_ACCOUNT
+  curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \
+    -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"query\",\"params\":{\"request_type\":\"view_account\",\"finality\":\"final\",\"account_id\":\"$a\"}}" | jq -r '.error.cause.name // "EXISTS"'
+done
 ```
 
 Proves: the exact code being deployed (hashes recorded before deploy), the CLI version, that testnet runs a protocol that accepts the wasm, and that the name is free.
@@ -135,7 +138,7 @@ near contract call-function as-read-only $REG nft_metadata json-args '{}' $NET n
 near contract call-function as-read-only $REG get_accounting json-args '{}' $NET now
 ```
 
-Proves: same as step 4; the name comes from `config/project.json` only. Note: `nftSymbol` is still a placeholder (config `isPlaceholder: true`); the owner should confirm it before this step because metadata cannot change later.
+Proves: same as step 4; the name `RoylTEE` and the share symbol `ROYLT` (owner decision, final) come from `config/project.json` only. Metadata cannot change after this step.
 
 ### Step 6. Delete the full-access keys of REG and USDC (2 transactions), then prove zero keys
 
@@ -252,6 +255,8 @@ near account add-key $AGENT grant-function-call-access --allowance '0.25 NEAR' \
   autogenerate-new-keypair save-to-legacy-keychain $NET $SIGN
 near account delete-keys $AGENT public-keys $AGENT_FULL_PK $NET $SIGN
 near account list-keys $AGENT $NET now                 # one function-call key on REG, no full access
+AGENT_FC_PK=ed25519:...                                # set by hand from the list-keys output (public key only)
+AGENT_SIGN="sign-with-legacy-keychain --signer-public-key $AGENT_FC_PK send"
 NOW_NS=$(($(date +%s) * 1000000000)); EXP=$((NOW_NS + 30*24*3600*1000000000))
 near contract call-function as-transaction $REG grant_role \
   json-args "{\"agent\":\"$AGENT\",\"methods\":[\"pay_from_allowance\",\"report\"],\"per_tx_limit\":\"100000\",\"daily_limit\":\"300000\",\"max_tx_per_day\":5,\"expires_at\":\"$EXP\"}" \
@@ -264,15 +269,15 @@ near contract call-function as-transaction $USDC ft_transfer_call \
   prepaid-gas '300 Tgas' attached-deposit '1 yoctoNEAR' sign-as $BUYER $NET $SIGN
 near contract call-function as-transaction $REG pay_from_allowance \
   json-args "{\"target\":{\"work\":{\"work_id\":1,\"right_type\":\"publishing\",\"territory\":\"WW\"}},\"amount\":\"100000\",\"statement_line_id\":\"agent-line-1\",\"period\":\"2026-Q3\",\"statement_hash\":\"$H_F\"}" \
-  prepaid-gas '300 Tgas' attached-deposit '0 NEAR' sign-as $AGENT $NET $SIGN
+  prepaid-gas '300 Tgas' attached-deposit '0 NEAR' sign-as $AGENT $NET $AGENT_SIGN
 near contract call-function as-transaction $REG pay_from_allowance \
   json-args "{\"target\":{\"work\":{\"work_id\":1,\"right_type\":\"publishing\",\"territory\":\"WW\"}},\"amount\":\"100000\",\"statement_line_id\":\"agent-line-1\",\"period\":\"2026-Q3\",\"statement_hash\":\"$H_F\"}" \
-  prepaid-gas '300 Tgas' attached-deposit '0 NEAR' sign-as $AGENT $NET $SIGN   # must fail: same line
+  prepaid-gas '300 Tgas' attached-deposit '0 NEAR' sign-as $AGENT $NET $AGENT_SIGN   # must fail: same line
 near contract call-function as-transaction $REG claim json-args '{"token_id":"s4"}' \
-  prepaid-gas '300 Tgas' attached-deposit '1 yoctoNEAR' sign-as $AGENT $NET $SIGN   # must fail at protocol level
+  prepaid-gas '300 Tgas' attached-deposit '1 yoctoNEAR' sign-as $AGENT $NET $AGENT_SIGN   # must fail at protocol level
 ```
 
-Proves: T6, T7, T8, T9 live (agent key cannot reach owner methods or attach deposits, limits hold, a statement line pays once). The function-call key's allowance (0.25 NEAR) caps the agent's gas spend. Which key the legacy keychain picks after the full-access key is deleted is UNVERIFIED; the full-access key file may stay in the store but no longer works on chain.
+Proves: T6, T7, T8, T9 live (agent key cannot reach owner methods or attach deposits, limits hold, a statement line pays once). The function-call key's allowance (0.25 NEAR) caps the agent's gas spend. Agent calls pass `--signer-public-key` (an option of `sign-with-legacy-keychain` in 0.31.1) so the CLI signs with the function-call key, not the deleted full-access key whose file may stay in the store. That the legacy keychain finds the function-call key file by that public key is UNVERIFIED.
 
 ### Step 13. Dispute (3 transactions)
 
