@@ -34,6 +34,7 @@ export const AREAS: Area[] = [
   { key: 'registrar', label: 'Registrar log', group: 'Oversight', purpose: 'Members, powers and recorded actions', href: '/registrar', tabs: [] },
   { key: 'member', label: 'Your shares', group: 'You', purpose: 'Claim, transfer, approve and draft', href: '/member', tabs: [
     { key: 'holdings', label: 'Holdings', href: '/member#holdings' },
+    { key: 'transfer', label: 'Transfer', href: '/member#transfer' },
     { key: 'approvals', label: 'Approvals', href: '/member#approvals' },
     { key: 'draft', label: 'Draft a split sheet', href: '/member#draft' },
   ] },

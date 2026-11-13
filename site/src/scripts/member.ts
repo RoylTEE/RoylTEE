@@ -4,6 +4,7 @@ import { connectWallet, disconnectWallet, sendCalls, type RegistryCall } from '.
 import { REGISTRY } from '../data/testnet';
 import { h, badge, acct, shareState, rightLabel, loading, fail, stamp } from './ui';
 import { statement } from './sharecard';
+import { transferChecks, canTransfer } from './transfer-rules';
 
 const root = document.querySelector<HTMLElement>('[data-member]')!;
 const q = <T extends Element>(s: string) => root.querySelector<T>(s)!;
@@ -17,7 +18,7 @@ function setAccount(account: string, wallet: boolean) {
   q('[data-who-badge]').replaceChildren(wallet ? badge('Wallet connected', 'ok') : badge('Read only', 'info'));
   q<HTMLButtonElement>('[data-disconnect]').hidden = !wallet;
   status.replaceChildren(wallet ? 'Signed in as ' : 'Viewing ', acct(account), wallet ? '. Actions open your wallet to sign.' : '. Connect that account\'s wallet to act.');
-  history.replaceState(null, '', `?account=${encodeURIComponent(account)}`);
+  history.replaceState(null, '', `?account=${encodeURIComponent(account)}${location.hash}`);
   void refresh();
 }
 
@@ -27,7 +28,9 @@ async function refresh() {
   ap.replaceChildren(h('div', { class: 'panel-body' }, loading()));
   try {
     const [mine, all] = await Promise.all([tokensFor(viewing), allTokens()]);
-    renderHeld(mine, await pool(mine, (t) => view<Ledger>('get_ledger', { token_id: t.token_id })));
+    const ledgers = await pool(mine, (t) => view<Ledger>('get_ledger', { token_id: t.token_id }));
+    renderHeld(mine, ledgers);
+    renderTransfer(mine, ledgers);
     await renderApprovals(all);
     stamp(document.querySelector('[data-stamp]'));
   } catch (err) { fail(held, err, () => void refresh()); ap.replaceChildren(); }
@@ -54,6 +57,50 @@ function renderHeld(tokens: Token[], ledgers: Ledger[]) {
       })),
       h('tfoot', {}, h('tr', {}, h('td', { class: 'p', colspan: '7', text: 'Total claimable' }), h('td', { class: 'num p-end', text: musdc(total) }), h('td', { class: 'x' }))))),
     h('div', { class: 'panel-body' }, h('details', {}, h('summary', { class: 'small', text: 'Statement for each share' }), ...tokens.map((t, i) => h('div', { class: 'stack' }, h('h4', { text: t.token_id }), statement(ledgers[i]))))));
+}
+
+function renderTransfer(mine: Token[], ledgers: Ledger[]) {
+  const box = q('[data-transfer]');
+  if (!mine.length) { box.replaceChildren(h('div', { class: 'empty' }, h('p', { text: `${viewing} holds no shares to transfer.` }), h('a', { class: 'btn', href: '/shares/', text: 'See who holds what in the ledger' }))); return; }
+  const pick = h('select', { id: 't-share' }, ...mine.map((t) => h('option', { value: t.token_id, text: `${t.token_id}, Work ${t.extra.work_id}, ${rightLabel[t.extra.right_type] ?? t.extra.right_type} ${pct(t.extra.percent_bps)}` })));
+  const to = h('input', { id: 't-to', placeholder: 'buyer-pub.royltee-dev.testnet', autocomplete: 'off', spellcheck: false });
+  const memo = h('input', { id: 't-memo', maxLength: 120, placeholder: 'Optional, public: for example the sale reference', autocomplete: 'off' });
+  const result = h('div', { class: 'stack', 'aria-live': 'polite' });
+  const check = async () => {
+    const t = mine.find((x) => x.token_id === pick.value)!; const l = ledgers[mine.indexOf(t)];
+    const receiver = to.value.trim().toLowerCase();
+    if (receiver && !ACCOUNT.test(receiver)) { result.replaceChildren(h('p', { class: 'notice bad' }, badge('Check', 'bad'), 'That is not a NEAR account id.')); return; }
+    result.replaceChildren(loading('Checking the receiver and the share'));
+    try {
+      const [active, cred, approval] = await Promise.all([
+        receiver ? view<boolean>('is_active_member', { account_id: receiver }) : Promise.resolve(false),
+        signer ? view<{ status: string } | null>('get_credential', { account_id: signer }) : Promise.resolve(null),
+        approvalOf(t),
+      ]);
+      const checks = transferChecks({ sender: signer, owner: t.owner_id, receiver, status: t.extra.status, dispute: t.extra.dispute, approval, payoutInFlight: l.payout_in_flight, transferPending: l.transfer_pending, senderCredential: cred?.status ?? null, receiverActive: active });
+      const ok = canTransfer(checks); const unclaimed = BigInt(t.extra.claimable);
+      result.replaceChildren(
+        h('ul', { class: 'checklist' }, ...checks.map((c) => h('li', {}, badge(c.ok ? 'OK' : 'Blocks', c.ok ? 'ok' : 'bad'), h('span', { text: c.text })))),
+        unclaimed > 0n ? h('div', { class: 'notice warn' }, badge('Claim first', 'warn'), h('div', {}, h('p', { text: `${musdc(unclaimed)} mUSDC is unclaimed on ${t.token_id}. It moves with the share: after the transfer, only the receiver can claim it.` }), h('p', { class: 'small', text: 'If that money is yours, claim it before you transfer. If the sale price already includes it, you can go ahead.' }), h('button', { class: 'btn sm', type: 'button', text: `Claim ${musdc(unclaimed)} mUSDC first`, disabled: !(signer && signer === t.owner_id), onclick: () => void claim(t) }))) : h('p', { class: 'small muted', text: 'Nothing unclaimed on this share, so no money moves with it.' }),
+        h('div', { class: 'review' },
+          h('p', { class: 'label', text: 'Review' }),
+          h('p', {}, 'Transfer ', h('strong', { class: 'mono', text: t.token_id }), ' from ', acct(t.owner_id, short(t.owner_id)), ' to ', receiver ? acct(receiver, short(receiver)) : h('span', { class: 'dim', text: 'no receiver yet' }), '. The share account and its payout address stay the same; control moves to the receiver.'),
+          h('p', { class: 'small muted', text: 'Your wallet signs nft_transfer on the registry with 1 yoctoNEAR attached. The contract checks every rule above again.' }),
+          h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', text: `Sign the transfer of ${t.token_id}`, disabled: !ok, onclick: async () => {
+            status.textContent = `Waiting for your wallet to sign nft_transfer(${t.token_id})...`;
+            try { await sendCalls(REGISTRY, [{ method: 'nft_transfer', args: { receiver_id: receiver, token_id: t.token_id, ...(memo.value.trim() ? { memo: memo.value.trim() } : {}) }, deposit: '1', gas: TGAS(100) }]); status.textContent = `Transfer of ${t.token_id} sent. Refreshing.`; await refresh(); }
+            catch (err) { status.textContent = `Transfer not sent: ${(err as Error).message || 'cancelled in the wallet'}.`; }
+          } }), ok ? null : h('span', { class: 'small muted', text: 'Fix what blocks it first.' }))));
+    } catch (err) { fail(result, err, () => void check()); }
+  };
+  box.replaceChildren(
+    h('div', { class: 'draft-meta' },
+      h('div', { class: 'field' }, h('label', { for: 't-share', text: 'Share' }), pick),
+      h('div', { class: 'field' }, h('label', { for: 't-to', text: 'Receiver account' }), to),
+      h('div', { class: 'field' }, h('label', { for: 't-memo', text: 'Memo' }), memo)),
+    h('div', {}, h('button', { class: 'btn', type: 'button', text: 'Check the transfer', onclick: () => void check() })),
+    result);
+  pick.addEventListener('change', () => result.replaceChildren());
 }
 
 async function claim(t: Token) {

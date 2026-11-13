@@ -27,6 +27,12 @@ export const prerender = false;
       <div data-held><div class="panel-body"><div class="empty"><p>Look up an account or connect a wallet to see the shares it holds and what each one can claim.</p></div></div></div>
     </section>
 
+    <section class="panel" id="transfer" data-tab-panel aria-labelledby="tr-h">
+      <div class="panel-head"><h2 id="tr-h">Transfer a share</h2><span class="end"><span class="badge unv">UNVERIFIED</span></span></div>
+      <div class="panel-body" data-transfer><div class="empty"><p>Choose an account first. The shares it holds can be sent to another verified member.</p></div></div>
+      <p class="panel-foot">Only the holder can transfer, only to an active verified member, and never while a payout is in flight, a dispute is open or another transfer is pending. Approvals for marketplaces are disabled by design. Sending from this page has not been run on testnet yet; the recorded catalog sale of s2 was signed outside this site.</p>
+    </section>
+
     <section class="panel" id="approvals" data-tab-panel aria-labelledby="ap-h">
       <div class="panel-head"><h2 id="ap-h">Split sheets to approve</h2><span class="caption">Shares other members registered on works this account registered</span></div>
       <div data-approvals><div class="panel-body"><div class="empty"><p>Choose an account first. Shares that wait for its signature show up here.</p></div></div></div>
@@ -46,6 +52,9 @@ export const prerender = false;
   .who-grid { grid-template-columns: 1.3fr 1fr; align-items: start; }
   .inline { display: flex; gap: var(--s2); }
   .inline input { flex: 1; min-width: 0; }
+  .checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s2); }
+  .checklist li { display: flex; gap: var(--s3); align-items: baseline; font-size: var(--fs-14); }
+  .checklist .badge { flex: none; min-width: 4.2rem; justify-content: center; }
   .review { border: 2px solid var(--ink); border-radius: var(--r-card); padding: var(--s5); display: grid; gap: var(--s4); background: var(--surface-2); }
   .draft-rows td { padding-top: .4rem; padding-bottom: .4rem; }
   .draft-rows input, .draft-rows select { min-width: 8rem; }
