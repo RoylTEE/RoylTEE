@@ -668,7 +668,7 @@ Callbacks now carry the lock they belong to. `on_claim` gets the lock's `since_b
 
 ### Sizes
 
-The registry wasm is 613584 bytes after block 3 (518782 after block 2), about 6.1 NEAR of storage on testnet at 1e19 yoctoNEAR per byte. A role record plus the first credits: a 0.1 NEAR deposit gave 93 line credits in the sandbox, so the role record costs about 0.007 NEAR.
+The registry wasm is 614394 bytes after block 3 (518782 after block 2), about 6.1 NEAR of storage on testnet at 1e19 yoctoNEAR per byte. A role record plus the first credits: a 0.1 NEAR deposit gave 93 line credits in the sandbox, so the role record costs about 0.007 NEAR.
 
 ### Toolchain note
 
