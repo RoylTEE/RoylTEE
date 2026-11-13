@@ -2,10 +2,32 @@
 import App from '../layouts/App.astro';
 import PowerTable from '../components/PowerTable.astro';
 import { SCENES, categoriesOf } from '../data/testnet';
+const controls: [string, string, string, string][] = [
+  ['grant_role', 'Give a sub-account a payment role', 'Organisation must be an active member; agent is its direct sub-account with no credential and not a payer; 0 < per payment <= daily; 1 to 1000 payments a day; expiry in the future', '0.01 NEAR plus 0.001 per line'],
+  ['add_line_credits', 'Prepay statement lines', "Only the agent's organisation; at least one line", '0.001 NEAR per line'],
+  ['revoke_role', 'Kill switch, takes effect at once', 'The organisation or the registrar; not already revoked. The allowance stays withdrawable', '1 yoctoNEAR'],
+  ['withdraw_allowance', 'Take unused Mock USDC back', "Only the agent's organisation, not suspended; up to the allowance left", '1 yoctoNEAR'],
+];
 const n = SCENES.filter((s) => categoriesOf(s).includes('agent')).length;
 ---
 <App area="agents" title="Agents" intro="Software that pays for music. Each agent spends from a capped allowance, names a work, and never picks the payee.">
   <div data-agents><p class="loading">Reading testnet</p></div>
+  <section class="panel" id="controls" aria-labelledby="ctl-h">
+    <div class="panel-head"><h2 id="ctl-h">Agent controls</h2><span class="end"><span class="badge warn">Needs the org wallet</span></span></div>
+    <div class="table-wrap">
+      <table class="ledger rows-sm">
+        <thead><tr><th>Control</th><th>What it does</th><th>Limits the contract enforces</th><th>Attaches</th></tr></thead>
+        <tbody>
+          {controls.map(([m, what, lim, dep]) => <tr><td class="p mono small">{m}</td><td class="p-wrap">{what}</td><td class="m wrap">{lim}</td><td class="x mono small">{dep}</td></tr>)}
+        </tbody>
+      </table>
+    </div>
+    <div class="panel-body stack">
+      <p class="small">Every control is signed by the label or publisher that owns the agent, never by the agent: its only key is a function call key, which cannot attach the deposit these methods need. Signing opens on Your shares, the one page that loads the wallet selector, so this page keeps the strict policy.</p>
+      <div class="actions"><a class="btn primary" href="/member?account=buyer-pub.royltee-dev.testnet#org">Open the agent controls</a><span class="badge unv">UNVERIFIED</span></div>
+      <p class="caption">Sending these from the site has not been run on testnet yet. The recorded role was granted outside this site.</p>
+    </div>
+  </section>
   <section class="panel" aria-labelledby="org-h">
     <div class="panel-head"><h2 id="org-h">What the organisation can do</h2><span class="caption">Signed by the label or publisher that granted the role, never by the agent</span></div>
     <PowerTable who="organisation" />

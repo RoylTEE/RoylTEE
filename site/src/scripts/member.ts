@@ -5,6 +5,7 @@ import { REGISTRY } from '../data/testnet';
 import { h, badge, acct, shareState, rightLabel, loading, fail, stamp } from './ui';
 import { statement } from './sharecard';
 import { transferChecks, canTransfer } from './transfer-rules';
+import { renderOrg } from './org';
 
 const root = document.querySelector<HTMLElement>('[data-member]')!;
 const q = <T extends Element>(s: string) => root.querySelector<T>(s)!;
@@ -31,6 +32,7 @@ async function refresh() {
     const ledgers = await pool(mine, (t) => view<Ledger>('get_ledger', { token_id: t.token_id }));
     renderHeld(mine, ledgers);
     renderTransfer(mine, ledgers);
+    renderOrg(q('[data-org]'), viewing, signer, status);
     await renderApprovals(all);
     stamp(document.querySelector('[data-stamp]'));
   } catch (err) { fail(held, err, () => void refresh()); ap.replaceChildren(); }

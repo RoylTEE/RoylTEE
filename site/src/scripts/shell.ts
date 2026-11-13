@@ -34,6 +34,7 @@ function show(key: string) {
   for (const a of links) {
     if (a.dataset.tabLink !== key) { a.removeAttribute('aria-current'); continue; }
     a.setAttribute('aria-current', 'page');
+    const crumb = document.querySelector('[data-tab-crumb]'); if (crumb && a.closest('[data-area-tabs]')) crumb.textContent = a.textContent;
     const bar = a.parentElement;
     if (bar && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = a.offsetLeft - bar.offsetLeft - 16;
   }

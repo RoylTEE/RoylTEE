@@ -33,6 +33,12 @@ export const prerender = false;
       <p class="panel-foot">Only the holder can transfer, only to an active verified member, and never while a payout is in flight, a dispute is open or another transfer is pending. Approvals for marketplaces are disabled by design. Sending from this page has not been run on testnet yet; the recorded catalog sale of s2 was signed outside this site.</p>
     </section>
 
+    <section class="panel" id="org" data-tab-panel aria-labelledby="org-h">
+      <div class="panel-head"><h2 id="org-h">Organisation agents</h2><span class="end"><span class="badge warn">Needs the org wallet</span> <span class="badge unv">UNVERIFIED</span></span></div>
+      <div class="panel-body" data-org><div class="empty"><p>Choose the organisation account first, for example buyer-pub.royltee-dev.testnet. Its wallet signs every control here; the agent never can.</p></div></div>
+      <p class="panel-foot">The checks mirror the contract rules; the contract stays the authority and refuses anything outside them. Sending from this page has not been run on testnet yet; the recorded agent role was granted outside this site.</p>
+    </section>
+
     <section class="panel" id="approvals" data-tab-panel aria-labelledby="ap-h">
       <div class="panel-head"><h2 id="ap-h">Split sheets to approve</h2><span class="caption">Shares other members registered on works this account registered</span></div>
       <div data-approvals><div class="panel-body"><div class="empty"><p>Choose an account first. Shares that wait for its signature show up here.</p></div></div></div>
@@ -48,6 +54,17 @@ export const prerender = false;
 <script>import '../scripts/member.ts';</script>
 <style is:global>
   .member { display: grid; gap: var(--s5); }
+  .org-card { border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--surface); }
+  .org-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2) var(--s3); min-height: 2.75rem; padding: var(--s3) var(--s4); cursor: pointer; font-weight: 600; }
+  .org-card-head:focus-visible { outline: 2px solid var(--focus, var(--ink)); outline-offset: 2px; }
+  .org-card[open] > .org-card-head { border-bottom: 1px solid var(--edge); }
+  .org-card-body { display: grid; gap: var(--s3); padding: var(--s4); }
+  .org-card-head .end { margin-left: auto; }
+  .org-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: var(--s3); }
+  .methods { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5); }
+  .methods legend { font-weight: 600; font-size: var(--fs-14); margin-bottom: var(--s2); }
+  .methods label { display: inline-flex; align-items: center; gap: var(--s2); min-height: 2.75rem; font-family: var(--mono); font-size: var(--fs-14); }
+  .methods input { width: 1.25rem; height: 1.25rem; }
   .member [data-tab-panel] { scroll-margin-top: 7rem; }
   .who-grid { grid-template-columns: 1.3fr 1fr; align-items: start; }
   .inline { display: flex; gap: var(--s2); }

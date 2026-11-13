@@ -34,9 +34,10 @@ export const AREAS: Area[] = [
   { key: 'agents', label: 'Agents', group: 'Oversight', purpose: 'Roles, limits and keys', href: '/agents', tabs: [] },
   { key: 'disputes', label: 'Disputes', group: 'Oversight', purpose: 'Frozen money and outcomes', href: '/disputes', tabs: [] },
   { key: 'registrar', label: 'Registrar log', group: 'Oversight', purpose: 'Members, powers and recorded actions', href: '/registrar', tabs: [] },
-  { key: 'member', label: 'Your shares', group: 'You', purpose: 'Claim, transfer, approve and draft', href: '/member', tabs: [
+  { key: 'member', label: 'Your shares', group: 'You', purpose: 'Claim, transfer, agents, approve, draft', href: '/member', tabs: [
     { key: 'holdings', label: 'Holdings', href: '/member#holdings' },
     { key: 'transfer', label: 'Transfer', href: '/member#transfer' },
+    { key: 'org', label: 'Organisation agents', href: '/member#org' },
     { key: 'approvals', label: 'Approvals', href: '/member#approvals' },
     { key: 'draft', label: 'Draft a split sheet', href: '/member#draft' },
   ] },
