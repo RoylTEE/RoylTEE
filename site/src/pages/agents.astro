@@ -1,0 +1,35 @@
+---
+import Base from '../layouts/Base.astro';
+import RegistryHeader from '../components/RegistryHeader.astro';
+import { PROJECT_NAME } from '../consts';
+import { SCENES, txUrl } from '../data/testnet';
+const rows = SCENES.filter((s) => s.step === 'Agent');
+---
+<Base title={`Agents . ${PROJECT_NAME}`} description="Payment agents, their limits and what their keys cannot do, read live from NEAR testnet." current="registry">
+  <RegistryHeader tab="agents" title="Agents" intro="Software that pays for music. Each agent spends from a capped allowance, names a work, and never picks the payee." />
+  <div class="container reg-body">
+    <div data-agents><p class="loading">Reading testnet</p></div>
+    <section class="panel" aria-labelledby="ag-act">
+      <div class="panel-head"><h2 id="ag-act">Recorded agent activity</h2><span class="caption">2026-11-13 (UTC). The agent is a scripted agent run by hand, not a model.</span></div>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>What happened</th><th>Result</th><th>Transaction</th></tr></thead>
+          <tbody>{rows.map((s) => <tr><td>{s.what}<br /><span class="small muted">{s.shows}</span></td><td>{s.result === 'refused' ? <span class="badge bad">Refused</span> : s.result === 'info' ? <span class="badge info">Recorded</span> : <span class="badge ok">Done</span>}</td><td>{s.txs.map((h) => <a class="acct-link" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td></tr>)}</tbody>
+        </table>
+      </div>
+      <div class="panel-foot">Also refused, with no transaction: the agent's claim on s4 with 1 yoctoNEAR. A function call key cannot attach a deposit, so the protocol stops it before it is sent.</div>
+    </section>
+  </div>
+</Base>
+<script>import '../scripts/agents.ts';</script>
+<style is:global>
+  .agent-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--s5); align-items: start; }
+  .meter { display: grid; gap: .4rem; }
+  .meter-top { display: flex; justify-content: space-between; gap: var(--s3); font-size: var(--fs-14); }
+  .meter-bar { height: .5rem; border-radius: 3px; background: var(--paper-2); border: 1px solid var(--rule); overflow: hidden; }
+  .meter-bar > span { display: block; height: 100%; background: var(--ink); }
+  .method-list { display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .method { font-family: var(--mono); font-size: var(--fs-14); padding: .2rem .5rem; border-radius: var(--r-ctl); border: 1px solid var(--ok-line); background: var(--ok-bg); color: var(--ok); }
+  .method.no { border-color: var(--bad-line); background: var(--bad-bg); color: var(--bad); text-decoration: line-through; }
+  @media (max-width: 991px) { .agent-grid { grid-template-columns: 1fr; } }
+</style>

@@ -1,4 +1,70 @@
 ---
-import dashboard from '../content/dashboard.html?raw';
+import Base from '../layouts/Base.astro';
+import RegistryHeader from '../components/RegistryHeader.astro';
+import { PROJECT_NAME } from '../consts';
+import { SCENES, txUrl } from '../data/testnet';
 ---
-<Fragment set:html={dashboard} />
+<Base title={`Catalog . ${PROJECT_NAME}`} description="Every work, share and share account on the registry, read live from NEAR testnet." current="registry">
+  <RegistryHeader tab="catalog" title="Catalog" intro="Every work, every share and every share account on the registry, read live from NEAR testnet with view calls." />
+  <div class="container reg-body">
+    <section aria-labelledby="stmt-h" class="stack">
+      <div class="row-head"><h2 id="stmt-h">Statement, since mint</h2><span class="caption">All share accounts together, in Mock USDC (testnet)</span></div>
+      <div class="figures" data-statement><p class="loading figure">Reading testnet</p></div>
+      <div class="figures minor" data-counts></div>
+    </section>
+
+    <section class="panel" aria-labelledby="works-h">
+      <div class="panel-head"><h2 id="works-h">Works and rights</h2><span class="caption">Composition rights are publishing, performance and mechanical. Recording rights are master.</span></div>
+      <div class="table-wrap" data-works><p class="loading panel-body">Reading works</p></div>
+    </section>
+
+    <section class="md" aria-labelledby="shares-h">
+      <div class="panel md-master">
+        <div class="panel-head"><h2 id="shares-h">Shares</h2><span class="caption">Select a share to inspect it</span><div class="end" data-export></div></div>
+        <div class="table-wrap" data-shares><p class="loading panel-body">Reading shares</p></div>
+      </div>
+      <aside class="panel md-detail" aria-label="Share inspector" aria-live="polite">
+        <div class="panel-body" data-inspector>
+          <div class="empty"><p>Pick a share in the table to see its holder, its share account, the live key list and its statement.</p></div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel" aria-labelledby="act-h">
+      <div class="panel-head"><h2 id="act-h">Recorded activity</h2><span class="caption">The on-chain demo, all on 2026-11-13 (UTC)</span></div>
+      <div class="table-wrap">
+        <table class="ledger">
+          <thead><tr><th>Step</th><th>What happened</th><th>Shares</th><th>Result</th><th>Transaction</th></tr></thead>
+          <tbody>
+            {SCENES.map((s) => (
+              <tr>
+                <td><strong>{s.step}</strong>{s.simulated && <><br /><span class="badge sim">Simulated payer</span></>}</td>
+                <td>{s.what}<br /><span class="small muted">{s.shows}</span></td>
+                <td class="mono">{s.tokens.map((t, i) => <>{i ? ', ' : ''}<a class="link" href={`/share?id=${t}`}>{t}</a></>)}</td>
+                <td>{s.result === 'refused' ? <span class="badge bad">Refused</span> : s.result === 'info' ? <span class="badge info">Recorded</span> : <span class="badge ok">Done</span>}</td>
+                <td>{s.txs.map((h) => <a class="acct-link tx" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div class="panel-foot">Full event history per share is in each transaction's logs (NEP-297 events, standard share_registry). A period view needs an event indexer, which is roadmap.</div>
+    </section>
+  </div>
+</Base>
+<script>import '../scripts/catalog.ts';</script>
+<style is:global>
+  .reg-body { display: grid; gap: var(--s6); padding-top: var(--s6); }
+  .row-head { display: flex; align-items: baseline; gap: var(--s4); flex-wrap: wrap; }
+  .row-head h2, .panel-head h2 { font-size: var(--fs-22); }
+  .figures.minor .figure .value { font-size: var(--fs-22); }
+  .md { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: var(--s5); align-items: start; }
+  .md-detail { position: sticky; top: 5rem; max-height: calc(100vh - 6rem); overflow: auto; }
+  .insp-head { display: flex; justify-content: space-between; gap: var(--s3); align-items: flex-start; }
+  .stmt { display: grid; gap: var(--s2); }
+  .stmt .ledger, .md-detail .ledger { border: 1px solid var(--rule); border-radius: var(--r-ctl); }
+  .md-detail h4 { margin-top: var(--s2); }
+  .acct-link.tx + .acct-link.tx { margin-left: .5rem; }
+  .matrix td .badge { margin: .1rem .25rem .1rem 0; }
+  @media (max-width: 991px) { .md { grid-template-columns: 1fr; } .md-detail { position: static; max-height: none; } }
+</style>

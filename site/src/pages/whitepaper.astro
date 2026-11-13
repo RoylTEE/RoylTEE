@@ -3,16 +3,18 @@ import Base from '../layouts/Base.astro';
 import { PROJECT_NAME } from '../consts';
 ---
 <Base title={`Whitepaper (placeholder) . ${PROJECT_NAME}`}>
-  <section class="wp pad">
-    <div class="wp-in">
-      <span class="tag-ph">Placeholder page</span>
+  <div class="page-head">
+    <div class="container stack">
+      <p class="eyebrow">Whitepaper</p>
       <h1>Design whitepaper</h1>
-      <p class="lead">The whitepaper goes here once it is approved. It covers the problem, design goals, the lifecycle, the NEAR and privacy design, the trust model, why NEAR, and the rollout from testnet to mainnet.</p>
-      <a class="btn no-chip outline" href="/">Back to home</a>
+      <p class="lead">This page is a placeholder until the whitepaper is approved. It will cover the problem, the design goals, the share lifecycle, the NEAR and privacy design, the trust model and the path from testnet to mainnet.</p>
     </div>
-  </section>
+  </div>
+  <div class="container">
+    <div class="empty"><span class="badge plain">Placeholder</span><p>Until then, the registry pages show the live contracts, and the help chat answers from the project notes.</p><div class="actions"><a class="btn primary" href="/dashboard/">Open the registry</a><a class="btn" href="/help#chat">Ask the help chat</a></div></div>
+  </div>
 </Base>
 <style>
-  .wp { padding-top: 8rem; padding-bottom: 10rem; }
-  .wp-in { max-width: 44rem; margin: 0 auto; display: grid; gap: 1.5rem; justify-items: start; }
+  .page-head { background: var(--surface); border-bottom: 1px solid var(--edge); padding: var(--s7) 0 var(--s6); margin-bottom: var(--s6); }
+  .page-head h1 { font-size: var(--fs-36); }
 </style>

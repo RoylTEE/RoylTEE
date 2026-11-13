@@ -1,0 +1,39 @@
+---
+import Base from '../layouts/Base.astro';
+import RegistryHeader from '../components/RegistryHeader.astro';
+import { PROJECT_NAME } from '../consts';
+---
+<Base title={`Share . ${PROJECT_NAME}`} description="One rights share: holder, share account, live key list, statement and history." current="registry">
+  <RegistryHeader tab="share" title="Share" intro="One rights share NFT: who holds it, the account it controls, and every recorded move." />
+  <div class="container reg-body">
+    <div class="share-grid">
+      <section class="panel" aria-label="Share details"><div class="panel-body" data-share><p class="loading">Reading testnet</p></div></section>
+      <div class="stack">
+        <section class="panel" aria-labelledby="powers-h">
+          <div class="panel-head"><h2 id="powers-h">What the holder can do</h2></div>
+          <div class="panel-body">
+            <ul class="plain-list">
+              <li>Claim the balance of the share account. Only the current holder can, and the money goes to that holder.</li>
+              <li>Transfer the share to another verified member. Unclaimed money goes with it.</li>
+              <li>Set a short public note. Payouts and agents never read it.</li>
+            </ul>
+            <a class="btn primary" href="/member">Go to your shares to claim</a>
+          </div>
+        </section>
+        <section class="panel" aria-labelledby="hist-h">
+          <div class="panel-head"><h2 id="hist-h">History</h2><span class="caption">Recorded on 2026-11-13 (UTC)</span></div>
+          <div data-history></div>
+          <div class="panel-foot">Events for every change are in each transaction's logs. <span data-vault-link></span></div>
+        </section>
+      </div>
+    </div>
+  </div>
+</Base>
+<script>import '../scripts/share.ts';</script>
+<style is:global>
+  .share-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--s5); align-items: start; }
+  .share-grid .panel-body h4 { margin-top: var(--s2); }
+  .share-grid .stmt .ledger, .share-grid .panel-body > .stack .ledger { border: 1px solid var(--rule); border-radius: var(--r-ctl); }
+  .plain-list { margin: 0; padding-left: 1.1rem; display: grid; gap: var(--s2); font-size: var(--fs-14); }
+  @media (max-width: 991px) { .share-grid { grid-template-columns: 1fr; } }
+</style>

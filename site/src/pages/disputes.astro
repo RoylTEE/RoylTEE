@@ -1,0 +1,17 @@
+---
+import Base from '../layouts/Base.astro';
+import RegistryHeader from '../components/RegistryHeader.astro';
+import { PROJECT_NAME } from '../consts';
+---
+<Base title={`Disputes . ${PROJECT_NAME}`} description="Open and resolved disputes and the money held for them, read live from NEAR testnet." current="registry">
+  <RegistryHeader tab="disputes" title="Disputes" intro="When shares for one work and right add up to more than 100 percent, or a code is registered twice, only the contested money is held until the registrar decides." />
+  <div class="container reg-body">
+    <div class="figures" data-dfig><p class="loading figure">Reading testnet</p></div>
+    <section class="panel" aria-labelledby="d-h">
+      <div class="panel-head"><h2 id="d-h">All disputes</h2></div>
+      <div data-disputes><p class="loading panel-body">Reading testnet</p></div>
+      <div class="panel-foot">Dispute documents are hashes of dummy documents. Arbitration is Simulated.</div>
+    </section>
+  </div>
+</Base>
+<script>import '../scripts/disputes.ts';</script>

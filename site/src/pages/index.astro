@@ -1,533 +1,237 @@
 ---
 import Base from '../layouts/Base.astro';
-import { DASHBOARD_URL, WHITEPAPER_URL, SOURCE_URL, PROJECT_NAME } from '../consts';
-const arrow = `<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M9 4l4 4-4 4"/></svg>`;
-const updates = [1, 2, 3, 4, 5];
-const logos = [1, 2, 3, 4, 5, 6];
-const problems = [
-  { img: 'split', t: 'Many owners per song', d: 'A song is split among writers, publishers, labels and others. Each share has its own owner, and each share can be sold.' },
-  { img: 'records', t: 'Records that disagree', d: 'Who owns which share is kept in separate databases that do not always agree, so a payer often cannot tell whom to pay.' },
-  { img: 'transfer', t: 'Shares change hands', d: 'When a share is sold, every payer has to learn the new payee. Until they do, money can land in the wrong place.' },
-  { img: 'agent', t: 'Software pays too', d: 'When an agent pays for music, it needs a payee it cannot get wrong and a budget it cannot go over.' },
+import { DASHBOARD_URL, PITCH, PROJECT_NAME } from '../consts';
+import { REGISTRY, SCENES, txUrl, accountUrl } from '../data/testnet';
+/* Work 0 as read from testnet view calls on 2026-11-13 (UTC). The registry pages show the live values. */
+const sheet = [
+  { id: 's1', holder: 'writer-a.royltee-dev.testnet', name: 'Writer A', role: 'Publishing', basis: 'copyright', bps: 5000, vault: 's1.reg.royltee-dev.testnet' },
+  { id: 's2', holder: 'buyer-pub.royltee-dev.testnet', name: 'Buyer publisher', role: 'Publishing', basis: 'copyright', bps: 5000, vault: 's2.reg.royltee-dev.testnet', sold: true },
 ];
-const compare = [
-  ['Payee', 'Each payer keeps its own list', 'Fixed by the work on record'],
-  ['After a sale', 'Every payer updates its records', 'Nothing changes for payers'],
-  ['Splits', 'Worked out by each payer', 'Split by basis points on chain'],
-  ['Rounding', 'Each payer picks a rule', 'One public rule, sums exactly'],
-  ['Agents', 'Broad payment access', 'Capped allowance, no payee choice'],
+const sale = SCENES.filter((s) => s.tokens.includes('s2') || (s.step === 'Refusal'));
+const people = [
+  { who: 'Songwriters and artists', job: 'Check the split on record, see what each share earned, claim it.', where: 'Your shares', href: '/member' },
+  { who: 'Publishers and labels', job: 'Hold shares, approve split sheets for works they registered, run a payment agent.', where: 'Your shares, Agents', href: '/member' },
+  { who: 'Catalog buyers', job: 'Confirm the share, the payout account, that the seller kept no key, and that unclaimed money came along.', where: 'Share page', href: '/share?id=s2' },
+  { who: 'Payers and their agents', job: 'Pay a work once, inside fixed limits, without ever choosing the payee.', where: 'Agents', href: '/agents' },
+  { who: 'Registrar', job: 'Admit members, resolve disputes with a document hash, answer support.', where: 'Disputes', href: '/disputes' },
 ];
 const steps = [
-  { n: '01', t: 'Pay once', d: 'A payer sends Mock USDC once, naming the work. The payment carries the payer, the period and a statement hash.' },
-  { n: '02', t: 'Split to vaults', d: 'The registry splits by basis points and forwards each part straight into a share vault. The parts add up to the payment exactly.' },
-  { n: '03', t: 'Claim', d: 'Whoever holds the share token can claim what its vault holds. Nobody else can, and the vault has no keys to steal.' },
-  { n: '04', t: 'Catalog sale', d: 'Selling a share moves the token. The vault address stays the same, so payers change nothing. Only the controller changes.' },
+  { t: 'Register the work and its shares', d: 'A member records the song by ISRC or ISWC, then one share per rightholder in basis points (100 basis points is 1 percent). Each share is minted as an NFT, and the registry opens a payout account for it with no access keys.', m: 'register_work, register_share' },
+  { t: 'Pay the work once', d: 'A payer sends Mock USDC (testnet) to the registry, naming the work, the period and a statement hash. The registry splits it by basis points into each share account in the same transaction. The parts add up to the payment exactly.', m: 'ft_transfer_call' },
+  { t: 'The holder claims', d: 'Whoever holds the share NFT at that moment can move its balance to themselves. Nobody else can, and there is no key on the account to steal.', m: 'claim' },
+  { t: 'Sell the share', d: 'Selling moves the NFT to another verified member. The payout address stays the same, so payers change nothing. Unclaimed money goes with the share.', m: 'nft_transfer' },
 ];
-const vaults = ['share-1', 'share-2', 'share-3', 'share-4', 'share-5'];
-const agentTabs = [
-  { t: 'A cap the owner sets', d: 'An agent spends only from an allowance its owner sets. When the cap is used up, its payments stop until the owner tops it up.' },
-  { t: 'The agent never picks the payee', d: 'An agent names the work and the amount. The registry decides where the money goes, using the splits on record.' },
-  { t: 'Locks that cannot freeze a vault', d: 'A payout in flight locks its vault so a transfer cannot race it. A stale lock can be released, so one failed call does not freeze a vault for good.' },
-  { t: 'Every move is an event', d: 'Payments, claims, transfers and registrar actions each emit an event that anyone can read and check.' },
+const holder = ['Claim the balance of its share account', 'Transfer the share to another verified member', 'Set a short public note on the share', 'Confirm a co-holder share of the same work'];
+const agent = ['Pay a work or share from its allowance', 'Report a statement line', 'Stay under a per payment limit, a 24 hour limit and a daily count'];
+const nobody = ['Choose where an agent payment goes', 'Change a split alone', 'Add a key to a share account', 'Pay the same statement line twice'];
+const real = [
+  ['Registry, share account and Mock USDC (testnet) contracts', 'Identity checks (KYB) behind a member credential'],
+  ['Share accounts with zero access keys', 'The fiat rail and conversion to USDC'],
+  ['Payments, splits, claims and transfers in Mock USDC', 'Payer statements and statement line ids'],
+  ['Agent limits, one payment per statement line, revocation', 'Provenance evidence (the field is real, the evidence is not checked)'],
+  ['Locks, credentials, disputes and escrow', 'Dispute documents (hashes of dummy documents)'],
 ];
-const life = [
-  { n: '01', t: 'Register the work', d: 'A work is recorded with its ISRC or ISWC. A duplicate code is refused and opens a dispute.' },
-  { n: '02', t: 'Mint the shares', d: 'Each share is a token with basis points for one right and territory. Over 100 percent is refused.' },
-  { n: '03', t: 'Pay', d: 'Known shares are paid. Any unassigned part waits in escrow that only the registrar can release, with a document hash.' },
-  { n: '04', t: 'Claim', d: 'The holder claims from the vault. A transfer cannot land while a payout is in flight.' },
-  { n: '05', t: 'Sell', d: 'The token moves to the buyer. The payout address does not change. The next payment goes to the new holder.' },
-  { n: '06', t: 'Dispute', d: 'Contested money is held, not guessed. The registrar resolves it with a document hash and an event.' },
-];
-const trust = [
-  { t: 'Zero key vaults', d: 'Vaults have no access keys. Only the registry contract can move money out, and only to the current holder.', icon: 'key' },
-  { t: 'A registrar with limits', d: 'Every registrar power needs a document hash and emits an event. The registrar cannot claim a share, sweep funds or change the contract.', icon: 'scale' },
-  { t: 'Disputes hold money', d: 'Contested money waits for a decision. A suspended share keeps earning but cannot be claimed or moved by its holder.', icon: 'pause' },
-  { t: 'Statements stay private', d: 'Royalty statements stay off chain. Only a hash of the statement travels with the payment.', icon: 'lock' },
-];
-const resources = [
-  { k: 'Whitepaper', f: 'PDF', t: 'The design, the mechanism and why it works', href: WHITEPAPER_URL },
-  { k: 'Dashboard', f: 'App', t: 'Open the NEAR testnet dashboard', href: DASHBOARD_URL },
-  { k: 'Source', f: 'Code', t: 'Read the contracts and tests', href: SOURCE_URL },
-  { k: 'Video', f: 'Video', t: 'Watch the catalog sale scene', href: '#video-placeholder' },
-];
-const quotes = [1, 2, 3];
+const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"s2.reg.royltee-dev.testnet"}}'`;
 ---
-<Base>
-  <!-- HERO -->
+<Base current="home">
   <section class="hero">
-    <div class="hero-art" aria-hidden="true">
-      <img src="/placeholder-hero.svg" alt="" data-parallax />
-      <div class="hero-shade"></div>
-    </div>
-    <div class="hero-body container pad">
-      <span class="tag-sim hero-tag" data-hero-fade>Simulated demo</span>
-      <h1 class="hero-h" data-hero-split>
-        <span class="hero-strong">The verified payout address</span>
-        <span class="hero-light">for every share of every song, human or AI.</span>
-      </h1>
-      <p class="hero-sub" data-hero-fade>Pay a work once. The registry splits it by basis points into share vaults that hold no keys. Whoever holds the share claims it.</p>
-      <div class="hero-ctas" data-hero-fade>
-        <a class="btn dark" href={DASHBOARD_URL}>Open testnet dashboard <span class="chip" set:html={arrow} /></a>
-        <a class="link-arrow hero-link" href={WHITEPAPER_URL}><span class="link-line">Read the whitepaper</span><Fragment set:html={arrow} /></a>
-      </div>
-    </div>
-  </section>
-
-  <!-- UPDATES STRIP -->
-  <section class="updates">
-    <div class="updates-in pad">
-      <div class="updates-head">
-        <p class="updates-title">Latest updates</p>
-        <div class="updates-nav">
-          <button class="sq" aria-label="Previous" data-up-prev><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 8H3M7 4L3 8l4 4"/></svg></button>
-          <button class="sq" aria-label="Next" data-up-next><Fragment set:html={arrow} /></button>
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Music rights registry, live on NEAR testnet</p>
+        <h1>{PITCH}</h1>
+        <p class="lead">The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.</p>
+        <div class="actions">
+          <a class="btn primary" href={DASHBOARD_URL}>Open the registry</a>
+          <a class="btn" href="#verify">Check it yourself</a>
         </div>
+        <p class="caption">Registry contract <a class="acct-link" href={accountUrl(REGISTRY)} target="_blank" rel="noopener">{REGISTRY}</a></p>
       </div>
-      <div class="updates-list" data-up-list>
-        {updates.map((i) => (
-          <a class="up-card" href="#updates-placeholder">
-            <div class="up-thumb frame gridbg"><span class="tag-mono">Placeholder</span></div>
-            <div class="up-text">
-              <p>Update {i} goes here. No news is published yet.</p>
-              <span class="link-arrow muted">Read more<Fragment set:html={arrow} /></span>
-            </div>
-          </a>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <!-- LOGO STRIP -->
-  <section class="logos sec-md" aria-label="Placeholder logo strip">
-    <p class="center logos-h">Placeholder logo strip. <span class="muted">No partners, customers or payers are claimed.</span></p>
-    <div class="marquee" data-marquee>
-      {[0, 1].map((row) => (
-        <div class={`mq-row ${row ? 'rev' : ''}`}>
-          {[0, 1].map(() => (
-            <div class="mq-track">{logos.map((l) => <img src={`/placeholder-logo-${l}.svg`} alt={`placeholder logo ${l}`} width="160" height="48" />)}</div>
-          ))}
+      <figure class="sheet" aria-labelledby="sheet-cap">
+        <div class="sheet-head">
+          <div>
+            <p class="eyebrow">Split sheet</p>
+            <p class="sheet-title">Work 0 <span class="mono dim">ISRC ZZRYL2600001</span></p>
+          </div>
+          <span class="badge ok">Complete</span>
         </div>
-      ))}
+        <dl class="sheet-meta">
+          <div><dt>Provenance</dt><dd>Human</dd></div>
+          <div><dt>Right</dt><dd>Publishing</dd></div>
+          <div><dt>Territory</dt><dd>World</dd></div>
+        </dl>
+        <div class="table-wrap">
+          <table class="ledger">
+            <thead><tr><th>Rightholder</th><th>Share</th><th class="num">Percent</th><th class="num">Keys</th></tr></thead>
+            <tbody>
+              {sheet.map((r) => (
+                <tr>
+                  <td><span class="holder">{r.name}</span><span class="acct dim">{r.holder.replace('.royltee-dev.testnet', '')}</span>{r.sold && <span class="badge info">Bought in catalog sale</span>}</td>
+                  <td class="mono"><a class="link" href={`/share?id=${r.id}`}>{r.id}</a></td>
+                  <td class="num">{(r.bps / 100).toFixed(2)}%</td>
+                  <td class="num">0</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot><tr><td colspan="2">Total</td><td class="num">100.00%</td><td></td></tr></tfoot>
+          </table>
+        </div>
+        <figcaption id="sheet-cap" class="caption">Read from testnet on 2026-11-13 (UTC). <a class="link" href={DASHBOARD_URL}>See the live values</a>.</figcaption>
+      </figure>
     </div>
   </section>
 
-  <!-- PROBLEM -->
-  <section class="problem sec-lg pad" id="problem">
+  <section class="section" id="problem">
     <div class="container">
-      <h2 class="center sec-h" data-split-lines>Every song has many owners.<br /><span class="muted">Every payer keeps its own list.</span></h2>
-      <div class="pcards">
-        {problems.map((p) => (
-          <article class="pcard" data-stagger>
-            <div class="pcard-img"><img src={`/placeholder-ill-${p.img}.svg`} alt="" /></div>
-            <div class="pcard-body"><h5>{p.t}</h5><p class="muted">{p.d}</p></div>
-          </article>
-        ))}
+      <div class="section-head">
+        <p class="eyebrow">Who it is for</p>
+        <h2>Every song has many owners, and every payer keeps its own list</h2>
+        <p class="lead">Split sheets, contracts and payer databases often disagree, and a catalog sale has to reach every payer before money goes to the new owner. {PROJECT_NAME} keeps one record per share that every member reads.</p>
       </div>
-    </div>
-  </section>
-
-  <!-- DARK PANEL COMPARISON -->
-  <section class="pad">
-    <div class="container panel-dark" data-stagger>
-      <div class="pd-left">
-        <h2 data-split-lines>Pay the share,<br />not the <span class="accent">person</span></h2>
-        <a class="btn no-chip" href="#how">How it works</a>
-      </div>
-      <div class="pd-table" role="table" aria-label="Comparison">
-        <div class="pd-col pd-old" role="rowgroup">
-          <div class="pd-colh" role="columnheader">Without a shared registry</div>
-          {compare.map(([k, a]) => <div class="pd-row" role="row"><span class="pd-k">{k}</span><span>{a}</span></div>)}
-        </div>
-        <div class="pd-col pd-new" role="rowgroup">
-          <div class="pd-colh" role="columnheader">With {PROJECT_NAME}</div>
-          {compare.map(([k, , b]) => <div class="pd-row" role="row"><span class="dot"></span><span>{b}</span></div>)}
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="ledger people">
+            <thead><tr><th>Who</th><th>What they need to do</th><th>Where</th></tr></thead>
+            <tbody>{people.map((p) => <tr><td><strong>{p.who}</strong></td><td>{p.job}</td><td><a class="link" href={p.href}>{p.where}</a></td></tr>)}</tbody>
+          </table>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- HOW IT WORKS DIAGRAM -->
-  <section class="how sec-lg pad" id="how">
+  <section class="section" id="how">
     <div class="container">
-      <div class="center how-head">
-        <h2 data-split-lines>How it works</h2>
-        <p class="lead" data-stagger>One registry contract. One vault per share. No keys on any vault.</p>
+      <div class="section-head">
+        <p class="eyebrow">How it works</p>
+        <h2>Four steps, all enforced by the contract</h2>
       </div>
-      <div class="diagram" data-diagram>
-        <div class="dg-top">
-          <div class="dg-logo" data-dg="logo"><span class="dg-mark">R</span></div>
-          <div class="dg-vline" data-dg="vline"></div>
-          <div class="dg-connector" data-dg="connector"></div>
-          <div class="dg-branches">
-            {['Payer', 'Agent', 'Member'].map((b) => (
-              <div class="dg-branch"><span class="dg-tick"></span><span class="dg-pill" data-dg="pill">{b}</span><span class="dg-tick short"></span><span class="dg-dot" data-dg="dot"></span></div>
-            ))}
-          </div>
-        </div>
-        <div class="dg-engine" data-dg="engine">
-          <div class="center">
-            <h4>The registry contract</h4>
-            <p class="muted">Records works, shares and splits. Moves money only by its rules.</p>
-          </div>
-          <div class="dg-cards">
-            {steps.map((s) => (
-              <div class="dg-card" data-dg="card">
-                <span class="mono accent">{s.n}</span>
-                <h5>{s.t}</h5>
-                <p class="muted">{s.d}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div class="dg-link" data-dg="link"><span class="dg-dot on"></span></div>
-        <div class="dg-vaults" data-dg="vaults">
-          <div class="dgv-text">
-            <p class="dgv-t"><span class="mono accent">&#9679;</span> Share vaults</p>
-            <p class="muted">Each share has its own payout account. It has zero access keys, so only the registry contract can move money out.</p>
-            <span class="tag-ph">Example data</span>
-          </div>
-          <div class="dgv-orbs">
-            {vaults.map((v, i) => (
-              <div class="orb-wrap" data-dg="orb"><span class="orb" style={`--h:${i}`}></span><span class="mono orb-l">{v}</span><span class="mono orb-k">keys: 0</span></div>
-            ))}
-          </div>
-        </div>
-        <div class="dg-link" data-dg="link"><span class="dg-dot on"></span></div>
-        <div class="dg-foot" data-dg="foot">
-          <span class="tag-sim">Simulated</span>
-          <p>Payers, statements and the catalog sale on this site are example data. Contract deployment to NEAR testnet is planned.</p>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- AGENTS AUTO TABS -->
-  <section class="agents sec-lg pad" id="agents">
-    <div class="container agents-grid">
-      <div class="agents-left">
-        <p class="eyebrow">Agents</p>
-        <h2 data-split-lines>Agents pay from capped allowances</h2>
-        <p class="lead">Software can pay for music without holding the keys to anyone's money.</p>
-      </div>
-      <div class="tabs" data-tabs>
-        {agentTabs.map((t, i) => (
-          <button class={`tab ${i === 0 ? 'is-active' : ''}`} data-tab>
-            <span class="tab-head"><svg class="tab-ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .8l1.9 1.4 2.3-.2.7 2.2 1.9 1.4-.8 2.2.8 2.2-1.9 1.4-.7 2.2-2.3-.2L8 15.2l-1.9-1.4-2.3.2-.7-2.2-1.9-1.4.8-2.2-.8-2.2 1.9-1.4.7-2.2 2.3.2z" fill="currentColor"/><path d="M5.2 8.2l1.8 1.8 3.8-3.8" fill="none" stroke="#fff" stroke-width="1.5"/></svg><span class="tab-t">{t.t}</span><span class="mono tab-n">0{i + 1}</span></span>
-            <span class="tab-body"><span class="tab-d">{t.d}</span></span>
-            <span class="tab-bar"><span class="tab-prog" data-prog></span></span>
-          </button>
+      <ol class="steps">
+        {steps.map((s, i) => (
+          <li>
+            <span class="step-n mono">{String(i + 1).padStart(2, '0')}</span>
+            <div><h3>{s.t}</h3><p class="muted">{s.d}</p></div>
+            <code class="step-m">{s.m}</code>
+          </li>
         ))}
-      </div>
+      </ol>
     </div>
   </section>
 
-  <!-- TESTIMONIAL PLACEHOLDER -->
-  <section class="voices sec-lg pad">
+  <section class="section" id="lifecycle">
     <div class="container">
-      <div class="center">
-        <p class="eyebrow">Voices</p>
-        <h2 class="sec-h" data-split-lines>What people say <span class="accent">goes here</span></h2>
+      <div class="section-head">
+        <p class="eyebrow">The catalog sale, on testnet</p>
+        <h2>Share s2 was sold. The address stayed. The money followed.</h2>
+        <p class="lead">These are the real transactions, in order. Open any of them on the explorer.</p>
       </div>
-      <div class="v-tabs" data-vtabs>
-        {quotes.map((q, i) => <button class={`v-tab ${i === 0 ? 'is-active' : ''}`} data-vtab><img src={`/placeholder-logo-${q}.svg`} alt={`placeholder logo ${q}`} /></button>)}
-      </div>
-      <div class="v-stage">
-        {quotes.map((q, i) => (
-          <div class={`v-slide ${i === 0 ? 'is-active' : ''}`} data-vslide>
-            <div class="v-quote">
-              <span class="tag-ph">Placeholder quote {q}</span>
-              <p class="v-text">A real quote goes here. <mark>We will not publish one</mark> until a real person says it and agrees to it.</p>
-              <div class="v-foot"><div><p class="v-name">Name placeholder</p><p class="muted v-role">Role placeholder</p></div><a class="btn no-chip outline" href="#voices-placeholder">Read more</a></div>
-            </div>
-            <div class="v-photo"><img src="/placeholder-portrait.svg" alt="placeholder portrait" /></div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </section>
-
-  <!-- LIFECYCLE, PINNED HORIZONTAL -->
-  <section class="life" id="lifecycle" data-life>
-    <div class="life-pin">
-      <div class="center life-head pad">
-        <p class="eyebrow">The share lifecycle</p>
-        <h2>Register. Mint. Pay. <span class="accent">Claim. Sell.</span></h2>
-      </div>
-      <div class="life-rail">
-        <div class="life-line"><span class="life-fill" data-life-fill></span></div>
-        <div class="life-track" data-life-track>
-          {life.map((l) => (
-            <article class="life-card">
-              <span class="life-stem"></span>
-              <div class="life-in">
-                <span class="mono accent">{l.n}</span>
-                <h4>{l.t}</h4>
-                <span class="life-dash"></span>
-                <p>{l.d}</p>
-              </div>
-            </article>
-          ))}
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="ledger">
+            <thead><tr><th>Step</th><th>What happened</th><th>Result</th><th>Transaction</th></tr></thead>
+            <tbody>
+              {sale.map((s) => (
+                <tr>
+                  <td><strong>{s.step}</strong>{s.simulated && <span class="badge sim">Simulated payer</span>}</td>
+                  <td>{s.what}<br /><span class="small muted">{s.shows}</span></td>
+                  <td>{s.result === 'refused' ? <span class="badge bad">Refused</span> : <span class="badge ok">Done</span>}</td>
+                  <td>{s.txs.map((h) => <a class="acct-link" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+        <div class="panel-foot">All on 2026-11-13 (UTC). Vault s2.reg.royltee-dev.testnet had 0 access keys before and after the sale. <a class="link" href="/share?id=s2">Check it live on the share page</a>.</div>
       </div>
     </div>
   </section>
 
-  <!-- TRUST GRID -->
-  <section class="trust sec-lg" id="trust">
-    <h2 class="center pad sec-h" data-split-lines>Trust and privacy</h2>
-    <div class="trust-grid">
-      {trust.map((t) => (
-        <div class="trust-cell" data-stagger>
-          <svg class="trust-ico" viewBox="0 0 80 80" fill="none" stroke="currentColor" stroke-width="1">
-            {t.icon === 'key' && <g><circle cx="40" cy="40" r="26" stroke-dasharray="3 4"/><rect x="28" y="36" width="24" height="18" rx="2"/><path d="M33 36v-6a7 7 0 0114 0v6"/><path d="M22 58L58 22" stroke="var(--amber)"/></g>}
-            {t.icon === 'scale' && <g><path d="M40 16v48M24 64h32M18 30h44"/><path d="M18 30l-8 16h16zM62 30l-8 16h16z"/><circle cx="40" cy="16" r="3" fill="var(--amber)" stroke="none"/></g>}
-            {t.icon === 'pause' && <g><circle cx="40" cy="40" r="24"/><circle cx="40" cy="40" r="32" stroke-dasharray="2 5"/><path d="M35 30v20M45 30v20" stroke="var(--amber)"/></g>}
-            {t.icon === 'lock' && <g><rect x="16" y="20" width="30" height="40" rx="2"/><path d="M22 30h18M22 38h12M22 46h16"/><path d="M50 40h14" stroke-dasharray="2 3"/><text x="52" y="36" font-size="7" fill="var(--amber)" stroke="none" font-family="monospace">hash</text></g>}
-          </svg>
-          <h5>{t.t}</h5>
-          <p class="muted">{t.d}</p>
-        </div>
-      ))}
-    </div>
-  </section>
-
-  <!-- RESOURCES -->
-  <section class="res sec-lg pad">
+  <section class="section" id="agents">
     <div class="container">
-      <h2 class="res-h">Read more</h2>
-      <div class="res-grid">
-        {resources.map((r, i) => (
-          <a class="res-card" href={r.href} data-card-fade>
-            <div class="res-thumb frame gridbg"><span class="tag-mono">{r.f}</span><span class="res-ph mono">placeholder-{r.k.toLowerCase()}</span></div>
-            <div class="res-body"><span class="tag">{r.k}</span><p>{r.t}</p><span class="tag-ph">Placeholder link</span></div>
-          </a>
-        ))}
+      <div class="section-head">
+        <p class="eyebrow">Holder powers and agent limits</p>
+        <h2>Short lists, enforced in code</h2>
+        <p class="lead">An agent holds a key that can only call two methods. Anything that moves ownership needs a deposit, and that key type cannot attach one.</p>
       </div>
+      <div class="powers">
+        <div class="panel"><div class="panel-head"><h3>A share holder can</h3></div><ul class="checks">{holder.map((h) => <li>{h}</li>)}</ul></div>
+        <div class="panel"><div class="panel-head"><h3>A payment agent can</h3></div><ul class="checks">{agent.map((h) => <li>{h}</li>)}</ul><div class="panel-foot"><a class="link" href="/agents">See the live agent role</a></div></div>
+        <div class="panel"><div class="panel-head"><h3>Nobody can</h3></div><ul class="checks no">{nobody.map((h) => <li>{h}</li>)}</ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="trust">
+    <div class="container">
+      <div class="section-head">
+        <p class="eyebrow">Real and Simulated</p>
+        <h2>What runs on chain, and what is a stand in</h2>
+      </div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="ledger">
+            <thead><tr><th>Real, on NEAR testnet</th><th>Simulated</th></tr></thead>
+            <tbody>{real.map(([a, b]) => <tr><td>{a}</td><td>{b}</td></tr>)}</tbody>
+          </table>
+        </div>
+        <div class="panel-foot">The registrar is a trusted role: every registrar action carries a document hash and emits an event. The registry and token accounts still hold one full access key each, so the registry itself is not keyless yet. The contracts use no trusted execution environment.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="verify">
+    <div class="container verify">
+      <div class="section-head">
+        <p class="eyebrow">Check it yourself</p>
+        <h2>No wallet needed</h2>
+        <p class="lead">Ask a public testnet node for the access keys of the share account that was sold. The answer is an empty list.</p>
+      </div>
+      <pre class="code"><code>{curl}</code></pre>
+      <p class="muted">From a clone of the repository, <code class="mono">npm run verify:testnet</code> checks all seven share accounts, the code hashes and the balances.</p>
     </div>
   </section>
 </Base>
 
 <style>
-  /* HERO: full bleed art, nav floats over it */
-  .hero { position: relative; margin-top: -6.25rem; min-height: 44rem; display: flex; align-items: center; overflow: hidden; }
-  .hero-art { position: absolute; inset: 0; }
-  .hero-art img { width: 100%; height: 115%; object-fit: cover; object-position: 70% 50%; }
-  .hero-shade { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(251,248,241,.85) 0%, rgba(251,248,241,.35) 50%, rgba(251,248,241,0) 75%); }
-  .hero-body { position: relative; padding-top: 9rem; padding-bottom: 6rem; }
-  .hero-tag { margin-bottom: 1.5rem; }
-  .hero-h { max-width: 54rem; font-size: clamp(2.5rem, 4.6vw, 4rem); line-height: 1.1; letter-spacing: -.02em; color: var(--ink); }
-  .hero-strong { display: block; font-weight: 600; }
-  .hero-light { display: block; font-weight: 300; }
-  .hero-sub { max-width: 36rem; margin-top: 1.25rem; font-size: 1.125rem; color: var(--ink2); }
-  .hero-ctas { display: flex; align-items: center; gap: 1.75rem; margin-top: 2.25rem; flex-wrap: wrap; }
-  .hero-link { color: var(--ink); }
-
-  /* UPDATES: tinted band, soft cards */
-  .updates { background: var(--bg2); }
-  .updates-in { display: grid; grid-template-columns: 12rem 1fr; gap: 2rem; padding-top: 1.25rem; padding-bottom: 1.25rem; max-width: 90rem; margin: 0 auto; }
-  .updates-head { display: flex; flex-direction: column; justify-content: space-between; }
-  .updates-title { font-size: 1.25rem; font-weight: 500; line-height: 1.3; }
-  .updates-nav { display: flex; gap: .5rem; }
-  .sq { width: 2.25rem; height: 2.25rem; display: grid; place-items: center; border-radius: var(--r-xs); border: 0; background: var(--panel); color: var(--text); cursor: pointer; transition: background-color .2s, color .2s; }
-  .sq:hover { background: var(--ink); color: #fff; }
-  .updates-list { display: flex; gap: .875rem; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; }
-  .updates-list::-webkit-scrollbar { display: none; }
-  .up-card { flex: 0 0 calc((100% - 1.75rem) / 3); scroll-snap-align: start; display: grid; grid-template-columns: 9rem 1fr; gap: 1rem; padding: .5rem; border-radius: var(--r-sm); background: var(--bg); border: 1px solid #e5e2d9; transition: background-color .3s; }
-  .up-card:hover { background: var(--panel); }
-  .up-thumb { min-height: 6.5rem; border-radius: var(--r-xs); }
-  .up-text { display: flex; flex-direction: column; gap: .4rem; font-size: .9rem; font-weight: 500; line-height: 1.3; padding: .25rem 0; }
-  .up-text .link-arrow { margin-top: auto; font-size: .8rem; font-weight: 400; color: var(--muted); }
-
-  /* LOGOS MARQUEE */
-  .logos-h { font-size: 1.25rem; margin-bottom: 2.25rem; padding: 0 var(--gutter); }
-  .marquee { position: relative; overflow: hidden; display: grid; gap: 1.25rem; }
-  .marquee::before, .marquee::after { content: ''; position: absolute; top: 0; bottom: 0; width: 12rem; z-index: 2; pointer-events: none; }
-  .marquee::before { left: 0; background: linear-gradient(90deg, var(--bg), transparent); }
-  .marquee::after { right: 0; background: linear-gradient(270deg, var(--bg), transparent); }
-  .mq-row { display: flex; width: max-content; }
-  .mq-track { display: flex; gap: 3rem; padding-right: 3rem; animation: mq 40s linear infinite; }
-  .mq-row.rev .mq-track { animation-direction: reverse; animation-duration: 48s; }
-  .marquee:hover .mq-track { animation-play-state: paused; }
-  @keyframes mq { from { transform: translateX(0); } to { transform: translateX(-100%); } }
-
-  /* PROBLEM CARDS: white, hairline border, 20px radius, tinted art half */
-  .sec-h { margin-bottom: 4rem; }
-  .pcards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; }
-  .pcard { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--panel); overflow: hidden; transition: border-color .4s; }
-  .pcard-img { background: var(--band); aspect-ratio: 12 / 7; display: grid; place-items: center; overflow: hidden; border-bottom: 1px solid var(--line); }
-  .pcard-img img { width: 100%; transition: transform .6s var(--ease-line); }
-  .pcard:hover { border-color: var(--line3); }
-  .pcard:hover .pcard-img img { transform: scale(1.06); }
-  .pcard-body { padding: 1.75rem 1.5rem 2rem; text-align: center; display: grid; gap: .75rem; }
-  .pcard-body p { font-size: .9rem; color: var(--muted); }
-
-  /* DARK STATEMENT PANEL: the one dark block mid page */
-  .panel-dark { display: grid; grid-template-columns: 1fr 1.05fr; gap: 3rem; align-items: center; padding: 5rem 4.5rem; border-radius: var(--r-md); background: var(--ink); color: #fff; position: relative; overflow: hidden; }
-  .panel-dark::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle at 15% 120%, rgba(245,165,36,.18), transparent 45%), linear-gradient(to right, rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,.035) 1px, transparent 1px); background-size: auto, 40px 40px, 40px 40px; pointer-events: none; }
-  .panel-dark > * { position: relative; }
-  .pd-left h2 { margin-bottom: 2rem; }
-  .pd-left .accent { color: var(--amber2); }
-  .pd-table { display: grid; grid-template-columns: 1fr 1fr; font-size: .875rem; }
-  .pd-col { border: 1px solid #3a362c; }
-  .pd-old { border-radius: 10px 0 0 10px; border-right: 0; background: #1f1c15; color: #a7a295; margin: 1rem 0; }
-  .pd-new { border-radius: 10px; border-color: var(--amber); background: #2a2214; color: #fff; }
-  .pd-colh { padding: .75rem 1rem; border-bottom: 1px solid #3a362c; font-size: .8rem; }
-  .pd-new .pd-colh { background: var(--amber); color: #2a1a00; border-color: var(--amber); border-radius: 9px 9px 0 0; font-weight: 600; }
-  .pd-row { display: flex; gap: .6rem; align-items: center; padding: .7rem 1rem; border-bottom: 1px dashed #3a362c; min-height: 2.9rem; }
-  .pd-row:last-child { border-bottom: 0; }
-  .pd-k { font-family: var(--mono); font-size: .7rem; color: #8d887c; min-width: 5.5rem; letter-spacing: 0; }
-  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); flex: none; }
-
-  /* DIAGRAM */
-  .how-head { margin-bottom: 3.5rem; }
-  .how-head .lead { margin-top: 1rem; color: var(--ink2); }
-  .dg-top { position: relative; display: flex; flex-direction: column; align-items: center; }
-  .dg-logo { width: 2.75rem; height: 2.75rem; border-radius: var(--r-xs); background: var(--amber); display: grid; place-items: center; z-index: 1; }
-  .dg-mark { font-weight: 700; font-size: 1.25rem; color: var(--ink); letter-spacing: -.04em; }
-  .dg-vline { width: 0; height: 1.5rem; border-left: 1px dashed var(--dim); transform-origin: top; }
-  .dg-connector { width: 66.6%; height: 0; border-top: 1px dashed var(--dim); }
-  .dg-branches { display: grid; grid-template-columns: repeat(3, 1fr); width: 100%; }
-  .dg-branch { display: flex; flex-direction: column; align-items: center; }
-  .dg-tick { width: 0; height: 1.25rem; border-left: 1px dashed var(--dim); }
-  .dg-tick.short { height: 1rem; }
-  .dg-pill { font-size: .875rem; padding: .35rem 1rem; border: 1px solid var(--line2); border-radius: var(--r-lg); background: var(--bg2); color: #524e46; }
-  .dg-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); margin-bottom: -4px; position: relative; z-index: 1; }
-  .dg-engine { border: 1px dashed var(--dim); border-radius: var(--r-md); padding: 2rem 1rem 1rem; display: grid; gap: 1.5rem; }
-  .dg-engine .muted { margin-top: .4rem; color: var(--ink2); }
-  .dg-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
-  .dg-card { padding: 2rem 1.4rem; border-radius: var(--r-sm); background: var(--panel); display: grid; gap: .6rem; align-content: start; text-align: center; transition: box-shadow .3s, transform .3s; }
-  .dg-card:hover { box-shadow: var(--shadow-soft); transform: translateY(-2px); }
-  .dg-card p { font-size: .875rem; color: var(--muted); }
-  .dg-link { height: 2.5rem; width: 0; margin: 0 auto; border-left: 1px dashed var(--dim); display: flex; align-items: flex-end; justify-content: center; }
-  .dg-link .dg-dot { margin-left: -1px; margin-bottom: -4px; }
-  .dg-vaults { border: 1px dashed var(--dim); border-radius: var(--r-md); padding: 2rem; display: grid; grid-template-columns: 1fr 1.6fr; gap: 2rem; align-items: center; }
-  .dgv-t { font-weight: 500; margin-bottom: .5rem; font-size: 1.125rem; }
-  .dgv-text .muted { font-size: .875rem; margin-bottom: .75rem; }
-  .dgv-orbs { display: flex; justify-content: space-between; gap: 1rem; }
-  .orb-wrap { display: flex; flex-direction: column; align-items: center; gap: .4rem; }
-  .orb { width: 3.75rem; height: 3.75rem; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff6e2 0%, var(--amber2) calc(30% + var(--h) * 4%), #d98a0a 100%); box-shadow: 0 8px 20px rgba(217,138,10,.22); position: relative; }
-  .orb::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 1px dashed rgba(143,84,0,.35); animation: spin 18s linear infinite; }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .orb-l { font-size: .75rem; }
-  .orb-k { font-size: .65rem; color: var(--green); }
-  .dg-foot { display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; border-radius: var(--r-md); background: var(--panel); font-size: .9rem; color: var(--muted); }
-
-  /* AGENTS: sticky heading, tinted panel, all items open, progress line under the active one */
-  .agents-grid { display: grid; grid-template-columns: 1fr 1.25fr; gap: 4rem; align-items: start; }
-  .agents-left { position: sticky; top: 8rem; display: grid; gap: 1.25rem; }
-  .agents-left h2 { font-size: 4rem; line-height: 1.1; }
-  .agents-left .lead { color: var(--ink2); }
-  .tabs { border: 1px solid var(--line2); border-radius: var(--r-md); background: var(--bg2); padding: 1.5rem 3rem 2rem; }
-  .tab { display: block; width: 100%; text-align: left; background: none; border: 0; color: var(--text); font: inherit; padding: 1.75rem 0 0; cursor: pointer; }
-  .tab-head { display: flex; align-items: center; gap: .9rem; }
-  .tab-ico { width: 16px; height: 16px; color: var(--dim); flex: none; transition: color .3s; }
-  .tab.is-active .tab-ico { color: var(--amber); }
-  .tab-t { flex: 1; font-size: 1.25rem; font-weight: 500; }
-  .tab-n { font-size: .75rem; color: var(--dim); }
-  .tab-body { display: block; }
-  .tab-d { display: block; color: var(--ink2); padding: 1rem 0 0 1.9rem; max-width: 34rem; }
-  .tab-bar { display: block; height: 1px; background: var(--line2); margin-top: 1.75rem; position: relative; overflow: hidden; }
-  .tab-prog { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: linear-gradient(90deg, var(--amber-tint2), var(--amber) 60%, var(--ink)); }
-  .tab:last-child .tab-bar { opacity: 0; }
-
-  /* VOICES */
-  .voices .sec-h { margin-top: .75rem; margin-bottom: 3rem; }
-  .v-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; margin-bottom: 1.25rem; }
-  .v-tab { background: none; border: 0; border-bottom: 1px solid var(--line2); padding: .75rem 0; cursor: pointer; opacity: .55; transition: opacity .3s, border-color .3s; display: grid; place-items: center; }
-  .v-tab.is-active { opacity: 1; border-color: var(--ink); }
-  .v-tab img { height: 2.5rem; width: auto; }
-  .v-stage { display: grid; }
-  .v-slide { grid-area: 1 / 1; display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem; opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .5s, transform .5s, visibility .5s; }
-  .v-slide.is-active { opacity: 1; visibility: visible; transform: none; }
-  .v-quote { border-radius: var(--r-md); background: var(--bg2); padding: 2rem; display: flex; flex-direction: column; gap: 1.25rem; min-height: 22rem; }
-  .v-text { font-size: 1.5rem; line-height: 1.35; flex: 1; }
-  .v-text mark { background: var(--amber-tint2); color: inherit; padding: 0 .15em; }
-  .v-foot { display: flex; justify-content: space-between; align-items: flex-end; }
-  .v-name { font-weight: 600; font-size: .9rem; }
-  .v-role { font-size: .85rem; }
-  .v-foot .btn { background: var(--panel); padding: .5rem 1rem; font-size: .875rem; }
-  .v-photo { border-radius: var(--r-md); overflow: hidden; }
-  .v-photo img { width: 100%; height: 100%; object-fit: cover; }
-
-  /* LIFECYCLE: pinned, gradient timeline, dark cards */
-  .life { border-top: 1px solid var(--line); overflow: hidden; }
-  .life-pin { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 6rem 0; }
-  .life-head { margin-bottom: 3.5rem; }
-  .life-head .eyebrow { color: var(--muted); }
-  .life-head h2 { margin-top: .75rem; font-size: 3rem; }
-  .life-head .accent { color: var(--amber-ink); }
-  .life-rail { position: relative; }
-  .life-line { height: 2px; background: var(--line2); margin: 0 var(--gutter); }
-  .life-fill { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--ink) 70%, var(--amber)); }
-  .life-track { display: flex; gap: 1.25rem; padding: 0 var(--gutter); width: max-content; }
-  .life-card { width: 20rem; display: flex; flex-direction: column; align-items: center; }
-  .life-stem { height: 6.25rem; border-left: 1px dashed var(--dim); }
-  .life-in { width: 100%; border-radius: var(--r-md); background: var(--ink); color: #fff; padding: 1.5rem 1rem; display: grid; gap: .75rem; text-align: center; min-height: 13rem; align-content: start; }
-  .life-in .accent { color: var(--amber2); }
-  .life-dash { border-top: 1px dashed var(--amber); opacity: .7; }
-  .life-in p { color: #cfcabe; font-size: .9rem; }
-
-  /* TRUST: full width hairline grid */
-  .trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line2); border-bottom: 1px solid var(--line2); }
-  .trust-cell { padding: 3rem 2rem; border-right: 1px solid var(--line2); text-align: center; display: grid; gap: .9rem; justify-items: center; align-content: start; }
-  .trust-cell:last-child { border-right: 0; }
-  .trust-ico { width: 5rem; height: 5rem; color: var(--ink2); margin-bottom: 1rem; }
-  .trust-cell p { font-size: .875rem; max-width: 17rem; color: var(--muted); }
-
-  /* RESOURCES */
-  .res-h { margin-bottom: 2.5rem; }
-  .res-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; }
-  .res-card { border-radius: var(--r-md); background: var(--panel); border: 1px solid var(--line); padding: .5rem; display: grid; gap: .5rem; align-content: start; transition: border-color .3s; }
-  .res-card:hover { border-color: var(--line3); }
-  .res-thumb { aspect-ratio: 16 / 9; display: grid; place-items: center; }
-  .res-ph { font-size: .7rem; color: var(--amber-ink); opacity: .7; }
-  .res-body { padding: .75rem .5rem 1rem; display: grid; gap: .75rem; justify-items: start; }
-
-  /* RESPONSIVE */
+  .hero { padding: var(--s8) 0 var(--s9); }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: var(--s8); align-items: center; }
+  .hero-copy { display: grid; gap: var(--s5); justify-items: start; }
+  .hero-copy h1 { max-width: 15ch; }
+  .sheet { margin: 0; background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-card); box-shadow: var(--shadow-1); overflow: hidden; }
+  .sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s4); padding: var(--s5); border-bottom: 1px solid var(--rule); }
+  .sheet-title { font-size: var(--fs-22); font-weight: 600; margin-top: .25rem; }
+  .sheet-title .mono { font-size: var(--fs-14); font-weight: 500; margin-left: .5rem; }
+  .sheet-meta { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border-bottom: 1px solid var(--rule); }
+  .sheet-meta div { padding: var(--s3) var(--s5); border-right: 1px solid var(--rule); }
+  .sheet-meta div:last-child { border-right: 0; }
+  .sheet-meta dt { font-size: var(--fs-12); color: var(--dim); }
+  .sheet-meta dd { margin: 0; font-weight: 600; font-size: var(--fs-14); }
+  .sheet .holder { display: block; font-weight: 600; }
+  .sheet .acct { display: block; font-size: var(--fs-12); }
+  .sheet .badge { margin-top: .35rem; }
+  .sheet figcaption { padding: var(--s3) var(--s5); border-top: 1px solid var(--rule); }
+  .people td:first-child { white-space: nowrap; }
+  .steps { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--ink); }
+  .steps li { display: grid; grid-template-columns: 4rem 1fr 14rem; gap: var(--s5); padding: var(--s5) 0; border-bottom: 1px solid var(--rule); align-items: start; }
+  .steps h3 { margin-bottom: .35rem; }
+  .steps p { max-width: 42rem; }
+  .step-n { font-size: var(--fs-22); font-weight: 600; color: var(--amber-ink); }
+  .step-m { font-family: var(--mono); font-size: var(--fs-14); color: var(--muted); justify-self: end; text-align: right; }
+  .powers { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s5); }
+  .checks { list-style: none; margin: 0; padding: var(--s3) var(--s5) var(--s4); display: grid; }
+  .checks li { padding: .6rem 0 .6rem 1.6rem; border-bottom: 1px solid var(--rule); position: relative; font-size: var(--fs-14); }
+  .checks li:last-child { border-bottom: 0; }
+  .checks li::before { content: ''; position: absolute; left: .1rem; top: .95rem; width: .7rem; height: .4rem; border-left: 2px solid var(--ok); border-bottom: 2px solid var(--ok); transform: rotate(-45deg); }
+  .checks.no li::before { width: .75rem; height: 2px; border: 0; background: var(--bad); transform: none; top: 1.15rem; }
+  .code { margin: 0 0 var(--s4); padding: var(--s4) var(--s5); background: var(--ink); color: #f1eee6; border-radius: var(--r-card); overflow-x: auto; font-family: var(--mono); font-size: var(--fs-14); line-height: 1.6; }
   @media (max-width: 991px) {
-    .pcards, .dg-cards, .trust-grid, .res-grid { grid-template-columns: repeat(2, 1fr); }
-    .trust-cell:nth-child(2) { border-right: 0; }
-    .trust-cell:nth-child(-n+2) { border-bottom: 1px solid var(--line2); }
-    .panel-dark { grid-template-columns: 1fr; padding: 3rem 2rem; }
-    .agents-grid { grid-template-columns: 1fr; gap: 2rem; }
-    .agents-left { position: static; }
-    .agents-left h2 { font-size: 3rem; }
-    .dg-vaults { grid-template-columns: 1fr; }
-    .up-card { flex-basis: 70%; }
+    .hero-grid { grid-template-columns: 1fr; gap: var(--s6); }
+    .powers { grid-template-columns: 1fr; }
+    .steps li { grid-template-columns: 3rem 1fr; }
+    .step-m { grid-column: 2; justify-self: start; text-align: left; }
   }
   @media (max-width: 767px) {
-    .hero { min-height: 40rem; margin-top: -5.75rem; }
-    .hero-body { text-align: center; padding-top: 9rem; }
-    .hero-h, .hero-sub { margin-left: auto; margin-right: auto; }
-    .hero-ctas { justify-content: center; flex-direction: column; gap: 1.25rem; }
-    .hero-shade { background: linear-gradient(180deg, rgba(251,248,241,.85), rgba(251,248,241,.6) 60%, rgba(251,248,241,.1)); }
-    .updates-in { grid-template-columns: 1fr; gap: 1rem; }
-    .updates-head { flex-direction: row; align-items: center; }
-    .up-card { flex-basis: 88%; grid-template-columns: 7rem 1fr; }
-    .pcards, .dg-cards, .trust-grid, .res-grid { grid-template-columns: 1fr; }
-    .trust-cell { border-right: 0; border-bottom: 1px solid var(--line2); }
-    .trust-cell:last-child { border-bottom: 0; }
-    .pd-table { grid-template-columns: 1fr; gap: .75rem; }
-    .pd-old { border-right: 1px solid #3a362c; border-radius: 10px; margin: 0; }
-    .dg-connector, .dg-branches .dg-tick:first-child { display: none; }
-    .dg-branches { gap: .5rem; }
-    .dgv-orbs { flex-wrap: wrap; justify-content: center; }
-    .dg-foot { flex-direction: column; text-align: center; }
-    .agents-left h2 { font-size: 2.2rem; }
-    .tabs { padding: .5rem 1.25rem 1.25rem; }
-    .v-slide { grid-template-columns: 1fr; }
-    .v-photo { max-height: 14rem; }
-    .v-text { font-size: 1.25rem; }
-    .life-pin { min-height: 0; padding: 4rem 0; }
-    .life-line { display: none; }
-    .life-track { flex-direction: column; width: auto; }
-    .life-card { width: 100%; }
-    .life-stem { height: 1.5rem; }
-    .life-head h2 { font-size: 2.2rem; }
-    .marquee::before, .marquee::after { width: 4rem; }
+    .hero { padding: var(--s6) 0 var(--s7); }
+    .sheet-head, .sheet-meta div, .sheet figcaption { padding-left: var(--s4); padding-right: var(--s4); }
+    .people td:first-child { white-space: normal; }
   }
 </style>
-
-<script>
-  import '../scripts/home';
-</script>

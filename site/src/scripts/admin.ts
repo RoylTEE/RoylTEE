@@ -14,7 +14,7 @@ async function load(more = false) {
     if (!more) list.replaceChildren(...(page.tickets.length ? page.tickets.map(row) : [el('li', { className: 'muted', textContent: 'No tickets.' })]));
     else if (page.tickets.length) { list.querySelector('.muted')?.remove(); list.append(...page.tickets.map(row)); }
     if (ticketCursor) {
-      const moreRow = el('li', { className: 'row' }, el('button', { type: 'button', className: 'btn no-chip outline', textContent: 'Load more tickets' }));
+      const moreRow = el('li', { className: 'row' }, el('button', { type: 'button', className: 'btn sm', textContent: 'Load more tickets' }));
       moreRow.setAttribute('data-more', '');
       moreRow.querySelector('button')!.onclick = () => { void load(true); };
       list.append(moreRow);
@@ -23,12 +23,12 @@ async function load(more = false) {
 }
 function row(t: Ticket) {
   const reply = el('textarea', { maxLength: 2000, rows: 3, placeholder: 'Reply', disabled: t.status === 'closed' });
-  const send = el('button', { className: 'btn no-chip dark', textContent: 'Reply', disabled: t.status === 'closed' });
-  const close = el('button', { className: 'btn no-chip outline', textContent: 'Close', disabled: t.status === 'closed' });
+  const send = el('button', { className: 'btn sm primary', textContent: 'Reply', disabled: t.status === 'closed' });
+  const close = el('button', { className: 'btn sm', textContent: 'Close', disabled: t.status === 'closed' });
   send.onclick = () => act({ action: 'reply', id: t.id, reply: reply.value });
   close.onclick = () => act({ action: 'close', id: t.id });
   return el('li', { className: `ticket ${t.status}` },
-    el('div', { className: 'ticket-head' }, el('strong', { textContent: t.subject }), el('span', { className: 'tag-mono', textContent: t.status })),
+    el('div', { className: 'ticket-head' }, el('strong', { textContent: t.subject }), el('span', { className: `badge ${t.status === 'closed' ? 'plain' : t.status === 'answered' ? 'ok' : 'warn'}`, textContent: t.status })),
     el('p', { className: 'mono muted', textContent: `${t.wallet} . ${new Date(t.createdAt).toISOString().slice(0, 16)} UTC` }),
     el('p', { textContent: t.message }), ...(t.reply ? [el('p', { className: 'reply', textContent: `Reply: ${t.reply}` })] : []),
     ...(t.closedAt ? [el('p', { className: 'muted', textContent: `Closed. Deleted 30 days after ${new Date(t.closedAt).toISOString().slice(0, 10)}.` })] : []),
