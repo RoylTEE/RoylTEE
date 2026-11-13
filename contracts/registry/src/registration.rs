@@ -129,6 +129,7 @@ impl Registry {
             .works
             .get(&work_id)
             .unwrap_or_else(|| env::panic_str("unknown work"));
+        let registrant = work.registered_by.clone();
         require!(
             !matches!(work.status, WorkStatus::Void { .. }),
             "work is void"
@@ -208,6 +209,10 @@ impl Registry {
                     s.status == ShareStatus::Active && s.dispute.is_none(),
                     "contests names a share that is not active"
                 );
+                require!(
+                    self.is_approved(t),
+                    "contests names a share pending approval: the work registrant can reject it"
+                );
                 // Nobody disputes their own share to hold the group's one
                 // dispute slot (review H2, sham self-dispute).
                 let owner = self.owner_of(t);
@@ -279,6 +284,15 @@ impl Registry {
             },
         );
         self.ledgers.insert(token_id.clone(), Ledger::default());
+        // On-chain split sheet (review M2): a share registered by anyone
+        // but the work registrant waits for the registrant's approval. A
+        // claimant goes to the registrar through its dispute instead.
+        let approval = if contested.is_none() && caller != registrant {
+            Approval::Pending
+        } else {
+            Approval::Approved
+        };
+        self.set_approval(&token_id, approval);
         if let Some(list) = contested {
             self.open_overallocation(&caller, &group_key, &token_id, list);
         }
@@ -301,6 +315,8 @@ impl Registry {
                 "vault": vault,
                 "evidence_hash": evidence_hash,
                 "status": ShareStatus::Pending,
+                "approval": approval.as_str(),
+                "registered_by": caller,
             }),
         );
 
@@ -419,6 +435,7 @@ impl Registry {
             s.status = ShareStatus::Failed;
         }
         self.prune_from_group(&share.group, token_id);
+        self.set_approval(token_id, Approval::Approved);
         if let Some(dispute_id) = claimant_of {
             self.cancel_dispute(dispute_id);
         }

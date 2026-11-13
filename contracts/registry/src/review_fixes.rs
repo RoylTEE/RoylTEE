@@ -257,3 +257,220 @@ fn h3_registrar_cannot_hold_a_credential() {
         drop(c.claim(t.clone()))
     });
 }
+
+// ---------- M2: on-chain split sheet ----------
+
+fn register_as(
+    c: &mut Registry,
+    caller: &str,
+    work_id: WorkId,
+    holder: &str,
+    bps: Bps,
+    contests: Option<Vec<TokenId>>,
+) -> TokenId {
+    call(&acc(caller), NearToken::from_near(1));
+    let _ = c.register_share(
+        work_id,
+        RightType::Publishing,
+        "WW".into(),
+        bps,
+        Basis::Copyright,
+        acc(holder),
+        h('e'),
+        contests,
+    );
+    format!("s{}", c.next_share)
+}
+
+fn finish_mint(c: &mut Registry, t: &TokenId) -> bool {
+    callback(ok(b""));
+    let _ = c.on_vault_created(t.clone(), acc("alice.near"));
+    callback(ok(
+        b"{\"total\":\"1250000000000000000000\",\"available\":\"0\"}",
+    ));
+    c.on_vault_ready(t.clone(), acc("alice.near"))
+}
+
+/// M2: a member who did not register the work can no longer take its
+/// payments by registering first. The share is held until the work
+/// registrant approves it; then the held money goes to its vault.
+#[test]
+fn m2_share_by_non_registrant_is_held_until_approved() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001"); // registered by alice
+    let t = register_as(&mut c, "carol.near", w, "carol.near", 10_000, None);
+    assert!(get_logs().join("\n").contains("\"approval\":\"pending\""));
+    assert!(finish_mint(&mut c, &t));
+    assert_eq!(c.get_share_approval(t.clone()), "pending");
+    assert!(matches!(
+        pay_work_msg(&mut c, w, 1_000_000),
+        PromiseOrValue::Value(U128(0))
+    ));
+    assert!(get_logs().join("\n").contains("awaiting_approval"));
+    assert_eq!(ledger(&c, &t).escrowed.0, 1_000_000);
+    assert_eq!(ledger(&c, &t).inbound_pending, 0, "nothing forwarded");
+    assert_eq!(c.get_accounting().escrow_total.0, 1_000_000);
+    // A direct share payment is held too.
+    call(&usdc(), NearToken::from_yoctonear(0));
+    let msg =
+        json!({ "pay_share": { "token_id": t, "period": "2026-Q3", "statement_hash": h('f') } });
+    assert!(matches!(
+        c.ft_on_transfer(acc("payer.near"), U128(5_000), msg.to_string()),
+        PromiseOrValue::Value(U128(0))
+    ));
+    assert_eq!(ledger(&c, &t).escrowed.0, 1_005_000);
+    // Held: no claim, no transfer, no sync, no confirmations.
+    yocto(&acc("carol.near"));
+    assert_panics("nothing to claim", || drop(c.claim(t.clone())));
+    yocto(&acc("carol.near"));
+    assert_panics("not approved", || {
+        c.nft_transfer(acc("bob.near"), t.clone(), None, None, None)
+    });
+    call(&acc("carol.near"), NearToken::from_yoctonear(0));
+    assert_panics("not approved", || drop(c.sync(t.clone())));
+    // Only the work registrant (or the registrar) signs.
+    yocto(&acc("carol.near"));
+    assert_panics("only the work registrant or the registrar", || {
+        c.approve_share(t.clone(), None)
+    });
+    yocto(&acc("bob.near"));
+    assert_panics("only the work registrant or the registrar", || {
+        c.approve_share(t.clone(), None)
+    });
+    call(&acc("alice.near"), NearToken::from_yoctonear(0));
+    assert_panics("exactly 1 yoctoNEAR", || c.approve_share(t.clone(), None));
+    yocto(&acc("alice.near"));
+    c.approve_share(t.clone(), None);
+    assert!(get_logs().join("\n").contains("share_approved"));
+    assert_eq!(c.get_share_approval(t.clone()), "approved");
+    assert_eq!(c.get_accounting().escrow_total.0, 0);
+    settle(&mut c, &t, 1_005_000);
+    yocto(&acc("carol.near"));
+    let _ = c.claim(t.clone());
+    assert_eq!(ledger(&c, &t).total_paid_out.0, 1_005_000);
+    // Approved now: later payments flow straight to the vault.
+    let _ = pay_work_msg(&mut c, w, 10_000);
+    assert_eq!(ledger(&c, &t).inbound_pending, 1);
+}
+
+/// M2: rejection voids the share, frees its bps and moves the held money
+/// to the group's unallocated escrow, so the real owner can register and
+/// the registrar can release it.
+#[test]
+fn m2_reject_voids_share_and_keeps_money_in_the_group() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = register_as(&mut c, "carol.near", w, "carol.near", 10_000, None);
+    assert!(finish_mint(&mut c, &t));
+    let _ = pay_work_msg(&mut c, w, 1_000_000);
+    // A pending share cannot be contested; the registrant rejects it instead.
+    call(&acc("alice.near"), NearToken::from_near(1));
+    assert_panics("pending approval", || {
+        drop(c.register_share(
+            w,
+            RightType::Publishing,
+            "WW".into(),
+            10_000,
+            Basis::Copyright,
+            acc("alice.near"),
+            h('e'),
+            Some(vec![t.clone()]),
+        ))
+    });
+    yocto(&registrar());
+    assert_panics("must give a doc_hash", || c.reject_share(t.clone(), None));
+    yocto(&registrar());
+    c.reject_share(t.clone(), Some(h('6')));
+    assert!(get_logs().join("\n").contains("share_rejected"));
+    assert_eq!(c.get_share(t.clone()).unwrap().status, ShareStatus::Void);
+    assert_eq!(c.get_share_approval(t.clone()), "rejected");
+    let g = group_of(&c, w);
+    assert_eq!((g.active_bps, g.unallocated.0), (0, 1_000_000));
+    assert!(g.shares.is_empty());
+    let acct = c.get_accounting();
+    assert_eq!(
+        (acct.escrow_total.0, acct.unallocated_total.0),
+        (0, 1_000_000)
+    );
+    yocto(&acc("alice.near"));
+    assert_panics("not pending approval", || c.approve_share(t.clone(), None));
+    call(&acc("carol.near"), NearToken::from_yoctonear(0));
+    assert_panics("not approved", || drop(c.sync(t.clone())));
+    // The real owner registers; the registrar releases the held money.
+    let real = mint(&mut c, w, "alice.near", 10_000);
+    assert_eq!(c.get_share_approval(real.clone()), "approved");
+    let key = GroupKey {
+        work_id: w,
+        right_type: RightType::Publishing,
+        territory: "WW".into(),
+    };
+    yocto(&registrar());
+    assert_panics("not active", || {
+        c.release_unallocated(key.clone(), t.clone(), U128(1), h('5'))
+    });
+    yocto(&registrar());
+    c.release_unallocated(key, real.clone(), U128(1_000_000), h('5'));
+    settle(&mut c, &real, 1_000_000);
+    assert_eq!(ledger(&c, &real).known_balance.0, 1_000_000);
+}
+
+/// M2: shares registered by the work registrant, and every share that
+/// existed before the rule (no approval key), are approved.
+#[test]
+fn m2_registrant_shares_and_old_shares_are_approved() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = mint(&mut c, w, "bob.near", 10_000);
+    assert_eq!(c.get_share_approval(t.clone()), "approved");
+    assert!(env::storage_read(b"apv:s1").is_none(), "no key, no state");
+    let extra = c.nft_token(t).unwrap().metadata.unwrap().extra.unwrap();
+    assert!(extra.contains("\"approval\":\"approved\""));
+}
+
+/// M2: a plain deposit sent straight into a rejected share's vault can be
+/// sent back by the registrar, and only for a rejected share.
+#[test]
+fn m2_registrar_recovers_plain_deposits_of_a_rejected_vault() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let ok_share = mint(&mut c, w, "bob.near", 5000);
+    let t = register_as(&mut c, "carol.near", w, "carol.near", 5000, None);
+    assert!(finish_mint(&mut c, &t));
+    yocto(&registrar());
+    assert_panics("only a rejected share", || {
+        drop(c.recover_rejected_vault(ok_share.clone(), acc("payer.near"), U128(10), h('4')))
+    });
+    yocto(&acc("alice.near"));
+    c.reject_share(t.clone(), None);
+    yocto(&acc("alice.near"));
+    assert_panics("registrar only", || {
+        drop(c.recover_rejected_vault(t.clone(), acc("payer.near"), U128(10), h('4')))
+    });
+    yocto(&registrar());
+    let _ = c.recover_rejected_vault(t.clone(), acc("payer.near"), U128(10), h('4'));
+    callback(ok(b""));
+    assert!(c.on_rejected_vault_recovered(t.clone(), acc("payer.near"), U128(10), h('4')));
+    assert!(get_logs().join("\n").contains("rejected_vault_recovered"));
+}
+
+/// M2: voiding a work moves money held for a pending share to the group's
+/// unallocated escrow (then L9 lets the registrar refund it).
+#[test]
+fn m2_void_work_moves_held_money_to_unallocated() {
+    let mut c = setup();
+    let w1 = work(&mut c, "USRC12600001");
+    let w2 = work(&mut c, "USRC12600001");
+    let t = register_as(&mut c, "carol.near", w1, "carol.near", 10_000, None);
+    assert!(finish_mint(&mut c, &t));
+    let _ = pay_work_msg(&mut c, w1, 50_000);
+    assert_eq!(ledger(&c, &t).escrowed.0, 50_000);
+    let id = match c.get_work(w2).unwrap().status {
+        WorkStatus::DuplicateOpen { dispute_id, .. } => dispute_id,
+        s => panic!("{s:?}"),
+    };
+    resolve(&mut c, id, Outcome::SwapPayable);
+    assert_eq!(c.get_share_approval(t.clone()), "rejected");
+    assert_eq!(group_of(&c, w1).unallocated.0, 50_000);
+    let acct = c.get_accounting();
+    assert_eq!((acct.escrow_total.0, acct.unallocated_total.0), (0, 50_000));
+}

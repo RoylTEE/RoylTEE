@@ -102,6 +102,10 @@ impl Registry {
                 && self.share(&token_id).dispute.is_none(),
             "share is not active or is in dispute"
         );
+        require!(
+            self.is_approved(&token_id),
+            "share is not approved by the work registrant"
+        );
         let initial = env::storage_usage();
         if let Some(s) = self.shares.get_mut(&token_id) {
             s.payer_attestation = Some(Attestation {
@@ -140,6 +144,10 @@ impl Registry {
         require!(
             share.status == ShareStatus::Active && share.dispute.is_none(),
             "share is not active or is in dispute"
+        );
+        require!(
+            self.is_approved(&token_id),
+            "share is not approved by the work registrant"
         );
         let owner = self.owner_of(&token_id);
         require!(
@@ -188,6 +196,7 @@ impl Registry {
                 self.shares
                     .get(*t)
                     .is_some_and(|s| s.status == ShareStatus::Active)
+                    && self.is_approved(t)
             })
             .filter_map(|t| self.owner_of(t))
             .filter(|o| Some(o) != own.as_ref())

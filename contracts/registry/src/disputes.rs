@@ -286,7 +286,7 @@ impl Registry {
         self.escrow_total += amount;
     }
 
-    fn take_escrow(&mut self, token_id: &TokenId) -> u128 {
+    pub(crate) fn take_escrow(&mut self, token_id: &TokenId) -> u128 {
         let amount = self
             .ledgers
             .get_mut(token_id)
@@ -338,14 +338,23 @@ impl Registry {
                 group.reserved_bps == 0,
                 "shares of this work are still minting"
             );
+            let mut held = 0u128;
             for t in &group.shares {
                 if self.share(t).status == ShareStatus::Active {
                     self.set_void(t, dispute_id);
+                    // A share still waiting for approval: its held money
+                    // joins the group's unallocated escrow (review M2).
+                    if self.approval(t) == Approval::Pending {
+                        held += self.take_escrow(t);
+                        self.set_approval(t, Approval::Rejected);
+                    }
                 }
             }
             if let Some(g) = self.groups.get_mut(key) {
                 g.active_bps = 0;
+                g.unallocated = U128(g.unallocated.0 + held);
             }
+            self.unallocated_total += held;
         }
         if let Some(w) = self.works.get_mut(&work_id) {
             w.status = WorkStatus::Void { dispute_id };

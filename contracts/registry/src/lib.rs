@@ -18,6 +18,7 @@ use near_sdk::{
 };
 
 mod agents;
+mod approval;
 mod disputes;
 mod holder;
 pub mod logic;
@@ -27,6 +28,7 @@ mod nft;
 mod registration;
 pub mod types;
 
+use approval::Approval;
 use types::*;
 
 /// Custom event standard. Name-neutral on purpose (DESIGN.md section 13).

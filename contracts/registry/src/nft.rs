@@ -187,6 +187,10 @@ impl Registry {
             self.share(&token_id).dispute.is_none(),
             "share is frozen by a dispute"
         );
+        require!(
+            self.is_approved(&token_id),
+            "share is not approved by the work registrant"
+        );
         let ledger = self
             .ledgers
             .get(&token_id)
@@ -317,6 +321,10 @@ impl Registry {
             "share is not transferable"
         );
         require!(share.dispute.is_none(), "share is frozen by a dispute");
+        require!(
+            self.is_approved(token_id),
+            "share is not approved by the work registrant"
+        );
         let ledger = self
             .ledgers
             .get(token_id)
@@ -396,6 +404,7 @@ impl Registry {
             "payer_attestation": share.payer_attestation,
             "note": share.note,
             "status": share.status,
+            "approval": self.approval(&share.token_id).as_str(),
             "vault": share.vault,
             "earned": v.earned,
             "paid_out": v.total_paid_out,
