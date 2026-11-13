@@ -1655,5 +1655,18 @@
     "status": "parked",
     "transactions": [],
     "note": "The owner asked to keep the registry and mock USDC full-access keys until they say they can be deleted. list-keys still shows one full-access key on each account."
+  },
+  "token_owners": {
+    "observed_at_utc": "2026-11-13T15:01:00Z",
+    "source": "nft_tokens view call on reg.royltee-dev.testnet (read only). s2 moved to buyer-pub in the step 11 catalog sale (HZ9pD2kLbqbjmKqC68ao6KBTUpQmQstyd2Tro8hWwYPy); the others are the holders at mint. npm run verify:testnet fails if a live owner differs or a token is missing from this list. Update it after any transfer or mint on testnet.",
+    "owners": {
+      "s1": "writer-a.royltee-dev.testnet",
+      "s2": "buyer-pub.royltee-dev.testnet",
+      "s3": "writer-a.royltee-dev.testnet",
+      "s4": "buyer-pub.royltee-dev.testnet",
+      "s5": "writer-a.royltee-dev.testnet",
+      "s6": "writer-b.royltee-dev.testnet",
+      "s7": "writer-b.royltee-dev.testnet"
+    }
   }
 }

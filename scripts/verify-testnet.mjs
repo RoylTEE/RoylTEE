@@ -7,8 +7,11 @@
 //  1. every share vault s<N>.REG has zero access keys (T1, T20)
 //  2. code hashes of the registry, mock USDC and every vault equal the record (T13)
 //  3. the registry and mock USDC key counts equal the record (T13 current state)
-//  4. every share token names its own vault account
-//  5. solvency: the registry's tracked counters <= its mock USDC balance (T31)
+//  4. every share token names its own vault account, that vault is in the
+//     record (so checks 1 and 2 cover it), and its owner equals
+//     token_owners in the record (for example s2 after the catalog sale)
+//  5. solvency: the registry's tracked counters <= its mock USDC balance (T31);
+//     a missing counter is a failure, not a zero
 //
 // RPC endpoint: NEAR_RPC_URL, default https://rpc.testnet.near.org
 import { readFileSync } from 'node:fs';
@@ -23,6 +26,7 @@ const accounts = record.accounts;
 const reg = Object.values(accounts).find((a) => a.variable === 'REG');
 const usdc = Object.values(accounts).find((a) => a.variable === 'USDC');
 const vaults = Object.values(accounts).filter((a) => /^S\d+$/.test(a.variable));
+const owners = (record.token_owners && record.token_owners.owners) || {};
 
 let failures = 0;
 const pass = (msg) => console.log(`PASS  ${msg}`);
@@ -83,17 +87,28 @@ for (const c of [reg, usdc]) {
 }
 
 const tokens = await view(reg.account_id, 'nft_tokens', { from_index: '0', limit: 100 });
+const recordedVaults = new Set(vaults.map((v) => v.account_id));
 for (const t of tokens) {
   const extra = JSON.parse(t.metadata.extra || '{}');
   const expected = `${t.token_id}.${reg.account_id}`;
   extra.vault === expected
-    ? pass(`token ${t.token_id} owner ${t.owner_id}, vault ${extra.vault}, status ${extra.status}, earned ${extra.earned}, paid out ${extra.paid_out}`)
+    ? pass(`token ${t.token_id} vault ${extra.vault}, status ${extra.status}, earned ${extra.earned}, paid out ${extra.paid_out}`)
     : fail(`token ${t.token_id} names vault ${extra.vault}, expected ${expected}`);
+  recordedVaults.has(extra.vault)
+    ? pass(`token ${t.token_id} vault is in the record, so its keys and code hash were checked above`)
+    : fail(`token ${t.token_id} vault ${extra.vault} is not in the record: keys and code hash not checked`);
+  if (!(t.token_id in owners)) fail(`token ${t.token_id} owner ${t.owner_id}: no recorded owner in token_owners`);
+  else if (owners[t.token_id] === t.owner_id) pass(`token ${t.token_id} owner ${t.owner_id}, as recorded`);
+  else fail(`token ${t.token_id} owner ${t.owner_id}, record says ${owners[t.token_id]}`);
+}
+for (const id of Object.keys(owners)) {
+  if (!tokens.some((t) => t.token_id === id)) fail(`token ${id} is in token_owners but not returned by nft_tokens`);
 }
 
 const acct = await view(reg.account_id, 'get_accounting');
-const tracked = ['allowance_total', 'unallocated_total', 'escrow_total', 'undelivered_total', 'forwards_in_flight_total']
-  .reduce((s, k) => s + BigInt(acct[k] ?? '0'), 0n);
+const counters = ['allowance_total', 'unallocated_total', 'escrow_total', 'undelivered_total', 'forwards_in_flight_total'];
+for (const k of counters) if (acct[k] === undefined) fail(`get_accounting has no ${k}`);
+const tracked = counters.reduce((s, k) => s + BigInt(acct[k] ?? '0'), 0n);
 const balance = BigInt(await view(usdc.account_id, 'ft_balance_of', { account_id: reg.account_id }));
 tracked <= balance
   ? pass(`solvency: tracked counters ${tracked} <= registry mock USDC balance ${balance} (base units, 6 decimals)`)
