@@ -2,6 +2,7 @@
 import { allTokens, view, viewAccount, accessKeys, pool } from './chain';
 import { DEPLOY_RECORD, REGISTRY, TOKEN } from '../data/testnet';
 import { h, badge, acct, fig, fail, stamp } from './ui';
+import { keyStatus } from './key-status';
 
 const $ = (s: string) => document.querySelector(s)!;
 const cut = (x: string) => `${x.slice(0, 8)}...${x.slice(-6)}`;
@@ -45,7 +46,7 @@ async function load() {
       h('thead', {}, h('tr', {}, ...['Account', 'Keys', 'Full access', 'Status'].map((x) => h('th', { text: x })))),
       h('tbody', {}, ...([[REGISTRY, regKeys], [TOKEN, usdcKeys]] as const).map(([a, ks]) => h('tr', {},
         h('td', { class: 'p' }, acct(a)), h('td', { class: 'm', text: `${ks.length} key${ks.length === 1 ? '' : 's'}` }), h('td', { class: 'm', text: `${full(ks)} full access` }),
-        h('td', { class: 'p-end' }, full(ks) ? badge('Deletion planned', 'warn') : badge('Keyless', 'ok')))))));
+        h('td', { class: 'p-end' }, ((s) => h('span', { title: s.detail.join('\n') || undefined }, badge(s.text, s.tone), ...s.detail.filter((d) => !d.endsWith('full access')).map((d) => h('div', { class: 'caption mono', text: d }))))(keyStatus(ks))))))));
     stamp(document.querySelector('[data-stamp]'));
   } catch (err) { fail($('[data-code]'), err, () => void load()); }
 }

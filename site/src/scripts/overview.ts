@@ -1,5 +1,5 @@
 /** Overview: the registry statement since mint, totals, and what needs attention. View calls only. */
-import { allTokens, view, accessKeys, tokenBalance, pool, approvalOf, musdc, type Token, type Ledger, type Accounting, type Dispute, type Role } from './chain';
+import { allTokens, allDisputes, view, accessKeys, tokenBalance, pool, approvalOf, musdc, type Token, type Ledger, type Accounting, type Dispute, type Role } from './chain';
 import { AGENTS } from '../data/testnet';
 import { h, badge, fig, fail, stamp, type Tone } from './ui';
 
@@ -15,7 +15,7 @@ async function load() {
       pool(tokens, (t) => accessKeys(t.extra.vault).then((k) => k.length)),
       pool(tokens, (t) => tokenBalance(t.extra.vault)),
       view<Accounting>('get_accounting'),
-      view<Dispute[]>('list_disputes', { from_index: 0, limit: 100 }),
+      allDisputes(),
       pool([...AGENTS], (a) => view<Role | null>('get_role', { agent: a })),
       tokens[0] ? approvalOf(tokens[0]) : Promise.resolve('not deployed'),
     ]);
@@ -43,7 +43,7 @@ async function load() {
     const open = disputes.filter((d) => d.status === 'open').length;
     const active = roles.filter((r) => r && !r.revoked && !r.expired).length;
     $('[data-attention]').replaceChildren(
-      todo('/shares/claims/', claimable.length ? `${claimable.length} share${claimable.length === 1 ? '' : 's'} with money to claim` : 'Nothing to claim', claimable.length ? `${musdc(toClaim)} mUSDC waits for its holders` : 'Every share account is claimed down to zero', claimable.length ? 'Ready to claim' : 'Clear', claimable.length ? 'ok' : 'plain'),
+      todo('/shares/claims/', claimable.length ? `${claimable.length} share${claimable.length === 1 ? '' : 's'} with money to claim` : 'Nothing to claim', claimable.length ? `${musdc(toClaim)} mUSDC waits for its holders` : 'No share has a balance its holder can claim right now', claimable.length ? 'Ready to claim' : 'Clear', claimable.length ? 'ok' : 'plain'),
       todo('/disputes', open ? `${open} open dispute${open === 1 ? '' : 's'}` : 'No open disputes', `${disputes.length} recorded in total; the money in escrow is ${musdc(acc.escrow_total)} mUSDC`, open ? 'Frozen' : 'Clear', open ? 'warn' : 'plain'),
       todo('/catalog/splits/', 'Split sheet approval', approval === 'not deployed' ? 'Not on the deployed build yet; a registry update is planned' : 'Shares waiting for the work registrant are listed per work', approval === 'not deployed' ? 'Not live yet' : 'Live', approval === 'not deployed' ? 'plain' : 'info'),
       todo('/agents', `${active} active payment agent${active === 1 ? '' : 's'}`, 'Capped allowance, scoped key, cannot pick the payee', 'Scripted agent', 'plain'),

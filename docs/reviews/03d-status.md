@@ -16,3 +16,25 @@ Branch: `fix/review-03b` (site), `fix/review-03a` (contract test for L7). Local 
 | L7 grant_role deposit | Checked | Code: role storage is measured and charged, the rest buys lines at 0.001 NEAR (`LINE_STORAGE_BYTES` = 100), any fraction refunded. Unit test `r03d_l7_grant_deposit_of_site_covers_role_storage` (branch `fix/review-03a`): 0.01 NEAR covers role storage with 2 spare lines; 0.015 NEAR buys at least 5 lines. Measured on the branch code in the unit test environment; on the deployed build UNVERIFIED. |
 
 Must fix list from the reviewer: merge (plan in the final report), redeploy decision (recommendation: redeploy after the merge, the in place upgrade test `u01` exists), vault money headline (reworded on `fix/review-03a`), hosted site check (owner's yes, steps in the final report).
+
+## Second reviewer, part 03d
+
+Tests: `site/tests/review-03d-model2.test.ts` (19 tests). Site total on this branch: 219 tests in 18 files.
+
+| Item | Verdict | Change |
+|---|---|---|
+| 1 Draft claims approval protection that the deployed build lacks | REAL | `approvalLive()` asks the registry for `get_share_approval`. If the method is missing (as on the deployed build), the draft says each new share becomes active and is paid as soon as it is minted. Approval wording shows only when the method exists. |
+| 2 Peer shares in the review card always show Approved | REAL | The review card shows each peer's approval as read (Approved, Waiting for approval, Rejected, or Not read). |
+| 3 Dispute id 0 reads as no dispute; approval not defaulted | REAL | `hasDispute` checks only null or undefined, and `shareState` and `transferChecks` use it. `shareState` falls back to `extra.approval`. |
+| 4 Split totals per right only | REAL | `groupTotals` totals per right and territory, and the footer names the territory. |
+| 5 Claims figures mixed; "claimed down to zero" | REAL | `breakdown` separates the vault balance, claimable (the lower of ledger and vault), unsynced and escrow held. The claims page shows unsynced and held figures. The "claimed down to zero" wording is removed from claims and overview. |
+| 6 Draft lists only works that already have shares | REAL | `allWorks()` reads works by id from 0 until the first missing id, so a work with no shares can get its first share. |
+| 7 Keyless shown for accounts with function call keys | REAL | `keyStatus` shows Keyless only when the account has zero keys. Function call keys are listed with their receiver and methods. |
+| 8 Integrated ref and README counts | REAL | Handled in the merge plan. Counts are taken on the merged tree after the owner merges. |
+| 9 Claim tied to transfer rules (void cannot claim) | REAL | `canClaim` follows the contract's claim checks (holder, not suspended, no transfer pending, no payout in flight, balance above zero). Share status is not a condition, so a void share keeps its claim. |
+| 10 Holder tokens and disputes read one page only | REAL | `tokensFor` and `allDisputes` page by 50 until a short page. |
+| 11 Fallback storage price shown as live | REAL | `storagePriceOrEstimate` reports whether the price was read live. The share card and accounts page label the fallback as an UNVERIFIED estimate. |
+| 12 Slow share read can overwrite a newer selection | REAL | A selection generation per target means a stale read does not render. |
+| 13 Thousands separators in input defaults | REAL | `musdcInput` writes input defaults without separators. |
+
+Not changed: the "credential suspended" check on the member claim button passes `suspended: false`, because the page does not read the holder's credential before showing the button. The contract still refuses a suspended holder, and the outcome text reports the refusal.

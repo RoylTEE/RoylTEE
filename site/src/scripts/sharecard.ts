@@ -1,14 +1,14 @@
 /** The share inspector: used beside the catalog table and as the body of the share page. */
-import { view, viewAccount, accessKeys, tokenBalance, storagePrice, approvalOf, musdc, near, pct, utc, short, type Token, type Work, type Share, type Ledger } from './chain';
+import { view, viewAccount, accessKeys, tokenBalance, storagePriceOrEstimate, approvalOf, musdc, near, pct, utc, short, type Token, type Work, type Share, type Ledger } from './chain';
 import { h, badge, acct, shareState, rightLabel, side, provLabel, tierLabel, loading, fail } from './ui';
 
-let priceCache: Promise<bigint> | undefined;
-const price = () => (priceCache ??= storagePrice().catch(() => 10n ** 19n));
+let priceCache: Promise<{ perByte: bigint; live: boolean }> | undefined;
+const price = () => (priceCache ??= storagePriceOrEstimate());
 
-export type ShareData = { token: Token; share: Share; ledger: Ledger; work: Work | null; approval: string; keys: number | null; keyList: string[]; nearBal: bigint; storage: number; perByte: bigint; vaultToken: string };
+export type ShareData = { token: Token; share: Share; ledger: Ledger; work: Work | null; approval: string; keys: number | null; keyList: string[]; nearBal: bigint; storage: number; perByte: bigint; priceLive: boolean; vaultToken: string };
 
 export async function loadShare(token: Token): Promise<ShareData> {
-  const [share, ledger, work, approval, acc, keys, vaultToken, perByte] = await Promise.all([
+  const [share, ledger, work, approval, acc, keys, vaultToken, sp] = await Promise.all([
     view<Share>('get_share', { token_id: token.token_id }),
     view<Ledger>('get_ledger', { token_id: token.token_id }),
     view<Work | null>('get_work', { work_id: token.extra.work_id }),
@@ -18,7 +18,7 @@ export async function loadShare(token: Token): Promise<ShareData> {
     tokenBalance(token.extra.vault),
     price(),
   ]);
-  return { token, share, ledger, work, approval, keys: keys.length, keyList: keys.map((k) => k.public_key), nearBal: BigInt(acc.amount), storage: acc.storage_usage, perByte, vaultToken };
+  return { token, share, ledger, work, approval, keys: keys.length, keyList: keys.map((k) => k.public_key), nearBal: BigInt(acc.amount), storage: acc.storage_usage, perByte: sp.perByte, priceLive: sp.live, vaultToken };
 }
 
 const kv = (rows: [string, Node | string][]) => h('dl', { class: 'kv' }, ...rows.flatMap(([k, v]) => [h('dt', { text: k }), h('dd', {}, v)]));
@@ -45,7 +45,7 @@ export function minBalance(d: ShareData) {
       h('thead', {}, h('tr', {}, h('th', { text: 'Share account NEAR' }), h('th', { class: 'num', text: 'NEAR' }))),
       h('tbody', {}, line('Balance', near(d.nearBal)), line(`Storage reserve (${d.storage.toLocaleString('en-US')} bytes)`, near(reserve), '- ')),
       h('tfoot', {}, line('Above the minimum', near(head), '', true))),
-    h('p', { class: 'caption' }, badge(head > 0n ? 'Above minimum' : 'Below minimum', tone), ' The account must keep enough NEAR to pay for its own storage. Storage price read live from the protocol config.'));
+    h('p', { class: 'caption' }, badge(head > 0n ? 'Above minimum' : 'Below minimum', tone), ` The account must keep enough NEAR to pay for its own storage. ${d.priceLive ? 'Storage price read live from the protocol config.' : 'UNVERIFIED estimate: the live storage price could not be read, so 1e19 yoctoNEAR per byte is assumed.'}`));
 }
 
 export function keysBlock(d: ShareData) {
@@ -90,8 +90,15 @@ export function renderShare(target: Element, d: ShareData, opts: { compact?: boo
     opts.compact ? h('a', { class: 'btn', href: `/share?id=${encodeURIComponent(t.token_id)}`, text: 'Open the full share page' }) : null]));
 }
 
+/** Selection generation per target: a slow read for an earlier selection never overwrites a newer one (second reviewer 03d item 12). */
+const generation = new WeakMap<Element, number>();
+export function nextGeneration(target: Element): () => boolean {
+  const g = (generation.get(target) ?? 0) + 1; generation.set(target, g);
+  return () => generation.get(target) === g;
+}
 export async function inspect(target: Element, token: Token, opts: { compact?: boolean } = {}) {
+  const current = nextGeneration(target);
   target.replaceChildren(loading(`Reading share ${token.token_id}`));
-  try { renderShare(target, await loadShare(token), opts); }
-  catch (err) { fail(target, err, () => void inspect(target, token, opts)); }
+  try { const d = await loadShare(token); if (current()) renderShare(target, d, opts); }
+  catch (err) { if (current()) fail(target, err, () => void inspect(target, token, opts)); }
 }

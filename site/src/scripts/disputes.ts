@@ -1,5 +1,5 @@
 /** Disputes page: list_disputes and the escrow totals, read live. */
-import { view, musdc, utc, short, type Dispute, type Accounting } from './chain';
+import { view, allDisputes, musdc, utc, short, type Dispute, type Accounting } from './chain';
 import { h, badge, acct, fig, stamp, fail, rightLabel } from './ui';
 import { SCENES, txUrl } from '../data/testnet';
 
@@ -7,7 +7,7 @@ const outcomeText: Record<string, string> = { uphold_existing: 'Existing shares 
 
 async function load() {
   try {
-    const [list, acc] = await Promise.all([view<Dispute[]>('list_disputes', { from_index: 0, limit: 50 }), view<Accounting>('get_accounting')]);
+    const [list, acc] = await Promise.all([allDisputes(), view<Accounting>('get_accounting')]);
     const open = list.filter((d) => d.status === 'open').length;
     document.querySelector('[data-dfig]')!.replaceChildren(fig('Open', 'Open', String(open)), fig('Resolved', 'Resolved', String(list.length - open)), fig('Held in dispute escrow', 'In escrow', musdc(acc.escrow_total), 'mUSDC'), fig('Unassigned, waiting for the registrar', 'Unassigned', musdc(acc.unallocated_total), 'mUSDC'));
     const target = document.querySelector('[data-disputes]')!;

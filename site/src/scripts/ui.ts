@@ -1,6 +1,7 @@
 /** Small DOM helpers for the registry pages. Text only: no HTML strings are ever parsed. */
 import { accountUrl, txUrl, ROLE_OF } from '../data/testnet';
 import type { Token } from './chain';
+import { hasDispute } from './transfer-rules';
 
 type Child = Node | string | null | undefined | false;
 export function h<K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}, ...children: Child[]): HTMLElementTagNameMap[K] {
@@ -28,15 +29,17 @@ export const provLabel: Record<string, string> = { human: 'Human', ai_assisted: 
 export const tierLabel: Record<string, string> = { self_asserted: 'Self asserted', counterparty_confirmed: 'Co-holders confirmed', payer_confirmed: 'Payer confirmed' };
 
 /** One workflow state per share, most urgent first. */
-export function shareState(t: Token, approval?: string): { text: string; tone: Tone; why: string } {
+export function shareState(t: Token, approvalArg?: string): { text: string; tone: Tone; why: string } {
   const e = t.extra;
+  // Default to the approval in the token metadata when the caller passes none (second reviewer 03d item 3).
+  const approval = approvalArg ?? e.approval;
   if (approval === 'pending') return { text: 'Waiting for approval', tone: 'warn', why: 'The work registrant has not signed this share yet. Its money is held in escrow.' };
   if (approval === 'rejected') return { text: 'Rejected', tone: 'bad', why: 'The work registrant rejected this share. It is void and is never paid.' };
   if (e.status === 'void') return { text: 'Void', tone: 'plain', why: 'Lost a dispute or its work was voided. Kept as a record, never paid again.' };
-  if (e.dispute) return { text: 'Frozen by dispute', tone: 'bad', why: 'New money for this share goes to escrow until the registrar resolves the dispute.' };
+  if (hasDispute(e.dispute)) return { text: 'Frozen by dispute', tone: 'bad', why: 'New money for this share goes to escrow until the registrar resolves the dispute.' };
   if (e.payout_in_flight) return { text: 'Payout in flight', tone: 'info', why: 'A claim is settling. Transfers wait until it finishes.' };
   if (e.transfer_pending) return { text: 'Transfer pending', tone: 'info', why: 'A transfer call is resolving. Claims wait until it finishes.' };
-  if (e.status === 'active' && BigInt(e.claimable || '0') > 0n) return { text: 'Ready to claim', tone: 'ok', why: 'The holder can claim this balance now.' };
+  if (BigInt(e.claimable || '0') > 0n) return { text: 'Ready to claim', tone: 'ok', why: e.status === 'void' ? 'Void, but the holder can still claim the balance it earned before.' : 'The holder can claim this balance now.' };
   if (e.status === 'active') return { text: 'Active', tone: 'ok', why: 'Paid on every payment to its work.' };
   return { text: e.status, tone: 'plain', why: '' };
 }

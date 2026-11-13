@@ -1,5 +1,5 @@
 /** Your shares, Organisation agents tab: the four org-signed agent controls. Each call is signed by the organisation wallet. */
-import { view, musdc, near, utc, short, type Role } from './chain';
+import { view, musdc, near, utc, short, type Role, musdcInput } from './chain';
 import { sendCalls } from './wallet';
 import { REGISTRY, REGISTRAR, TOKEN_DECIMALS } from '../data/testnet';
 import { h, badge, acct, fail } from './ui';
@@ -73,7 +73,7 @@ export function renderOrg(box: Element, viewing: string, signer: string, status:
     const rc = revokeChecks(org, REGISTRAR, facts);
 
     // withdraw_allowance
-    const amt = inp('o-amt', role ? musdc(role.allowance) : '', { inputmode: 'decimal' }); const wChecks = h('div'); const wAct = h('div');
+    const amt = inp('o-amt', role ? musdcInput(role.allowance) : '', { inputmode: 'decimal' }); const wChecks = h('div'); const wAct = h('div');
     const wUpdate = () => { const a = parseUnits(amt.value, TOKEN_DECIMALS); const c = withdrawChecks(org, orgSuspended, facts, a);
       wChecks.replaceChildren(list(c)); wAct.replaceChildren(signBtn('Withdraw to the organisation', allOk(c), () => void sign('withdraw_allowance', 'withdraw_allowance', { agent, amount: String(a) }, '1', 100))); };
     amt.addEventListener('input', wUpdate); wUpdate();

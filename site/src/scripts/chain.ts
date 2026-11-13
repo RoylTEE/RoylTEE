@@ -82,7 +82,39 @@ export async function allTokens(): Promise<Token[]> {
     if (page.length < 50) return capClaimable(out);
   }
 }
-export const tokensFor = async (account_id: string) => capClaimable((await view<RawToken[]>('nft_tokens_for_owner', { account_id, limit: 100 })).map(parseToken));
+/** Every token of one holder, page by page (second reviewer 03d item 10). */
+export async function tokensFor(account_id: string): Promise<Token[]> {
+  const out: Token[] = [];
+  for (let from = 0; ; from += 50) {
+    const page = await view<RawToken[]>('nft_tokens_for_owner', { account_id, from_index: String(from), limit: 50 });
+    out.push(...page.map(parseToken));
+    if (page.length < 50) return capClaimable(out);
+  }
+}
+/** Every work by id. Ids start at 0 and are never reused, so the first missing id ends the list. */
+export async function allWorks(max = 1000): Promise<Work[]> {
+  const out: Work[] = [];
+  for (let id = 0; id < max; id++) { const w = await view<Work | null>('get_work', { work_id: id }); if (!w) break; out.push(w); }
+  return out;
+}
+/** Every dispute, page by page. */
+export async function allDisputes(): Promise<Dispute[]> {
+  const out: Dispute[] = [];
+  for (let from = 0; ; from += 50) {
+    const page = await view<Dispute[]>('list_disputes', { from_index: from, limit: 50 });
+    out.push(...page);
+    if (page.length < 50) return out;
+  }
+}
+/** Whether the deployed registry has split sheet approval: true only if get_share_approval exists. */
+export async function approvalLive(): Promise<boolean> {
+  try { await view('get_share_approval', { token_id: 's1' }); return true; }
+  catch (err) { if (err instanceof ViewError && err.missingMethod) return false; if (err instanceof ViewError && !/RPC/.test(err.message)) return true; throw err; }
+}
+/** Storage price per byte read live, or a fixed estimate marked as such if the read fails (second reviewer 03d item 11). */
+export async function storagePriceOrEstimate(): Promise<{ perByte: bigint; live: boolean }> {
+  try { return { perByte: await storagePrice(), live: true }; } catch { return { perByte: 10n ** 19n, live: false }; }
+}
 export const oneToken = async (token_id: string) => { const t = await view<RawToken | null>('nft_token', { token_id }); return t ? (await capClaimable([parseToken(t)]))[0] : null; };
 
 /** Split sheet status. The deployed registry predates this view, so a missing method is reported as such. */
@@ -107,6 +139,8 @@ export function units(raw: string | bigint, decimals: number, min = 2, max = dec
   return `${neg ? '-' : ''}${whole.toLocaleString('en-US')}${frac ? '.' + frac : ''}`;
 }
 export const musdc = (raw: string | bigint) => units(raw, TOKEN_DECIMALS, 2);
+/** For input defaults: no thousands separators, so the value parses back unchanged (second reviewer 03d item 13). */
+export const musdcInput = (raw: string | bigint) => musdc(raw).replace(/,/g, '');
 export const near = (yocto: string | bigint) => units(yocto, 24, 4, 4);
 export const pct = (bps: number) => `${(bps / 100).toFixed(bps % 100 ? 2 : 0)}%`;
 export const utc = (ns: string | null | undefined) => ns ? new Date(Number(BigInt(ns) / 1_000_000n)).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : 'none';

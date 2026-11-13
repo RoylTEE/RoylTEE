@@ -1,6 +1,7 @@
 /** Shares, Claims: shares with a claimable balance, the total, and where each holder claims it. */
 import { allTokens, musdc, short } from './chain';
 import { h, badge, fig, shareState, fail, stamp } from './ui';
+import { breakdown } from './claimable';
 
 const target = document.querySelector('[data-claims]')!;
 async function load() {
@@ -9,9 +10,13 @@ async function load() {
     const open = tokens.filter((t) => BigInt(t.extra.claimable) > 0n);
     const total = open.reduce((a, t) => a + BigInt(t.extra.claimable), 0n);
     const paid = tokens.reduce((a, t) => a + BigInt(t.extra.paid_out), 0n);
+    const b = tokens.map((t) => breakdown(t.extra));
+    const unsynced = b.reduce((a, x) => a + x.unsynced, 0n); const held = b.reduce((a, x) => a + x.held, 0n);
     document.querySelector('[data-claim-fig]')!.replaceChildren(
       fig('Waiting to be claimed', 'To claim', musdc(total), 'mUSDC'),
       fig('Shares with a balance', 'Shares', `${open.length}/${tokens.length}`),
+      fig('In share accounts, not synced yet', 'Not synced', musdc(unsynced), 'mUSDC'),
+      fig('Held in dispute escrow', 'Held', musdc(held), 'mUSDC'),
       fig('Claimed by holders since mint', 'Claimed', musdc(paid), 'mUSDC', '', { wide: true }));
     target.replaceChildren(open.length
       ? h('table', { class: 'ledger rows-sm' },
@@ -23,7 +28,7 @@ async function load() {
             h('td', { class: 'x' }, badge(st.text, st.tone)),
             h('td', { class: 'num p-end', text: `${musdc(t.extra.claimable)} mUSDC` }),
             h('td', { class: 'm' }, h('a', { class: 'link', href: `/member?account=${encodeURIComponent(t.owner_id)}#holdings`, text: 'Claim in Your shares' }))); })))
-      : h('div', { class: 'panel-body' }, h('div', { class: 'empty' }, h('p', { text: 'Every share account is claimed down to zero. New money shows up here after the next payment.' }), h('a', { class: 'btn', href: '/activity#payments', text: 'See recorded payments' }))));
+      : h('div', { class: 'panel-body' }, h('div', { class: 'empty' }, h('p', { text: 'No share has a balance its holder can claim right now. Money in a share account that is not synced yet, and money held in escrow, are counted separately above.' }), h('a', { class: 'btn', href: '/activity#payments', text: 'See recorded payments' }))));
     stamp(document.querySelector('[data-stamp]'));
   } catch (err) { fail(target, err, () => void load()); }
 }

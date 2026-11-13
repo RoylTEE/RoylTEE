@@ -200,7 +200,7 @@ describe('review 03d M2: the draft refuses when the group would exceed 100 perce
     expect(overLimit(null, 10000)).toBeNull();
     const m = readFileSync(new URL('../src/scripts/member.ts', import.meta.url), 'utf8');
     expect(m).toMatch(/view<GroupTotals>\('get_group'/);
-    expect(m).toMatch(/On the registry deployed on testnet today, each new share is paid as soon as it is minted/);
+    expect(m).toMatch(/so each new share becomes active and is paid as soon as it is minted/);
   });
 });
 

@@ -1,20 +1,21 @@
 /** Shares, Share accounts: keys, NEAR against the storage minimum, and Mock USDC held, for every share account. */
-import { allTokens, accessKeys, viewAccount, tokenBalance, storagePrice, pool, musdc, near } from './chain';
+import { allTokens, accessKeys, viewAccount, tokenBalance, storagePriceOrEstimate, pool, musdc, near } from './chain';
 import { h, badge, acct, fig, fail, stamp } from './ui';
 
 const target = document.querySelector('[data-accounts]')!;
 async function load() {
   try {
     const tokens = await allTokens();
-    const [keys, accts, held, perByte] = await Promise.all([
-      pool(tokens, (t) => accessKeys(t.extra.vault)), pool(tokens, (t) => viewAccount(t.extra.vault)), pool(tokens, (t) => tokenBalance(t.extra.vault)), storagePrice().catch(() => 10n ** 19n),
+    const [keys, accts, held, sp] = await Promise.all([
+      pool(tokens, (t) => accessKeys(t.extra.vault)), pool(tokens, (t) => viewAccount(t.extra.vault)), pool(tokens, (t) => tokenBalance(t.extra.vault)), storagePriceOrEstimate(),
     ]);
+    const perByte = sp.perByte;
     const rows = tokens.map((t, i) => { const reserve = BigInt(accts[i].storage_usage) * perByte; return { t, keys: keys[i].length, bal: BigInt(accts[i].amount), reserve, head: BigInt(accts[i].amount) - reserve, held: held[i] }; });
     const keyless = rows.filter((r) => r.keys === 0).length, above = rows.filter((r) => r.head > 0n).length;
     document.querySelector('[data-acc-fig]')!.replaceChildren(
       fig('Share accounts', 'Accounts', String(rows.length)),
       fig('With 0 access keys', 'Keyless', `${keyless}/${rows.length}`, '', keyless === rows.length ? badge('All keyless', 'ok') : badge('Check keys', 'bad'), { keep: true }),
-      fig('Above the storage minimum', 'Above minimum', `${above}/${rows.length}`, '', above === rows.length ? badge('All above', 'ok') : badge('Top up needed', 'bad'), { keep: true }),
+      fig(sp.live ? 'Above the storage minimum' : 'Above the storage minimum, UNVERIFIED estimate (live storage price not read)', 'Above minimum', `${above}/${rows.length}`, '', above === rows.length ? badge('All above', 'ok') : badge('Top up needed', 'bad'), { keep: true }),
       fig('Mock USDC held', 'mUSDC held', musdc(rows.reduce((a, r) => a + BigInt(r.held), 0n)), 'mUSDC'),
     );
     target.replaceChildren(h('table', { class: 'ledger rows-sm' },

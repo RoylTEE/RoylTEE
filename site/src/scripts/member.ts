@@ -1,10 +1,10 @@
 /** Your shares: read only lookup, or a connected wallet that can claim, approve, reject and register shares. */
-import { allTokens, tokensFor, view, approvalOf, pool, musdc, pct, short, type Token, type Work, type Ledger } from './chain';
+import { allTokens, allWorks, tokensFor, view, approvalOf, approvalLive, pool, musdc, pct, short, type Token, type Work, type Ledger } from './chain';
 import { connectWallet, disconnectWallet, sendCalls, type RegistryCall } from './wallet';
 import { REGISTRY } from '../data/testnet';
 import { h, badge, acct, shareState, rightLabel, loading, fail, stamp } from './ui';
 import { statement } from './sharecard';
-import { transferChecks, canTransfer } from './transfer-rules';
+import { transferChecks, canTransfer, canClaim } from './transfer-rules';
 import { renderOrg } from './org';
 import { outcomeText } from './tx-outcome';
 import { overLimit, type GroupTotals } from './draft-check';
@@ -49,8 +49,9 @@ function renderHeld(tokens: Token[], ledgers: Ledger[]) {
       h('thead', {}, h('tr', {}, ...['Share', 'Work', 'Role', 'Percent', 'Status', 'Paid in', 'Claimed', 'Claimable', ''].map((t, i) => h('th', { class: i >= 3 && i <= 7 && i !== 4 ? 'num' : undefined, text: t })))),
       h('tbody', {}, ...tokens.map((t, i) => {
         const st = shareState(t); const l = ledgers[i];
-        const can = !!signer && signer === t.owner_id && BigInt(t.extra.claimable) > 0n && t.extra.status === 'active' && !t.extra.payout_in_flight && !t.extra.transfer_pending;
-        const why = !signer ? 'Connect this account to claim' : BigInt(t.extra.claimable) === 0n ? 'Nothing to claim' : can ? '' : 'Not claimable right now';
+        // Claim rules are separate from transfer rules: a void share keeps its claim (second reviewer 03d item 9).
+        const cc = canClaim({ signer, owner: t.owner_id, claimable: BigInt(t.extra.claimable), payoutInFlight: t.extra.payout_in_flight, transferPending: t.extra.transfer_pending, suspended: false });
+        const can = cc.ok; const why = cc.why;
         const btn = h('button', { class: can ? 'btn sm primary' : 'btn sm', type: 'button', text: 'Claim', disabled: !can, title: why || undefined, 'aria-label': `Claim share ${t.token_id}`, onclick: () => void claim(t) });
         return h('tr', {},
           h('td', { class: 'p' }, h('a', { class: 'row-btn', href: `/share?id=${t.token_id}`, text: t.token_id })),
@@ -127,7 +128,8 @@ async function renderApprovals(all: Token[]) {
   const pending = candidates.filter((_, i) => approvals[i] === 'pending');
   if (!mineWorks.size) { ap.replaceChildren(h('div', { class: 'panel-body' }, h('div', { class: 'empty' }, h('p', { text: `${short(viewing)} has not registered any works, so no split sheet waits for its signature.` })))); return; }
   if (!pending.length) { ap.replaceChildren(h('div', { class: 'panel-body' }, h('div', { class: 'empty' }, h('p', { text: 'Nothing waits for a signature. When another member registers a share on one of these works, it appears here for review.' }), h('a', { class: 'btn', href: '#draft-h', text: 'Draft a split sheet' })))); return; }
-  ap.replaceChildren(h('div', { class: 'panel-body' }, ...pending.map((t) => reviewCard(t, all))));
+  const statusOf = new Map(candidates.map((t, i) => [t.token_id, approvals[i]] as const));
+  ap.replaceChildren(h('div', { class: 'panel-body' }, ...pending.map((t) => reviewCard(t, all, statusOf))));
 }
 
 function sheetTable(rows: { holder: string; role: string; bps: number; state: Node }[], total: number) {
@@ -138,10 +140,11 @@ function sheetTable(rows: { holder: string; role: string; bps: number; state: No
 }
 const totalLine = (bps: number) => h('span', { class: 'total' }, 'Total', bps === 10000 ? badge('Equals 100%', 'ok') : bps > 10000 ? badge(`Over by ${pct(bps - 10000)}`, 'bad') : badge(`${pct(10000 - bps)} not assigned`, 'warn'));
 
-function reviewCard(t: Token, all: Token[]) {
+const peerBadge = (a: string | undefined) => a === 'approved' ? badge('Approved', 'ok') : a === 'pending' ? badge('Waiting for approval', 'warn') : a === 'rejected' ? badge('Rejected', 'bad') : badge('Not read', 'plain');
+function reviewCard(t: Token, all: Token[], statusOf: Map<string, string>) {
   const group = all.filter((x) => x.extra.work_id === t.extra.work_id && x.extra.right_type === t.extra.right_type && x.extra.territory === t.extra.territory && x.extra.status === 'active');
   const after = group.reduce((a, x) => a + x.extra.percent_bps, 0);
-  const rows = group.map((x) => ({ holder: x.owner_id, role: rightLabel[x.extra.right_type], bps: x.extra.percent_bps, state: x.token_id === t.token_id ? badge('Waiting for approval', 'warn') : badge('Approved', 'ok') }));
+  const rows = group.map((x) => ({ holder: x.owner_id, role: rightLabel[x.extra.right_type], bps: x.extra.percent_bps, state: x.token_id === t.token_id ? badge('This share: waiting for your signature', 'warn') : peerBadge(statusOf.get(x.token_id) ?? x.extra.approval) }));
   const act = (method: 'approve_share' | 'reject_share') => async () => {
     status.textContent = `Waiting for your wallet to sign ${method}(${t.token_id})...`;
     try { const out = await sendCalls(REGISTRY, [{ method, args: { token_id: t.token_id, doc_hash: null }, deposit: '1', gas: TGAS(100) }]); status.textContent = outcomeText(out, `${method} for ${t.token_id}`, 'Refreshing.'); await refresh(); }
@@ -163,9 +166,10 @@ type Row = { holder: string; role: string; basis: string; percent: string };
 async function draft() {
   const box = q('[data-draft]');
   try {
-    const all = await allTokens();
-    const ids = [...new Set(all.map((t) => t.extra.work_id))].sort((a, b) => a - b);
-    const works = (await pool(ids, (id) => view<Work | null>('get_work', { work_id: id }))).filter((w): w is Work => !!w && w.status === 'active');
+    // Works are read by id from the registry, not taken from existing shares, so a newly registered
+    // work can get its first share here (second reviewer 03d item 6).
+    const [all, allW, live] = await Promise.all([allTokens(), allWorks(), approvalLive()]);
+    const works = allW.filter((w) => w.status === 'active');
     if (!works.length) { box.replaceChildren(h('div', { class: 'empty' }, h('p', { text: 'There are no active works yet. Register the work first with register_work; the README shows the command.' }))); return; }
     let rows: Row[] = [{ holder: '', role: 'publishing', basis: 'copyright', percent: '' }];
     const work = h('select', { id: 'd-work' }, ...works.map((w) => h('option', { value: String(w.id), text: `Work ${w.id}, ${w.code_type.toUpperCase()} ${w.code}` })));
@@ -210,7 +214,7 @@ async function draft() {
       review.replaceChildren(h('div', { class: 'review' },
         h('div', { class: 'insp-head' }, h('h3', { text: 'Review before you sign' }), badge(blocked ? 'Cannot send' : 'Ready to sign', blocked ? 'bad' : 'ok')),
         sheetTable(rows.map((r, i) => ({ holder: r.holder, role: rightLabel[r.role], bps: bpsOf(r), state: creds[i]?.status === 'active' ? badge('Member', 'ok') : badge('No active credential', 'bad') })), rows.reduce((a, r) => a + bpsOf(r), 0)),
-        h('p', { class: 'small muted', text: signer && signer !== w.registered_by ? `You did not register work ${w.id}. On the registry deployed on testnet today, each new share is paid as soon as it is minted, with no approval step. Approval by ${short(w.registered_by)} comes only with the planned registry update.` : `${rows.length} transaction${rows.length > 1 ? 's' : ''} to ${REGISTRY}, 0.2 NEAR attached to each. Evidence hash ${digest.slice(0, 12)}...` }),
+        h('p', { class: 'small muted', text: signer && signer !== w.registered_by ? (live ? `You did not register work ${w.id}. Each new share waits until ${short(w.registered_by)} approves it; its money is held until then.` : `You did not register work ${w.id}. The registry on testnet has no split sheet approval (checked just now: get_share_approval is not on the contract), so each new share becomes active and is paid as soon as it is minted.`) : `${rows.length} transaction${rows.length > 1 ? 's' : ''} to ${REGISTRY}, 0.2 NEAR attached to each. Evidence hash ${digest.slice(0, 12)}...` }),
         h('div', { class: 'actions' },
           h('button', { class: 'btn primary', type: 'button', text: `Sign ${rows.length} in your wallet`, disabled: blocked || !signer, onclick: async () => {
             status.textContent = 'Reading the current split from testnet...';
