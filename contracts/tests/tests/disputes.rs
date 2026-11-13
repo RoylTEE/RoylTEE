@@ -189,8 +189,10 @@ async fn t14_over_allocation_dispute_freezes_only_contested_fraction() -> anyhow
 async fn t14b_uphold_existing_voids_claimant() -> anyhow::Result<()> {
     let e = setup().await?;
     let w = e.register_work("USRC12600001").await?;
-    let a = e.mint(w, e.writer_a.id(), 6_000).await?;
-    let b = e.mint(w, e.writer_b.id(), 4_000).await?;
+    // The caller (writer_a) may not contest its own share, so writer_b
+    // holds the contested one.
+    let a = e.mint(w, e.writer_b.id(), 6_000).await?;
+    let b = e.mint(w, e.writer_a.id(), 4_000).await?;
     let (c, id) = mint_contesting(&e, w, &e.buyer, 3_000, vec![&a]).await?;
     check(e.pay_work(w, 1_000_000).await?);
     assert_eq!(e.balance(&e.vault(&b)).await?, 400_000);

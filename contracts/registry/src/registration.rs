@@ -181,13 +181,12 @@ impl Registry {
                 group.reserved_bps == 0,
                 "shares in this group are still minting; retry after they finish"
             );
+            // The claimant names exactly the shares it contests: there is no
+            // default of every active share (review H2).
             let list = contests.unwrap_or_else(|| {
-                group
-                    .shares
-                    .iter()
-                    .filter(|t| self.share(t).status == ShareStatus::Active)
-                    .cloned()
-                    .collect()
+                env::panic_str(
+                    "name the contested shares in contests: the group would exceed 100 percent",
+                )
             });
             require!(!list.is_empty(), "nothing to contest");
             let mut sorted = list.clone();
@@ -195,6 +194,7 @@ impl Registry {
             sorted.dedup();
             require!(sorted.len() == list.len(), "contests lists a share twice");
             let mut contested_bps = 0u32;
+            let mut smallest = u32::MAX;
             for t in &list {
                 let s = self
                     .shares
@@ -208,11 +208,26 @@ impl Registry {
                     s.status == ShareStatus::Active && s.dispute.is_none(),
                     "contests names a share that is not active"
                 );
+                // Nobody disputes their own share to hold the group's one
+                // dispute slot (review H2, sham self-dispute).
+                let owner = self.owner_of(t);
+                require!(
+                    owner.as_ref() != Some(&holder) && owner.as_ref() != Some(&caller),
+                    "contests names a share held by the claimant or the caller"
+                );
                 contested_bps += u32::from(s.percent_bps);
+                smallest = smallest.min(u32::from(s.percent_bps));
             }
+            let excess = total - FULL_BPS;
             require!(
-                contested_bps >= total - FULL_BPS,
+                contested_bps >= excess,
                 "contested shares do not cover the excess over 100 percent"
+            );
+            // Minimal: dropping any named share would leave the excess
+            // uncovered, so no share is frozen that is not needed (review H2).
+            require!(
+                contested_bps - smallest < excess,
+                "contests names more shares than the excess needs"
             );
             Some(list)
         } else {
@@ -403,6 +418,7 @@ impl Registry {
         if let Some(s) = self.shares.get_mut(token_id) {
             s.status = ShareStatus::Failed;
         }
+        self.prune_from_group(&share.group, token_id);
         if let Some(dispute_id) = claimant_of {
             self.cancel_dispute(dispute_id);
         }
@@ -410,6 +426,15 @@ impl Registry {
             "vault_failed",
             json!({ "token_id": token_id, "vault": share.vault, "reason": reason }),
         );
+    }
+
+    /// Drops a Failed or Void share from its group's list so dead entries
+    /// never fill MAX_GROUP_ENTRIES (review H2). The share record, its NFT
+    /// and its history stay.
+    pub(crate) fn prune_from_group(&mut self, group: &GroupKey, token_id: &TokenId) {
+        if let Some(g) = self.groups.get_mut(group) {
+            g.shares.retain(|t| t != token_id);
+        }
     }
 
     /// Writes pending collection changes so storage_usage is accurate.

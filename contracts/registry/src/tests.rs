@@ -1661,11 +1661,18 @@ fn over_allocation_rules() {
         panics(|| reg(&mut c, 5000, Some(vec![a.clone(), a.clone()]))),
         "duplicate entry"
     );
-    // Default contests: every active share.
-    let cl = mint_with(&mut c, w, "alice.near", 5000, None);
+    // No default: the claimant must name the contested shares (review H2).
+    assert!(panics(|| reg(&mut c, 5000, None)), "contests required");
+    // Not minimal: a alone covers the 4000 excess, b is not needed.
+    assert!(
+        panics(|| reg(&mut c, 5000, Some(vec![a.clone(), b.clone()]))),
+        "minimal set only"
+    );
+    let cl = mint_with(&mut c, w, "alice.near", 5000, Some(vec![a.clone()]));
     let id = c.get_share(cl).unwrap().dispute.unwrap();
     assert!(matches!(c.get_dispute(id).unwrap().kind,
-        DisputeKind::Overallocation { ref contested, .. } if contested.len() == 2));
+        DisputeKind::Overallocation { ref contested, .. } if contested == &vec![a.clone()]));
+    assert!(c.get_share(b.clone()).unwrap().dispute.is_none());
     assert!(
         panics(|| reg(&mut c, 100, None)),
         "group has an open dispute"
@@ -1686,7 +1693,7 @@ fn failed_claimant_mint_cancels_dispute_and_escrow_goes_to_undelivered() {
         Basis::Copyright,
         acc("alice.near"),
         h('e'),
-        None,
+        Some(vec![a.clone()]),
     );
     let cl = format!("s{}", c.next_share);
     let id = c.get_share(cl.clone()).unwrap().dispute.unwrap();
@@ -1811,8 +1818,8 @@ fn void_work_waits_for_its_share_dispute() {
         s => panic!("{s:?}"),
     };
     let _ = w1;
-    let _a = mint(&mut c, w2, "bob.near", 10_000);
-    let cl = mint_with(&mut c, w2, "carol.near", 1000, None);
+    let a = mint(&mut c, w2, "bob.near", 10_000);
+    let cl = mint_with(&mut c, w2, "carol.near", 1000, Some(vec![a]));
     let share_dispute = c.get_share(cl).unwrap().dispute.unwrap();
     yocto(&registrar());
     assert!(panics(|| c.resolve(id, Outcome::VoidDuplicate, h('7'))));
@@ -1878,9 +1885,9 @@ fn void_share_keeps_claim_and_sync() {
 // ---------- audit fixes ----------
 
 #[test]
-fn group_entry_list_is_capped_including_failed_shares() {
-    // Failed and Void shares stay in the group's list. Without a cap on the
-    // whole list, every payment and void loop would grow with them.
+fn failed_shares_leave_the_group_list() {
+    // Failed shares are pruned from the group's list (review H2), so the
+    // list stays bounded by live shares and never closes the group.
     let mut c = setup();
     let w = work(&mut c, "USRC12600001");
     for _ in 0..MAX_GROUP_ENTRIES {
@@ -1898,18 +1905,10 @@ fn group_entry_list_is_capped_including_failed_shares() {
         let t = format!("s{}", c.next_share);
         callback(PromiseResult::Failed);
         let _ = c.on_vault_created(t, acc("alice.near"));
+        assert!(group_of(&c, w).shares.is_empty());
     }
-    call(&acc("alice.near"), NearToken::from_near(1));
-    assert!(panics(|| drop(c.register_share(
-        w,
-        RightType::Publishing,
-        "WW".into(),
-        100,
-        Basis::Copyright,
-        acc("bob.near"),
-        h('e'),
-        None
-    ))));
+    let t = mint(&mut c, w, "bob.near", 100);
+    assert_eq!(group_of(&c, w).shares, vec![t]);
 }
 
 #[test]

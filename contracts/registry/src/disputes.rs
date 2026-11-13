@@ -56,6 +56,9 @@ impl Registry {
                 let bps = u32::from(self.share(claimant).percent_bps);
                 self.unfreeze(claimant);
                 self.set_void(claimant, dispute_id);
+                // The voided claimant leaves the group list, so repeated
+                // claims cannot close the group (review H2).
+                self.prune_from_group(group, claimant);
                 if let Some(g) = self.groups.get_mut(group) {
                     g.claimant_bps -= bps;
                     g.open_dispute = None;
@@ -108,6 +111,7 @@ impl Registry {
                     }
                     if e.bps == 0 {
                         self.set_void(&e.token_id, dispute_id);
+                        self.prune_from_group(group, &e.token_id);
                     }
                     self.forward(&e.token_id, credit);
                     released.push(

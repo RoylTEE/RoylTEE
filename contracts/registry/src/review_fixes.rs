@@ -100,3 +100,134 @@ fn l4_sync_does_not_land_during_transfer_pending() {
     assert_eq!(c.on_sync(t.clone(), now), None, "transfer still pending");
     assert_eq!(ledger(&c, &t).known_balance.0, 0);
 }
+
+// ---------- H2: contests ----------
+
+/// H2: a 1 bps claim can no longer default to contesting every share; a
+/// named minimal set freezes only what the excess needs.
+#[test]
+fn h2_one_bps_claim_freezes_only_one_named_share() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let a = mint(&mut c, w, "bob.near", 5000);
+    let b = mint(&mut c, w, "carol.near", 5000);
+    call(&acc("alice.near"), NearToken::from_near(1));
+    assert_panics("name the contested shares", || {
+        drop(c.register_share(
+            w,
+            RightType::Publishing,
+            "WW".into(),
+            1,
+            Basis::Copyright,
+            acc("alice.near"),
+            h('e'),
+            None,
+        ))
+    });
+    call(&acc("alice.near"), NearToken::from_near(1));
+    assert_panics("more shares than the excess needs", || {
+        drop(c.register_share(
+            w,
+            RightType::Publishing,
+            "WW".into(),
+            1,
+            Basis::Copyright,
+            acc("alice.near"),
+            h('e'),
+            Some(vec![a.clone(), b.clone()]),
+        ))
+    });
+    let _cl = mint_with(&mut c, w, "alice.near", 1, Some(vec![a.clone()]));
+    assert!(c.get_share(a.clone()).unwrap().dispute.is_some());
+    assert!(c.get_share(b.clone()).unwrap().dispute.is_none());
+    let _ = pay_work_msg(&mut c, w, 1_000_000);
+    assert_eq!(ledger(&c, &a).escrowed.0, 500_000);
+    assert_eq!(ledger(&c, &b).inbound_pending, 1, "b still paid");
+}
+
+/// H2: repeated claims plus uphold_existing no longer fill the group list;
+/// each voided claimant is removed, so the group never closes.
+#[test]
+fn h2_repeat_claims_do_not_close_the_group() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let a = mint(&mut c, w, "bob.near", 5000);
+    let _b = mint(&mut c, w, "carol.near", 5000);
+    for _ in 0..(MAX_GROUP_ENTRIES + 5) {
+        let cl = mint_with(&mut c, w, "alice.near", 1, Some(vec![a.clone()]));
+        let id = c.get_share(cl.clone()).unwrap().dispute.unwrap();
+        resolve(&mut c, id, Outcome::UpholdExisting);
+        assert_eq!(c.get_share(cl).unwrap().status, ShareStatus::Void);
+        assert_eq!(group_of(&c, w).shares.len(), 2);
+    }
+    // A genuine claimant can still register.
+    let cl = mint_with(&mut c, w, "alice.near", 2500, Some(vec![a.clone()]));
+    assert!(c.get_share(cl).unwrap().dispute.is_some());
+}
+
+/// H2: an incumbent cannot open a sham dispute against its own dummy share
+/// to hold the group's one dispute slot.
+#[test]
+fn h2_incumbent_cannot_dispute_its_own_share() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let _main = mint(&mut c, w, "bob.near", 9999);
+    let dummy = mint(&mut c, w, "bob.near", 1);
+    call(&acc("alice.near"), NearToken::from_near(1));
+    assert_panics("held by the claimant or the caller", || {
+        drop(c.register_share(
+            w,
+            RightType::Publishing,
+            "WW".into(),
+            1,
+            Basis::Copyright,
+            acc("bob.near"),
+            h('e'),
+            Some(vec![dummy.clone()]),
+        ))
+    });
+    // The caller cannot contest a share it holds either.
+    call(&acc("bob.near"), NearToken::from_near(1));
+    assert_panics("held by the claimant or the caller", || {
+        drop(c.register_share(
+            w,
+            RightType::Publishing,
+            "WW".into(),
+            1,
+            Basis::Copyright,
+            acc("carol.near"),
+            h('e'),
+            Some(vec![dummy.clone()]),
+        ))
+    });
+    assert!(group_of(&c, w).open_dispute.is_none());
+}
+
+/// H2: uphold_claimant with a 0 bps result also prunes the voided share.
+#[test]
+fn h2_zero_bps_outcome_is_pruned() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let a = mint(&mut c, w, "bob.near", 5000);
+    let b = mint(&mut c, w, "carol.near", 5000);
+    let cl = mint_with(&mut c, w, "alice.near", 5000, Some(vec![b.clone()]));
+    let id = c.get_share(cl.clone()).unwrap().dispute.unwrap();
+    resolve(
+        &mut c,
+        id,
+        Outcome::UpholdClaimant {
+            new_bps: vec![
+                BpsEntry {
+                    token_id: b.clone(),
+                    bps: 0,
+                },
+                BpsEntry {
+                    token_id: cl.clone(),
+                    bps: 5000,
+                },
+            ],
+        },
+    );
+    assert_eq!(c.get_share(b.clone()).unwrap().status, ShareStatus::Void);
+    assert_eq!(group_of(&c, w).shares, vec![a, cl]);
+}
