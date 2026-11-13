@@ -1,6 +1,8 @@
 ---
 import Base from '../layouts/Base.astro';
 import { PROJECT_NAME } from '../consts';
+/* Rendered per request so the wallet selector gets a fresh CSP nonce (src/middleware.ts). */
+export const prerender = false;
 ---
 <Base title={`Help . ${PROJECT_NAME}`} description="Ask the RoylTEE help guide or contact support with a NEAR testnet wallet.">
   <section class="help pad">

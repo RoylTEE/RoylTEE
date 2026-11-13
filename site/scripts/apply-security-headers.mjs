@@ -11,7 +11,8 @@ const routes = [];
 for (const block of blocks) {
   const headers = {};
   for (const h of block.headers ?? []) headers[h.key] = h.value;
-  const src = block.source === '/(.*)' ? '/(.*)' : block.source;
+  // vercel.json sources here are plain regex groups, so anchoring gives the same match in the build output config.
+  const src = block.source === '/(.*)' ? '/(.*)' : `^${block.source}$`;
   routes.push({ src, headers, continue: true });
 }
 if (!routes.length) throw new Error('No headers in vercel.json');

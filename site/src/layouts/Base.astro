@@ -7,6 +7,8 @@ import Footer from '../components/Footer.astro';
 import { PROJECT_NAME, PITCH } from '../consts';
 interface Props { title?: string; description?: string }
 const { title = PROJECT_NAME, description = PITCH } = Astro.props;
+/* Set by src/middleware.ts on wallet sign in pages only. The browser hides the nonce attribute from the DOM; scripts read it from the element. */
+const cspNonce = Astro.locals.cspNonce;
 ---
 <!doctype html>
 <html lang="en">
@@ -16,6 +18,7 @@ const { title = PROJECT_NAME, description = PITCH } = Astro.props;
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    {cspNonce && <script is:inline nonce={cspNonce} data-csp-nonce></script>}
   </head>
   <body>
     <a class="announce" href="#notice">
