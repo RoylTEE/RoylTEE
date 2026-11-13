@@ -61,3 +61,18 @@ export const DEPLOY_RECORD = {
   mockUsdc: { account: 'usdc.royltee-dev.testnet', codeHash: '47ybTZxhaJ9ZW3FC9jwaDdLfwgkJ59cCrnkSn5oop67t', sha256: '2e5c896b2ead7d1bd12a2944971d6a393902084cf47616c54d18e7a577efc0bb' },
   vault: { codeHash: 'BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU', sha256: '973b2cbdbe904de710dcc7bf54a7b4164156f8c81d2932191e6968514aaaa727' },
 } as const;
+
+/** register_share transactions that minted each share (deployments/testnet.json, steps 9 and 13). */
+export const MINTS: Record<string, { tx: string; at: string }> = {
+  s1: { tx: '7wxZ7Bmstzu9qTUayrvzbGP97tcD6GRLMaZo7pTVAqzh', at: '2026-11-13T05:49:49Z' },
+  s2: { tx: '5w2dvQS54div1eWYPrfFBteYK541cQiCxfvfKhEYw51c', at: '2026-11-13T05:49:56Z' },
+  s3: { tx: '6TM8ZRPrH88GXN9AcgBCF7WGkyLLnn64PnkRnqNEg3Fz', at: '2026-11-13T05:50:03Z' },
+  s4: { tx: 'DPSu7aR4HCsTp4mvvAKgbTbwcAzDnvADYBmvsoSpANuH', at: '2026-11-13T05:50:10Z' },
+  s5: { tx: '79TqB2ZMs8DcTGpsvYidKvffe4ytf7gWngWDveJnVhDf', at: '2026-11-13T05:50:17Z' },
+  s6: { tx: '4VFK3fPFo5Amk9B6r2KzBqpkVEmYNtN53vpcHyLC9q5J', at: '2026-11-13T05:50:23Z' },
+  s7: { tx: '3uKby5aP5pN6sMEp1EJSWn7xDEzyH2nASNzS7ccstJba', at: '2026-11-13T07:42:25Z' },
+};
+/** nft_transfer transactions in the record. Each emits an nft_transfer event. */
+export const TRANSFERS: { token: string; from: string; to: string; tx: string; at: string; what: string }[] = [
+  { token: 's2', from: 'writer-b.royltee-dev.testnet', to: 'buyer-pub.royltee-dev.testnet', tx: 'HZ9pD2kLbqbjmKqC68ao6KBTUpQmQstyd2Tro8hWwYPy', at: '2026-11-13T05:59:22Z', what: 'Catalog sale' },
+];

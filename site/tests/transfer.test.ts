@@ -30,3 +30,23 @@ describe('transfer screen: the same rules as check_transfer in the contract', ()
     expect(readFileSync(new URL('../src/pages/member.astro', import.meta.url), 'utf8')).toMatch(/id="transfer" data-tab-panel[\s\S]*?UNVERIFIED/);
   });
 });
+
+import { holderChain } from '../src/scripts/holders';
+import { MINTS, TRANSFERS, SCENES } from '../src/data/testnet';
+describe('holder chain from the record', () => {
+  it('s2 goes from its mint holder to buyer-pub through the recorded sale', () => {
+    const c = holderChain('s2', 'writer-b.royltee-dev.testnet', 'buyer-pub.royltee-dev.testnet');
+    expect(c.steps.map((s) => s.holder)).toEqual(['writer-b.royltee-dev.testnet', 'buyer-pub.royltee-dev.testnet']);
+    expect(c.steps[0].tx).toBe(MINTS.s2.tx);
+    expect(c.matches).toBe(true);
+  });
+  it('flags a live owner that differs from the record instead of hiding it', () => {
+    const c = holderChain('s1', 'writer-a.royltee-dev.testnet', 'someone.testnet');
+    expect(c.steps).toHaveLength(1);
+    expect(c.matches).toBe(false);
+  });
+  it('every recorded transfer is also a recorded scene, and every share has a mint', () => {
+    for (const t of TRANSFERS) expect(SCENES.some((s) => s.txs.includes(t.tx))).toBe(true);
+    expect(Object.keys(MINTS)).toEqual(['s1', 's2', 's3', 's4', 's5', 's6', 's7']);
+  });
+});

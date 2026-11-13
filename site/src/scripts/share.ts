@@ -1,7 +1,9 @@
 /** Share page: reads ?id=, then fills the Summary, Statement, Account and History tabs. */
 import { oneToken } from './chain';
-import { SCENES } from '../data/testnet';
+import { SCENES, MINTS, type Scene } from '../data/testnet';
+import { holderChain } from './holders';
 import { h, badge, tx, acct, stamp, fail } from './ui';
+import { short } from './chain';
 import { loadShare, shareParts } from './sharecard';
 
 const $ = (s: string) => document.querySelector(s)!;
@@ -16,7 +18,9 @@ async function load() {
     document.title = document.title.replace(/^Share/, `Share ${id}`);
     $('h1').textContent = `Share ${id}`;
     const crumb = document.querySelector('.crumbs [aria-current]'); if (crumb) crumb.textContent = `Share ${id}`;
-    const p = shareParts(await loadShare(token));
+    const d = await loadShare(token);
+    const p = shareParts(d);
+    renderHolders(holderChain(id, d.share.holder_at_mint, token.owner_id));
     $('[data-share-head]').replaceChildren(...p.head);
     $('[data-summary]').replaceChildren(p.summary);
     $('[data-statement]').replaceChildren(p.statement);
@@ -26,7 +30,25 @@ async function load() {
   } catch (err) { fail($('[data-share-head]'), err, () => void load()); }
 }
 
-const rows = SCENES.map((s, i) => ({ ...s, n: i + 1 })).filter((s) => s.tokens.includes(id)).reverse();
+function renderHolders(c: ReturnType<typeof holderChain>) {
+  const when = (at: string | null) => at ? `${at.slice(0, 10)} ${at.slice(11, 16)} UTC` : 'Not in the record';
+  $('[data-holders]').replaceChildren(
+    h('div', { class: 'table-wrap' }, h('table', { class: 'ledger rows-sm' },
+      h('thead', {}, h('tr', {}, ...['#', 'Holder', 'How', 'When', 'Transaction'].map((x) => h('th', { text: x })))),
+      h('tbody', {}, ...c.steps.map((s, i) => h('tr', {},
+        h('td', { class: 'x nowrap', text: String(i + 1) }),
+        h('td', { class: 'p' }, acct(s.holder)),
+        h('td', { class: 'm wrap' }, s.from ? `${s.how} ${short(s.from)}` : s.how),
+        h('td', { class: 'm nowrap', text: when(s.at) }),
+        h('td', { class: 'p-end' }, s.tx ? tx(s.tx) : badge('Not recorded', 'warn'))))))),
+    h('div', { class: 'panel-foot' }, c.matches
+      ? h('span', {}, badge('Matches the chain', 'ok'), ' The owner on chain now is the last recorded holder.')
+      : h('span', {}, badge('Changed after the record', 'warn'), ' The owner on chain now is ', acct(c.liveOwner), '. The newer move is in the share history on the explorer.')));
+}
+
+const mint = MINTS[id];
+const rows = ((mint ? [{ step: 'Mint', what: `register_share minted ${id} and deployed its keyless share account`, shows: 'The vault is created with no keys', txs: [mint.tx], tokens: [id], result: 'ok', simulated: false, n: 0 }] : []) as (Scene & { n: number })[])
+  .concat(SCENES.map((s, i) => ({ ...s, n: i + 1 })).filter((s) => s.tokens.includes(id))).reverse();
 $('[data-history]').replaceChildren(rows.length
   ? h('div', { class: 'table-wrap' }, h('table', { class: 'ledger rows-sm' },
       h('thead', {}, h('tr', {}, h('th', { text: 'Step' }), h('th', { text: 'What happened' }), h('th', { text: 'Result' }), h('th', { text: 'Transaction' }))),

@@ -31,7 +31,12 @@ const keys = [...new Set(links.map((a) => a.dataset.tabLink!))];
 const panels = [...document.querySelectorAll<HTMLElement>('[data-tab-panel]')];
 function show(key: string) {
   body.dataset.tab = key;
-  for (const a of links) { if (a.dataset.tabLink === key) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); }
+  for (const a of links) {
+    if (a.dataset.tabLink !== key) { a.removeAttribute('aria-current'); continue; }
+    a.setAttribute('aria-current', 'page');
+    const bar = a.parentElement;
+    if (bar && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = a.offsetLeft - bar.offsetLeft - 16;
+  }
   for (const p of panels) p.hidden = p.id !== key;
 }
 const fromHash = () => { const k = decodeURIComponent(location.hash.slice(1)); return keys.includes(k) ? k : keys[0]; };

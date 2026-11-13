@@ -8,6 +8,7 @@ import PowerTable from '../components/PowerTable.astro';
     <a href="#summary" data-tab-link="summary" aria-current="page">Summary</a>
     <a href="#statement" data-tab-link="statement">Statement</a>
     <a href="#account" data-tab-link="account">Account and keys</a>
+    <a href="#holders" data-tab-link="holders">Holders</a>
     <a href="#history" data-tab-link="history">History</a>
   </nav>
   <section class="panel" id="summary" data-tab-panel aria-label="Summary">
@@ -27,6 +28,10 @@ import PowerTable from '../components/PowerTable.astro';
   <section class="panel" id="account" data-tab-panel aria-label="Account and keys">
     <div class="panel-head"><h2>Share account</h2><span class="caption">Live access key list, NEAR balance and storage minimum</span></div>
     <div class="panel-body" data-account><p class="loading">Reading testnet</p></div>
+  </section>
+  <section class="panel" id="holders" data-tab-panel aria-label="Holders">
+    <div class="panel-head"><h2>Holders</h2><span class="caption">Recorded mint and nft_transfer events, checked against the owner on chain now</span></div>
+    <div data-holders><p class="loading panel-body">Reading testnet</p></div>
   </section>
   <section class="panel" id="history" data-tab-panel aria-label="History">
     <div class="panel-head"><h2>History</h2><span class="caption">Recorded on 2026-11-13 (UTC)</span></div>
