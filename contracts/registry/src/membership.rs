@@ -28,6 +28,11 @@ impl Registry {
             !self.is_system_account(&account),
             "system accounts cannot hold a credential"
         );
+        // The registrar never holds, receives or claims a share (review H3).
+        require!(
+            account != self.registrar,
+            "the registrar cannot hold a credential"
+        );
         require!(
             self.roles.get(&account).is_none(),
             "agent accounts cannot hold a credential"

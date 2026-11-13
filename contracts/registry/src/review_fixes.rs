@@ -231,3 +231,29 @@ fn h2_zero_bps_outcome_is_pruned() {
     assert_eq!(c.get_share(b.clone()).unwrap().status, ShareStatus::Void);
     assert_eq!(group_of(&c, w).shares, vec![a, cl]);
 }
+
+// ---------- H3: registrar ----------
+
+/// H3: the registrar cannot grant itself a credential, so it can never be
+/// a holder, receive a share through registrar_transfer, or claim.
+#[test]
+fn h3_registrar_cannot_hold_a_credential() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = mint(&mut c, w, "bob.near", 10_000);
+    pay_share(&mut c, &t, 100_000);
+    call(&registrar(), NearToken::from_near(1));
+    assert_panics("the registrar cannot hold a credential", || {
+        drop(c.grant_credential(registrar(), h('a'), h('b'), h('c')))
+    });
+    yocto(&registrar());
+    c.suspend_credential(acc("bob.near"), h('9'));
+    yocto(&registrar());
+    assert_panics("receiver has no active credential", || {
+        c.registrar_transfer(t.clone(), registrar(), h('8'))
+    });
+    yocto(&registrar());
+    assert_panics("only the current holder can claim", || {
+        drop(c.claim(t.clone()))
+    });
+}
