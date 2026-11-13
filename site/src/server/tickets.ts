@@ -33,14 +33,14 @@ export function ticketText(input: Record<string, unknown>) {
   return { subject: clean(input.subject, LIMITS.subject), message: clean(input.message, LIMITS.message) };
 }
 /**
- * Bounded: one prune of entries whose record TTL has passed, one range of at most OPEN_PER_WALLET
- * members, and at most OPEN_PER_WALLET record reads. It never scans the wallet's full history.
+ * Bounded: one prune of entries whose record TTL has passed, one range of at most `limit`
+ * (OPEN_PER_WALLET, or one more for the check after a write) members, and at most that many record reads. It never scans the wallet's full history.
  */
-export async function openCount(store: Store, owner: string, now = Date.now()) {
+export async function openCount(store: Store, owner: string, now = Date.now(), limit = OPEN_PER_WALLET) {
   const index = openIndex(owner);
   await store.removeBelow(index, now - OPEN_SECONDS * 1000);
   let n = 0;
-  for (const id of await store.rangeNewest(index, Number.MAX_SAFE_INTEGER, OPEN_PER_WALLET)) {
+  for (const id of await store.rangeNewest(index, Number.MAX_SAFE_INTEGER, limit)) {
     const t = await store.get<Ticket>(`ticket:${id}`);
     if (t && t.status !== 'closed') n++;
     else await store.remove(index, id);
@@ -68,10 +68,25 @@ export async function createTicket(store: Store, owner: string, input: Record<st
     await store.add(wallet(owner), now, ticket.id);
     await store.add(openIndex(owner), now, ticket.id);
     await store.add('tickets:all', now, ticket.id);
+    // Audit F4: the slot reservation is a lease. If a submit outlives SLOT_LOCK_SECONDS, a second
+    // submit can pass the count check too, so both could write and the wallet would hold
+    // OPEN_PER_WALLET + 1 open tickets. Check again after the write and take this ticket back if the
+    // cap is exceeded. A submit whose write lands last always sees the extra ticket, so the cap
+    // holds; if two writes land before either check, both are refused, which is safe.
+    if (await openCount(store, owner, now, OPEN_PER_WALLET + 1) > OPEN_PER_WALLET) {
+      await dropTicket(store, owner, ticket.id);
+      fail(429, 'You already have the maximum number of open tickets. Please wait for a reply or for an older ticket to close.');
+    }
     return ticket;
   } finally {
     await store.uncount(lock);
   }
+}
+async function dropTicket(store: Store, owner: string, id: string) {
+  await store.del(`ticket:${id}`);
+  await store.remove(wallet(owner), id);
+  await store.remove(openIndex(owner), id);
+  await store.remove('tickets:all', id);
 }
 export type BackfillReport = { scanned: number; indexed: number; ttlSet: number; expired: number; applied: boolean };
 /**
