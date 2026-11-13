@@ -1,6 +1,6 @@
 # Transfer threat model
 
-Status: written on 2026-11-13, BEFORE any contract code existed in this repo. Block 2 code landed later the same day; rows covered by passing tests say so under "Block 2 status" at the end. Owner decisions 3, 4 and 10 (2026-11-13) changed T23 and T25 and added T34 and T35; those edits are marked. Block 3 added T36 and T37 and a "Block 3 status" section.
+Status: written on 2026-11-13, BEFORE any contract code existed in this repo. Block 2 code landed later the same day; rows covered by passing tests say so under "Block 2 status" at the end. Owner decisions 3, 4 and 10 (2026-11-13) changed T23 and T25 and added T34 and T35; those edits are marked. Block 3 added T36 and T37 and a "Block 3 status" section. Block 4 changed T24 (held deposits by refusing sync instead of a snapshot cap), added T38 and a "Block 4 status" section.
 
 Scope: every way a seller, a buyer, an agent, a payer, an outside attacker or a privileged role could keep money or access, move money to the wrong place, or lose money, around a rights-share NFT and its vault. Testnet only. Mock USDC only.
 
@@ -180,8 +180,8 @@ Terms used below (full detail in DESIGN.md):
 ### T24. Plain transfer straight into a contested vault during a dispute
 - Attack: a payer (or the contested holder's friend) sends USDC with a plain `ft_transfer` directly to a contested vault, skipping the registry's escrow, and the holder claims it at once.
 - Impact: dispute freeze bypassed for direct payments.
-- Mitigation: when a dispute opens, the registry schedules a snapshot `sync` of each contested vault; `claim` on a contested share is blocked until the snapshot lands, then capped at the snapshot balance (old money) until resolve. Direct deposits after the snapshot stay in the vault, visible, unclaimable until resolve. After resolve the cap is lifted for the vault's holder, whatever the outcome (documented limitation: production payers pay through the registry; direct transfers bypass escrow math).
-- Test: test 25 (direct transfer during open dispute is not claimable; old balance is; after resolve all is claimable).
+- Mitigation (block 4, replaces the snapshot plan): `sync` is refused on a share in an open dispute, so the ledger only knows money routed through the registry (which goes to escrow for contested shares) plus what it knew before. A plain deposit straight into a contested vault stays in the vault, unattributed and unclaimable, until resolve; then `sync` picks it up for the vault's holder whatever the outcome. Unsynced plain deposits made before the dispute opened are held the same way (conservative). Documented limitation: production payers pay through the registry; direct transfers bypass escrow math.
+- Test: sandbox `t14_over_allocation_dispute_freezes_only_contested_fraction` (plain deposit into the contested vault held, sync refused, old balance claimable, after resolve sync and claim pick it up).
 
 ### T25. Payment to an under-allocated or over-allocated group
 - Attack or fault: a payer or agent pays a work group whose active shares sum below 100 percent (unallocated part has no owner) or above (no dispute recorded yet because of a pending mint).
@@ -261,6 +261,12 @@ Terms used below (full detail in DESIGN.md):
 - Mitigation: the money can only reach registered vaults (T8); per-transaction, rolling daily and count limits cap the damage (T7, T27); every payment event carries the agent, statement line id, period and statement hash, so the organisation can reconcile and revoke at once (T14). Refunds between members are off chain. Residual risk, accepted for the demo.
 - Test: tests 9 and 10 (limits and revoke); test 11 (no payee outside the registry).
 
+### T38. Dispute powers used to seize or misroute escrow
+- Attack: a member opens a frivolous over-allocation claim to freeze rivals; or the registrar resolves to redirect escrow; or a claimant whose mint fails leaves contested shares frozen forever.
+- Impact: income frozen or misdirected.
+- Mitigation: only the contested shares are frozen and only for new money; the claimant must name shares whose bps cover the excess; one open dispute per group. `resolve` can only send escrow to the dispute's own parties, by bps that keep the group total unchanged, with 1 yoctoNEAR, a document hash and an event. A failed claimant mint cancels the dispute and moves escrow to undelivered for `retry_forward`. Challenger bond, expiry and appeal stay roadmap (T11, T12).
+- Test: unit tests `over_allocation_rules`, `uphold_claimant_splits_escrow_by_new_bps`, `failed_claimant_mint_cancels_dispute_and_escrow_goes_to_undelivered`; sandbox `t14b_uphold_existing_voids_claimant` (non-registrar resolve fails).
+
 ## Test mapping summary
 
 | Test | Covers |
@@ -320,3 +326,15 @@ Passing in the sandbox (`contracts/tests/tests/agents.rs`), every test ending wi
 Unit tests cover the role checks (T28), limits and the rolling window, line credits (T27), failed allowance withdrawal, note rules, retry of an undelivered forward (T26), stale lock release only after the timeout (T19) and late callbacks (T36). A stuck lock and a failed forward cannot be produced in the sandbox, so those paths are unit-tested only.
 
 Not yet covered: tests 14, 17 to 31 beyond the unit-level parts (block 4), counterparty confirmation, licenses, and the live `verify-keys` and `verify:testnet` scripts (block 5).
+
+## Block 4 status (2026-11-13)
+
+Passing in the sandbox (`contracts/tests/tests/disputes.rs`), each ending with the solvency check (T31) and, where a vault is involved, the zero-keys proof:
+- test 14 (T11, T24): a claimant above 100 percent contests one share; the uncontested share keeps being paid; the contested share's new money is escrowed in the registry; claimant and contested share cannot transfer; a plain deposit into the contested vault is held and `sync` is refused; old money stays claimable; `uphold_claimant` splits the escrow 2500/2500; the held deposit becomes claimable after resolve; the next payment splits exactly over the new bps.
+- test 14b: `uphold_existing` voids the claimant (cannot move, never paid), returns escrow, and only the registrar can resolve (T38).
+- test 14c (T11 duplicate path): payment to a duplicate ISRC is refused and refunded; `swap_payable` flips the payable entry; the voided share keeps what it already earned.
+- `confirm_share`: counterparty_confirmed, dropped after the confirming holder's share is sold.
+
+Unit tests also cover: contests validation, default contests, a second claim while a dispute is open, `keep_both`, `void_duplicate`, voiding a work only after its share dispute, failed claimant mint (dispute cancelled, escrow to undelivered, retry_forward), Void shares still syncing and claiming, `split_by_total`.
+
+Not yet covered: tests 17 to 31 beyond the unit-level parts, licenses (cut first), AUDIT.md (the audit skill named in the brief is not available here), and the live `verify-keys` and `verify:testnet` scripts (block 5).

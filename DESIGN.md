@@ -1,6 +1,6 @@
 # Design
 
-Status: block 1 design, written 2026-11-13 before any contract code. Block 2 and block 3 code landed the same day; where the code differs from the plan below, sections 16 and 17 say so and DECISIONS_LOG.md records it. Read THREAT_MODEL.md alongside this file.
+Status: block 1 design, written 2026-11-13 before any contract code. Block 2, 3 and 4 code landed the same day; where the code differs from the plan below, sections 16, 17 and 18 say so and DECISIONS_LOG.md records it. Read THREAT_MODEL.md alongside this file.
 
 Product in one line: the verified payout address for every share of every song, human or AI. The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.
 
@@ -673,3 +673,33 @@ The registry wasm is 614394 bytes after block 3 (518782 after block 2), about 6.
 ### Toolchain note
 
 pkg-config is now installed on the build machine, so the sandbox tests find OpenSSL without `OPENSSL_LIB_DIR` and `OPENSSL_INCLUDE_DIR`. A fresh machine needs pkg-config and the OpenSSL development headers.
+
+## 18. Block 4 as built (2026-11-13)
+
+Disputes, resolve, confirm_share. Each choice is also a row in DECISIONS_LOG.md (rows 51 to 60).
+
+```rust
+#[payable] pub fn register_share(&mut self, work_id: WorkId, right_type: RightType, territory: String,
+    percent_bps: Bps, basis: Basis, holder: AccountId, evidence_hash: Hash32,
+    contests: Option<Vec<TokenId>>) -> Promise;
+// If active + reserved + claimant bps + percent_bps > 10000: the new share is a claimant and an
+// Overallocation dispute opens now. contests (default: every active share of the group) must be
+// active, undisputed shares of the group whose bps cover the excess. Refused while shares of the
+// group are minting or while the group has an open dispute. contests is refused when not over.
+#[payable] pub fn resolve(&mut self, dispute_id: DisputeId, outcome: Outcome, doc_hash: Hash32);
+// 1y, registrar. Outcome: "uphold_existing" | {"uphold_claimant": {"new_bps": [{token_id, bps}]}}
+// for Overallocation; "void_duplicate" | "keep_both" | "swap_payable" for DuplicateCode.
+#[payable] pub fn confirm_share(&mut self, token_id: TokenId);  // deposit >= 1 yocto, covers storage
+pub fn get_evidence_tier(&self, token_id: TokenId) -> String;
+pub fn list_disputes(&self, from_index: Option<u64>, limit: Option<u64>) -> Vec<Dispute>;
+```
+
+State added: `Share.dispute: Option<DisputeId>`, `Share.confirmations`, `ShareStatus::Void`, `WorkStatus::Void`, `Work.groups` (at most 16), `Group.claimant_bps`, `Group.open_dispute`, `Ledger.escrowed`, `Dispute.status` (open, resolved with outcome and doc hash, cancelled).
+
+Payment routing while a group dispute is open: paid set = Active shares minus the claimant (sum at most 10000); credits for contested shares go to `escrowed` and `escrow_total`; others are forwarded. `payment_in` carries `escrowed` lines.
+
+Held deposits: `sync` is refused while a share is in a dispute, which replaces the snapshot sync and claim cap planned in section 5 (T24). Void shares can still `sync`, `claim` and `retry_forward`.
+
+Events added: `dispute_opened` (kind overallocation: group, claimant, contested), `dispute_frozen` {dispute_id, token_id, claimable_snapshot}, `dispute_resolved` {dispute_id, outcome, doc_hash, released, by}, `dispute_cancelled`, `share_voided`, `work_voided`, `share_confirmed`.
+
+`amend_split` is still not built: a split changes only through `uphold_claimant`.
