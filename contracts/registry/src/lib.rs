@@ -18,6 +18,7 @@ use near_sdk::{
 };
 
 mod agents;
+mod disputes;
 mod holder;
 pub mod logic;
 mod membership;
@@ -47,6 +48,7 @@ pub const FT_STORAGE_DEPOSIT: NearToken = NearToken::from_micronear(1_250);
 pub const MINT_RESERVE_BYTES: StorageUsage = 1_000;
 
 pub const MAX_SHARES_PER_GROUP: usize = 16;
+pub const MAX_GROUPS_PER_WORK: usize = 16;
 pub const MAX_URI_LEN: usize = 256;
 pub const MAX_NOTE_LEN: usize = 280;
 pub const MAX_PERIOD_LEN: usize = 32;
@@ -275,6 +277,16 @@ impl Registry {
             .unwrap_or_else(|| env::panic_str("unknown share"))
     }
 
+    /// True if the share is the claimant of an open over-allocation dispute.
+    pub(crate) fn is_claimant(&self, share: &Share) -> bool {
+        share.dispute.is_some_and(|id| {
+            matches!(
+                self.disputes.get(&id).map(|d| &d.kind),
+                Some(DisputeKind::Overallocation { claimant, .. }) if claimant == &share.token_id
+            )
+        })
+    }
+
     fn ledger_mut(&mut self, token_id: &TokenId) -> &mut Ledger {
         self.ledgers
             .get_mut(token_id)
@@ -302,6 +314,7 @@ pub(crate) fn ledger_view(l: &Ledger) -> LedgerView {
         claimable: U128(l.known_balance),
         total_routed_in: U128(l.total_routed_in),
         undelivered: U128(l.undelivered),
+        escrowed: U128(l.escrowed),
         inbound_pending: l.inbound_pending,
         payout_in_flight: l.payout_in_flight.clone(),
         transfer_pending: l.transfer_pending.clone(),

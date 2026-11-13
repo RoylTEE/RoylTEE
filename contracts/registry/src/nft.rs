@@ -180,6 +180,10 @@ impl Registry {
             self.share(&token_id).status == ShareStatus::Active,
             "share is not transferable"
         );
+        require!(
+            self.share(&token_id).dispute.is_none(),
+            "share is frozen by a dispute"
+        );
         let ledger = self
             .ledgers
             .get(&token_id)
@@ -309,6 +313,7 @@ impl Registry {
             share.status == ShareStatus::Active,
             "share is not transferable"
         );
+        require!(share.dispute.is_none(), "share is frozen by a dispute");
         let ledger = self
             .ledgers
             .get(token_id)
@@ -381,7 +386,10 @@ impl Registry {
             "percent_bps": share.percent_bps,
             "basis": share.basis,
             "provenance": provenance,
-            "evidence_tier": if share.payer_attestation.is_some() { "payer_confirmed" } else { "self_asserted" },
+            "evidence_tier": self.evidence_tier(share),
+            "confirmations": share.confirmations,
+            "dispute": share.dispute,
+            "escrowed": v.escrowed,
             "payer_attestation": share.payer_attestation,
             "note": share.note,
             "status": share.status,

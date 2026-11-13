@@ -55,6 +55,27 @@ pub fn split_partial(amount: u128, parts: &[SplitPart]) -> Option<(Vec<u128>, u1
     Some((credits, amount - sum))
 }
 
+/// Splits `amount` over `parts` by their own total (not 10000), for
+/// releasing dispute escrow under new bps. Parts with 0 bps get 0. Same
+/// remainder rule as `split`. Credits sum to `amount` exactly. None if the
+/// parts total 0 or on overflow.
+pub fn split_by_total(amount: u128, parts: &[SplitPart]) -> Option<Vec<u128>> {
+    let total: u128 = parts.iter().map(|(_, b)| u128::from(*b)).sum();
+    if total == 0 {
+        return None;
+    }
+    let mut credits = Vec::with_capacity(parts.len());
+    let mut sum: u128 = 0;
+    for (_, bps) in parts {
+        let c = amount.checked_mul(u128::from(*bps))? / total;
+        sum += c;
+        credits.push(c);
+    }
+    let idx = remainder_index(parts);
+    credits[idx] += amount - sum;
+    Some(credits)
+}
+
 /// Index of the part that takes the remainder: largest bps, then lowest number.
 pub fn remainder_index(parts: &[SplitPart]) -> usize {
     let mut best = 0;
@@ -280,5 +301,15 @@ mod tests {
         assert!(!is_territory("ww") && !is_territory("WWW"));
         assert_eq!(share_number("s12"), Some(12));
         assert_eq!(share_number("l12"), None);
+    }
+
+    #[test]
+    fn split_by_total_uses_the_parts_total() {
+        let c = split_by_total(500_001, &[(2, 2500), (3, 2500)]).unwrap();
+        assert_eq!(c, vec![250_001, 250_000], "tie goes to the lowest number");
+        let c = split_by_total(7, &[(1, 0), (2, 3333), (3, 1667)]).unwrap();
+        assert_eq!(c.iter().sum::<u128>(), 7);
+        assert_eq!(c[0], 0);
+        assert!(split_by_total(5, &[(1, 0)]).is_none());
     }
 }

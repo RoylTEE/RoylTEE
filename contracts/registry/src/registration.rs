@@ -53,7 +53,7 @@ impl Registry {
                         },
                         opened_by: caller.clone(),
                         opened_at: U64(env::block_timestamp()),
-                        resolved: false,
+                        status: DisputeStatus::Open,
                     },
                 );
                 emit(
@@ -85,6 +85,7 @@ impl Registry {
             metadata_uri: metadata_uri.clone(),
             registered_by: caller.clone(),
             status,
+            groups: Vec::new(),
             created_at: U64(env::block_timestamp()),
         };
         self.works.insert(id, work);
@@ -120,10 +121,18 @@ impl Registry {
         basis: Basis,
         holder: AccountId,
         evidence_hash: Hash32,
+        contests: Option<Vec<TokenId>>,
     ) -> Promise {
         let caller = self.assert_active_caller();
         require!(self.is_active(&holder), "holder has no active credential");
-        require!(self.works.get(&work_id).is_some(), "unknown work");
+        let work = self
+            .works
+            .get(&work_id)
+            .unwrap_or_else(|| env::panic_str("unknown work"));
+        require!(
+            !matches!(work.status, WorkStatus::Void { .. }),
+            "work is void"
+        );
         require!(
             (1..=10_000).contains(&percent_bps),
             "percent_bps must be 1 to 10000"
@@ -144,17 +153,80 @@ impl Registry {
             territory,
         };
         let mut group = self.groups.get(&group_key).cloned().unwrap_or_default();
+        require!(
+            group.open_dispute.is_none(),
+            "this work, right and territory has an open dispute"
+        );
         let live = group
             .shares
             .iter()
-            .filter(|t| self.share(t).status != ShareStatus::Failed)
+            .filter(|t| {
+                !matches!(
+                    self.share(t).status,
+                    ShareStatus::Failed | ShareStatus::Void
+                )
+            })
             .count();
         require!(live < MAX_SHARES_PER_GROUP, "group is full");
-        // Over-allocation becomes a dispute in block 4; until then it is refused.
-        require!(
-            group.active_bps + group.reserved_bps + u32::from(percent_bps) <= FULL_BPS,
-            "shares for this work, right and territory would exceed 100 percent"
-        );
+        let total =
+            group.active_bps + group.reserved_bps + group.claimant_bps + u32::from(percent_bps);
+        // Above 100 percent the new share becomes a claimant and an
+        // over-allocation dispute opens against `contests` (T11).
+        let contested = if total > FULL_BPS {
+            require!(
+                group.reserved_bps == 0,
+                "shares in this group are still minting; retry after they finish"
+            );
+            let list = contests.unwrap_or_else(|| {
+                group
+                    .shares
+                    .iter()
+                    .filter(|t| self.share(t).status == ShareStatus::Active)
+                    .cloned()
+                    .collect()
+            });
+            require!(!list.is_empty(), "nothing to contest");
+            let mut sorted = list.clone();
+            sorted.sort();
+            sorted.dedup();
+            require!(sorted.len() == list.len(), "contests lists a share twice");
+            let mut contested_bps = 0u32;
+            for t in &list {
+                let s = self
+                    .shares
+                    .get(t)
+                    .unwrap_or_else(|| env::panic_str("contests names an unknown share"));
+                require!(
+                    s.group == group_key,
+                    "contests names a share outside this group"
+                );
+                require!(
+                    s.status == ShareStatus::Active && s.dispute.is_none(),
+                    "contests names a share that is not active"
+                );
+                contested_bps += u32::from(s.percent_bps);
+            }
+            require!(
+                contested_bps >= total - FULL_BPS,
+                "contested shares do not cover the excess over 100 percent"
+            );
+            Some(list)
+        } else {
+            require!(
+                contests.is_none(),
+                "contests only apply when the group would exceed 100 percent"
+            );
+            None
+        };
+        if !work.groups.contains(&group_key) {
+            require!(
+                work.groups.len() < MAX_GROUPS_PER_WORK,
+                "work has too many groups"
+            );
+            if let Some(w) = self.works.get_mut(&work_id) {
+                w.groups.push(group_key.clone());
+            }
+        }
 
         self.next_share += 1;
         let number = self.next_share;
@@ -181,11 +253,16 @@ impl Registry {
                 registered_by: caller.clone(),
                 note: None,
                 payer_attestation: None,
+                dispute: None,
+                confirmations: Vec::new(),
                 last_effective_from: now,
                 created_at: now,
             },
         );
         self.ledgers.insert(token_id.clone(), Ledger::default());
+        if let Some(list) = contested {
+            self.open_overallocation(&caller, &group_key, &token_id, list);
+        }
         self.flush_all();
         charge_storage(
             initial,
@@ -290,12 +367,17 @@ impl Registry {
         }
         .emit();
         let bps = u32::from(share.percent_bps);
+        let claimant = self.is_claimant(&share);
         let group = self
             .groups
             .get_mut(&share.group)
             .unwrap_or_else(|| env::panic_str("unknown group"));
         group.reserved_bps -= bps;
-        group.active_bps += bps;
+        if claimant {
+            group.claimant_bps += bps;
+        } else {
+            group.active_bps += bps;
+        }
         if let Some(s) = self.shares.get_mut(&token_id) {
             s.status = ShareStatus::Active;
         }
@@ -313,8 +395,12 @@ impl Registry {
         if let Some(g) = self.groups.get_mut(&share.group) {
             g.reserved_bps -= u32::from(share.percent_bps);
         }
+        let claimant_of = share.dispute.filter(|_| self.is_claimant(&share));
         if let Some(s) = self.shares.get_mut(token_id) {
             s.status = ShareStatus::Failed;
+        }
+        if let Some(dispute_id) = claimant_of {
+            self.cancel_dispute(dispute_id);
         }
         emit(
             "vault_failed",
@@ -323,7 +409,7 @@ impl Registry {
     }
 
     /// Writes pending collection changes so storage_usage is accurate.
-    fn flush_all(&mut self) {
+    pub(crate) fn flush_all(&mut self) {
         self.works.flush();
         self.code_index.flush();
         self.shares.flush();

@@ -112,8 +112,11 @@ impl Registry {
     /// amount is debited before the forward; a second failure puts it back.
     pub fn retry_forward(&mut self, token_id: TokenId) {
         require!(
-            self.share(&token_id).status == ShareStatus::Active,
-            "share is not active"
+            matches!(
+                self.share(&token_id).status,
+                ShareStatus::Active | ShareStatus::Void
+            ),
+            "share has no vault"
         );
         require!(Self::has_gas_for_forwards(1), "not enough gas to forward");
         let l = self.ledger_mut(&token_id);
@@ -168,10 +171,17 @@ impl Registry {
     /// `ft_transfer` payments straight into a vault count as earned.
     /// Anyone may call it. Refused while any lock or forward is open (T21).
     pub fn sync(&mut self, token_id: TokenId) -> Promise {
-        let vault = self.share(&token_id).vault.clone();
+        let share = self.share(&token_id);
+        let vault = share.vault.clone();
         require!(
-            self.share(&token_id).status == ShareStatus::Active,
-            "share is not active"
+            matches!(share.status, ShareStatus::Active | ShareStatus::Void),
+            "share has no vault"
+        );
+        // T24: during a dispute plain deposits into the vault stay held and
+        // unattributed; the ledger keeps only what it already knew.
+        require!(
+            share.dispute.is_none(),
+            "share is in dispute: sync after resolve"
         );
         let ledger = self.ledger_mut(&token_id);
         require!(ledger.payout_in_flight.is_none(), "payout in flight");
@@ -253,7 +263,10 @@ impl Registry {
         );
         let share = self.share(&token_id);
         require!(share.group == group, "share is not in this group");
-        require!(share.status == ShareStatus::Active, "share is not active");
+        require!(
+            share.status == ShareStatus::Active && share.dispute.is_none(),
+            "share is not active or is in dispute"
+        );
         require!(amount.0 > 0, "amount must be positive");
         require!(Self::has_gas_for_forwards(1), "not enough gas to forward");
         let g = self
@@ -392,26 +405,34 @@ impl Registry {
             .get(&key)
             .ok_or("no shares registered for this group")?;
         // Pending shares are not paid yet; their bps count as unassigned.
-        let paid: Vec<(TokenId, u64, Bps)> = group
+        // A dispute claimant is not paid; contested shares are paid into
+        // escrow (T11).
+        let paid: Vec<(TokenId, u64, Bps, bool)> = group
             .shares
             .iter()
             .map(|t| (t, self.share(t)))
-            .filter(|(_, s)| s.status == ShareStatus::Active)
-            .map(|(t, s)| (t.clone(), s.number, s.percent_bps))
+            .filter(|(_, s)| s.status == ShareStatus::Active && !self.is_claimant(s))
+            .map(|(t, s)| (t.clone(), s.number, s.percent_bps, s.dispute.is_some()))
             .collect();
         if paid.is_empty() {
             return Err("no active shares in this group");
         }
-        let parts: Vec<logic::SplitPart> = paid.iter().map(|(_, n, b)| (*n, *b)).collect();
+        let parts: Vec<logic::SplitPart> = paid.iter().map(|(_, n, b, _)| (*n, *b)).collect();
         let (credits, unallocated) =
             logic::split_partial(amount, &parts).ok_or("shares total more than 10000 bps")?;
-        if !Self::has_gas_for_forwards(paid.len()) {
+        if !Self::has_gas_for_forwards(paid.iter().filter(|p| !p.3).count()) {
             return Err("not enough gas to forward to every share");
         }
         let mut lines = Vec::with_capacity(paid.len());
-        for ((token_id, _, _), credit) in paid.iter().zip(credits) {
-            self.forward(token_id, credit);
-            lines.push(json!({ "token_id": token_id, "amount": U128(credit) }));
+        let mut escrowed = Vec::new();
+        for ((token_id, _, _, frozen), credit) in paid.iter().zip(credits) {
+            if *frozen {
+                self.escrow(token_id, credit);
+                escrowed.push(json!({ "token_id": token_id, "amount": U128(credit), "dispute_id": self.share(token_id).dispute }));
+            } else {
+                self.forward(token_id, credit);
+                lines.push(json!({ "token_id": token_id, "amount": U128(credit) }));
+            }
         }
         if unallocated > 0 {
             let g = self
@@ -433,6 +454,7 @@ impl Registry {
                 "statement_hash": p.statement_hash,
                 "statement_line_id": p.statement_line_id,
                 "credits": lines,
+                "escrowed": escrowed,
                 "unallocated": U128(unallocated),
             }),
         );
@@ -462,10 +484,18 @@ impl Registry {
         if !work_ok {
             return Err("work is a disputed duplicate: payments refused until resolve");
         }
-        if !Self::has_gas_for_forwards(1) {
-            return Err("not enough gas to forward");
+        if self.is_claimant(share) {
+            return Err("share is a dispute claimant: not paid until resolve");
         }
-        self.forward(&p.token_id, amount);
+        let frozen = share.dispute;
+        if frozen.is_some() {
+            self.escrow(&p.token_id, amount);
+        } else {
+            if !Self::has_gas_for_forwards(1) {
+                return Err("not enough gas to forward");
+            }
+            self.forward(&p.token_id, amount);
+        }
         emit(
             "payment_in",
             json!({
@@ -477,7 +507,8 @@ impl Registry {
                 "period": p.period,
                 "statement_hash": p.statement_hash,
                 "statement_line_id": line,
-                "credits": [{ "token_id": p.token_id, "amount": U128(amount) }],
+                "credits": if frozen.is_none() { json!([{ "token_id": p.token_id, "amount": U128(amount) }]) } else { json!([]) },
+                "escrowed": if let Some(id) = frozen { json!([{ "token_id": p.token_id, "amount": U128(amount), "dispute_id": id }]) } else { json!([]) },
             }),
         );
         Ok(())

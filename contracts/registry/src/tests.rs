@@ -89,6 +89,17 @@ fn work(c: &mut Registry, code: &str) -> WorkId {
 
 /// Registers and fully mints one share; returns its token id.
 fn mint(c: &mut Registry, work_id: WorkId, holder: &str, bps: Bps) -> TokenId {
+    mint_with(c, work_id, holder, bps, None)
+}
+
+/// Like `mint`, naming the shares a claimant contests (block 4).
+fn mint_with(
+    c: &mut Registry,
+    work_id: WorkId,
+    holder: &str,
+    bps: Bps,
+    contests: Option<Vec<TokenId>>,
+) -> TokenId {
     call(&acc("alice.near"), NearToken::from_near(1));
     let _ = c.register_share(
         work_id,
@@ -98,6 +109,7 @@ fn mint(c: &mut Registry, work_id: WorkId, holder: &str, bps: Bps) -> TokenId {
         Basis::Copyright,
         acc(holder),
         h('e'),
+        contests,
     );
     let token_id = format!("s{}", c.next_share);
     callback(ok(b""));
@@ -149,6 +161,7 @@ fn failed_vault_creation_mints_nothing_and_releases_bps() {
         Basis::Copyright,
         acc("bob.near"),
         h('e'),
+        None,
     );
     callback(PromiseResult::Failed);
     let r = c.on_vault_created("s1".into(), acc("alice.near"));
@@ -175,6 +188,7 @@ fn failed_token_registration_mints_nothing() {
         Basis::Copyright,
         acc("bob.near"),
         h('e'),
+        None,
     );
     callback(ok(b""));
     let _ = c.on_vault_created("s1".into(), acc("alice.near"));
@@ -185,24 +199,6 @@ fn failed_token_registration_mints_nothing() {
         ShareStatus::Failed
     );
     assert_eq!(c.nft_total_supply().0, 0);
-}
-
-#[test]
-#[should_panic(expected = "would exceed 100 percent")]
-fn over_allocation_is_refused_in_block_2() {
-    let mut c = setup();
-    let w = work(&mut c, "USRC12600001");
-    mint(&mut c, w, "bob.near", 6000);
-    call(&acc("alice.near"), NearToken::from_near(1));
-    let _ = c.register_share(
-        w,
-        RightType::Publishing,
-        "WW".into(),
-        5000,
-        Basis::Copyright,
-        acc("bob.near"),
-        h('e'),
-    );
 }
 
 #[test]
@@ -227,6 +223,7 @@ fn register_share_needs_deposit() {
         Basis::Copyright,
         acc("bob.near"),
         h('e'),
+        None,
     );
 }
 
@@ -1405,4 +1402,475 @@ fn late_failed_claim_after_stale_release_changes_no_balance() {
     callback(ok(b"\"700000\""));
     assert!(c.on_sync(t.clone(), U64(epoch)).is_some());
     assert_eq!(ledger(&c, &t).claimable.0, 700_000);
+}
+
+// ---------- block 4: disputes, resolve, confirm_share ----------
+
+fn pay_work_msg(c: &mut Registry, w: WorkId, amount: u128) -> PromiseOrValue<U128> {
+    call(&usdc(), NearToken::from_yoctonear(0));
+    let msg = json!({ "pay_work": { "work_id": w, "right_type": "publishing", "territory": "WW",
+        "period": "2026-Q3", "statement_hash": h('f') } });
+    c.ft_on_transfer(acc("payer.near"), U128(amount), msg.to_string())
+}
+
+fn settle(c: &mut Registry, t: &TokenId, amount: u128) {
+    callback(ok(b""));
+    assert!(c.on_forward(t.clone(), U128(amount)));
+}
+
+fn resolve(c: &mut Registry, id: DisputeId, outcome: Outcome) {
+    yocto(&registrar());
+    c.resolve(id, outcome, h('7'));
+}
+
+fn group_of(c: &Registry, w: WorkId) -> Group {
+    c.get_group(w, RightType::Publishing, "WW".into()).unwrap()
+}
+
+/// A 5000 (bob), B 5000 (carol), claimant C 5000 (alice) contesting B.
+fn contested_setup() -> (Registry, WorkId, TokenId, TokenId, TokenId, DisputeId) {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let a = mint(&mut c, w, "bob.near", 5000);
+    let b = mint(&mut c, w, "carol.near", 5000);
+    pay_share(&mut c, &b, 30_000); // old money, stays claimable
+    let cl = mint_with(&mut c, w, "alice.near", 5000, Some(vec![b.clone()]));
+    let id = c.get_share(cl.clone()).unwrap().dispute.unwrap();
+    (c, w, a, b, cl, id)
+}
+
+#[test]
+fn over_allocation_opens_dispute_and_freezes_only_the_contested_fraction() {
+    let (mut c, w, a, b, cl, id) = contested_setup();
+    let d = c.get_dispute(id).unwrap();
+    assert_eq!(d.status, DisputeStatus::Open);
+    assert!(
+        matches!(d.kind, DisputeKind::Overallocation { ref claimant, ref contested, .. }
+        if claimant == &cl && contested == &vec![b.clone()])
+    );
+    let g = group_of(&c, w);
+    assert_eq!(
+        (g.active_bps, g.claimant_bps, g.open_dispute),
+        (10_000, 5000, Some(id))
+    );
+    assert!(c.get_share(a.clone()).unwrap().dispute.is_none());
+
+    assert!(matches!(
+        pay_work_msg(&mut c, w, 1_000_000),
+        PromiseOrValue::Value(U128(0))
+    ));
+    assert!(get_logs().join("\n").contains("\"escrowed\":[{"));
+    settle(&mut c, &a, 500_000);
+    assert_eq!(ledger(&c, &a).known_balance.0, 500_000);
+    assert_eq!(ledger(&c, &b).escrowed.0, 500_000);
+    assert_eq!(ledger(&c, &b).known_balance.0, 30_000);
+    assert_eq!(ledger(&c, &cl).known_balance.0, 0);
+    assert_eq!(c.get_accounting().escrow_total.0, 500_000);
+
+    // Direct payment to the contested share also goes to escrow; to the
+    // claimant it is refused.
+    call(&usdc(), NearToken::from_yoctonear(0));
+    let msg =
+        json!({ "pay_share": { "token_id": b, "period": "2026-Q3", "statement_hash": h('f') } });
+    assert!(matches!(
+        c.ft_on_transfer(acc("payer.near"), U128(1000), msg.to_string()),
+        PromiseOrValue::Value(U128(0))
+    ));
+    assert_eq!(ledger(&c, &b).escrowed.0, 501_000);
+    let msg =
+        json!({ "pay_share": { "token_id": cl, "period": "2026-Q3", "statement_hash": h('f') } });
+    assert!(matches!(
+        c.ft_on_transfer(acc("payer.near"), U128(1000), msg.to_string()),
+        PromiseOrValue::Value(U128(1000))
+    ));
+
+    // Frozen shares cannot move or sync; old money stays claimable.
+    yocto(&acc("carol.near"));
+    assert!(panics(|| c.nft_transfer(
+        acc("bob.near"),
+        b.clone(),
+        None,
+        None,
+        None
+    )));
+    yocto(&acc("alice.near"));
+    assert!(panics(|| c.nft_transfer(
+        acc("bob.near"),
+        cl.clone(),
+        None,
+        None,
+        None
+    )));
+    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    assert!(panics(|| drop(c.sync(b.clone()))));
+    yocto(&acc("carol.near"));
+    let _ = c.claim(b.clone());
+    assert_eq!(ledger(&c, &b).total_paid_out.0, 30_000);
+    // The unfrozen share still moves.
+    callback(ok(b""));
+    c.on_claim(b.clone(), acc("carol.near"), U128(30_000), U64(0));
+    yocto(&acc("bob.near"));
+    c.nft_transfer(acc("carol.near"), a.clone(), None, None, None);
+}
+
+#[test]
+fn uphold_claimant_splits_escrow_by_new_bps() {
+    let (mut c, w, a, b, cl, id) = contested_setup();
+    let _ = pay_work_msg(&mut c, w, 1_000_001);
+    settle(&mut c, &a, 500_001);
+    assert_eq!(ledger(&c, &b).escrowed.0, 500_000);
+    let bad = Outcome::UpholdClaimant {
+        new_bps: vec![
+            BpsEntry {
+                token_id: b.clone(),
+                bps: 2500,
+            },
+            BpsEntry {
+                token_id: cl.clone(),
+                bps: 2000,
+            },
+        ],
+    };
+    yocto(&registrar());
+    assert!(panics(|| c.resolve(id, bad, h('7'))), "sum must match");
+    let missing = Outcome::UpholdClaimant {
+        new_bps: vec![BpsEntry {
+            token_id: cl.clone(),
+            bps: 5000,
+        }],
+    };
+    yocto(&registrar());
+    assert!(
+        panics(|| c.resolve(id, missing, h('7'))),
+        "must name every party"
+    );
+
+    resolve(
+        &mut c,
+        id,
+        Outcome::UpholdClaimant {
+            new_bps: vec![
+                BpsEntry {
+                    token_id: b.clone(),
+                    bps: 2500,
+                },
+                BpsEntry {
+                    token_id: cl.clone(),
+                    bps: 2500,
+                },
+            ],
+        },
+    );
+    assert!(get_logs().join("\n").contains("dispute_resolved"));
+    assert_eq!(c.get_accounting().escrow_total.0, 0);
+    settle(&mut c, &b, 250_000);
+    settle(&mut c, &cl, 250_000);
+    assert!(matches!(
+        c.get_dispute(id).unwrap().status,
+        DisputeStatus::Resolved { .. }
+    ));
+    let g = group_of(&c, w);
+    assert_eq!(
+        (g.active_bps, g.claimant_bps, g.open_dispute),
+        (10_000, 0, None)
+    );
+    assert_eq!(c.get_share(cl.clone()).unwrap().percent_bps, 2500);
+    assert!(c.get_share(b.clone()).unwrap().dispute.is_none());
+
+    // Next payment: 5000 / 2500 / 2500, nothing escrowed.
+    let _ = pay_work_msg(&mut c, w, 100_000);
+    settle(&mut c, &a, 50_000);
+    settle(&mut c, &b, 25_000);
+    settle(&mut c, &cl, 25_000);
+    assert_eq!(ledger(&c, &cl).known_balance.0, 275_000);
+    yocto(&acc("alice.near"));
+    c.nft_transfer(acc("bob.near"), cl.clone(), None, None, None);
+    yocto(&registrar());
+    assert!(
+        panics(|| c.resolve(id, Outcome::UpholdExisting, h('7'))),
+        "already resolved"
+    );
+}
+
+#[test]
+fn uphold_existing_voids_claimant_and_returns_escrow() {
+    let (mut c, w, a, b, cl, id) = contested_setup();
+    let _ = pay_work_msg(&mut c, w, 1_000_000);
+    settle(&mut c, &a, 500_000);
+    yocto(&acc("bob.near"));
+    assert!(
+        panics(|| c.resolve(id, Outcome::UpholdExisting, h('7'))),
+        "registrar only"
+    );
+    yocto(&registrar());
+    assert!(
+        panics(|| c.resolve(id, Outcome::KeepBoth, h('7'))),
+        "kind mismatch"
+    );
+    resolve(&mut c, id, Outcome::UpholdExisting);
+    settle(&mut c, &b, 500_000);
+    assert_eq!(ledger(&c, &b).known_balance.0, 530_000);
+    assert_eq!(c.get_share(cl.clone()).unwrap().status, ShareStatus::Void);
+    let g = group_of(&c, w);
+    assert_eq!(
+        (g.active_bps, g.claimant_bps, g.open_dispute),
+        (10_000, 0, None)
+    );
+    yocto(&acc("alice.near"));
+    assert!(panics(|| c.nft_transfer(
+        acc("bob.near"),
+        cl.clone(),
+        None,
+        None,
+        None
+    )));
+    let _ = pay_work_msg(&mut c, w, 10_000);
+    settle(&mut c, &a, 5000);
+    settle(&mut c, &b, 5000);
+    assert_eq!(c.get_accounting().escrow_total.0, 0);
+}
+
+#[test]
+fn over_allocation_rules() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let a = mint(&mut c, w, "bob.near", 6000);
+    let b = mint(&mut c, w, "carol.near", 3000);
+    let reg = |c: &mut Registry, bps: Bps, contests: Option<Vec<TokenId>>| {
+        call(&acc("alice.near"), NearToken::from_near(1));
+        drop(c.register_share(
+            w,
+            RightType::Publishing,
+            "WW".into(),
+            bps,
+            Basis::Copyright,
+            acc("alice.near"),
+            h('e'),
+            contests,
+        ));
+    };
+    assert!(
+        panics(|| reg(&mut c, 500, Some(vec![a.clone()]))),
+        "contests only when over"
+    );
+    assert!(
+        panics(|| reg(&mut c, 5000, Some(vec![b.clone()]))),
+        "3000 does not cover 4000 excess"
+    );
+    assert!(
+        panics(|| reg(&mut c, 5000, Some(vec![a.clone(), a.clone()]))),
+        "duplicate entry"
+    );
+    // Default contests: every active share.
+    let cl = mint_with(&mut c, w, "alice.near", 5000, None);
+    let id = c.get_share(cl).unwrap().dispute.unwrap();
+    assert!(matches!(c.get_dispute(id).unwrap().kind,
+        DisputeKind::Overallocation { ref contested, .. } if contested.len() == 2));
+    assert!(
+        panics(|| reg(&mut c, 100, None)),
+        "group has an open dispute"
+    );
+}
+
+#[test]
+fn failed_claimant_mint_cancels_dispute_and_escrow_goes_to_undelivered() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let a = mint(&mut c, w, "bob.near", 10_000);
+    call(&acc("alice.near"), NearToken::from_near(1));
+    let _ = c.register_share(
+        w,
+        RightType::Publishing,
+        "WW".into(),
+        4000,
+        Basis::Copyright,
+        acc("alice.near"),
+        h('e'),
+        None,
+    );
+    let cl = format!("s{}", c.next_share);
+    let id = c.get_share(cl.clone()).unwrap().dispute.unwrap();
+    let _ = pay_work_msg(&mut c, w, 100_000);
+    assert_eq!(ledger(&c, &a).escrowed.0, 100_000);
+    callback(PromiseResult::Failed);
+    let _ = c.on_vault_created(cl.clone(), acc("alice.near"));
+    assert_eq!(c.get_dispute(id).unwrap().status, DisputeStatus::Cancelled);
+    assert_eq!(ledger(&c, &a).undelivered.0, 100_000);
+    let acct = c.get_accounting();
+    assert_eq!(
+        (acct.escrow_total.0, acct.undelivered_total.0),
+        (0, 100_000)
+    );
+    assert!(group_of(&c, w).open_dispute.is_none());
+    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    c.retry_forward(a.clone());
+    settle(&mut c, &a, 100_000);
+    assert_eq!(ledger(&c, &a).known_balance.0, 100_000);
+}
+
+fn dup_setup() -> (Registry, WorkId, WorkId, TokenId, TokenId, DisputeId) {
+    let mut c = setup();
+    let w1 = work(&mut c, "USRC12600001");
+    let w2 = work(&mut c, "USRC12600001");
+    let t1 = mint(&mut c, w1, "bob.near", 10_000);
+    let t2 = mint(&mut c, w2, "carol.near", 10_000);
+    let id = match c.get_work(w2).unwrap().status {
+        WorkStatus::DuplicateOpen { dispute_id, .. } => dispute_id,
+        s => panic!("{s:?}"),
+    };
+    (c, w1, w2, t1, t2, id)
+}
+
+#[test]
+fn void_duplicate_keeps_original_payable() {
+    let (mut c, w1, w2, t1, t2, id) = dup_setup();
+    yocto(&registrar());
+    assert!(
+        panics(|| c.resolve(id, Outcome::UpholdExisting, h('7'))),
+        "kind mismatch"
+    );
+    resolve(&mut c, id, Outcome::VoidDuplicate);
+    assert!(matches!(
+        c.get_work(w2).unwrap().status,
+        WorkStatus::Void { .. }
+    ));
+    assert_eq!(c.get_share(t2.clone()).unwrap().status, ShareStatus::Void);
+    assert!(matches!(
+        pay_work_msg(&mut c, w2, 50_000),
+        PromiseOrValue::Value(U128(50_000))
+    ));
+    assert!(matches!(
+        pay_work_msg(&mut c, w1, 50_000),
+        PromiseOrValue::Value(U128(0))
+    ));
+    settle(&mut c, &t1, 50_000);
+}
+
+#[test]
+fn keep_both_makes_duplicate_payable() {
+    let (mut c, _w1, w2, _t1, t2, id) = dup_setup();
+    resolve(&mut c, id, Outcome::KeepBoth);
+    assert_eq!(c.get_work(w2).unwrap().status, WorkStatus::Active);
+    assert!(matches!(
+        pay_work_msg(&mut c, w2, 50_000),
+        PromiseOrValue::Value(U128(0))
+    ));
+    settle(&mut c, &t2, 50_000);
+}
+
+#[test]
+fn swap_payable_flips_which_entry_is_paid() {
+    let (mut c, w1, w2, t1, t2, id) = dup_setup();
+    pay_share(&mut c, &t1, 40_000); // earned before the flip
+    resolve(&mut c, id, Outcome::SwapPayable);
+    assert!(matches!(
+        c.get_work(w1).unwrap().status,
+        WorkStatus::Void { .. }
+    ));
+    assert_eq!(c.get_work(w2).unwrap().status, WorkStatus::Active);
+    assert_eq!(c.get_share(t1.clone()).unwrap().status, ShareStatus::Void);
+    assert!(matches!(
+        pay_work_msg(&mut c, w1, 50_000),
+        PromiseOrValue::Value(U128(50_000))
+    ));
+    assert!(matches!(
+        pay_work_msg(&mut c, w2, 50_000),
+        PromiseOrValue::Value(U128(0))
+    ));
+    settle(&mut c, &t2, 50_000);
+    // The voided share's holder keeps what was already earned.
+    yocto(&acc("bob.near"));
+    let _ = c.claim(t1.clone());
+    assert_eq!(ledger(&c, &t1).total_paid_out.0, 40_000);
+    // A third registration of the code is now a duplicate of w2.
+    let w3 = work(&mut c, "USRC12600001");
+    assert!(
+        matches!(c.get_work(w3).unwrap().status, WorkStatus::DuplicateOpen { original, .. } if original == w2)
+    );
+    // Shares cannot be added to a void work.
+    call(&acc("alice.near"), NearToken::from_near(1));
+    assert!(panics(|| drop(c.register_share(
+        w1,
+        RightType::Master,
+        "WW".into(),
+        100,
+        Basis::Copyright,
+        acc("alice.near"),
+        h('e'),
+        None
+    ))));
+}
+
+#[test]
+fn void_work_waits_for_its_share_dispute() {
+    let mut c = setup();
+    let w1 = work(&mut c, "USRC12600001");
+    let w2 = work(&mut c, "USRC12600001");
+    let id = match c.get_work(w2).unwrap().status {
+        WorkStatus::DuplicateOpen { dispute_id, .. } => dispute_id,
+        s => panic!("{s:?}"),
+    };
+    let _ = w1;
+    let _a = mint(&mut c, w2, "bob.near", 10_000);
+    let cl = mint_with(&mut c, w2, "carol.near", 1000, None);
+    let share_dispute = c.get_share(cl).unwrap().dispute.unwrap();
+    yocto(&registrar());
+    assert!(panics(|| c.resolve(id, Outcome::VoidDuplicate, h('7'))));
+    resolve(&mut c, share_dispute, Outcome::UpholdExisting);
+    resolve(&mut c, id, Outcome::VoidDuplicate);
+    assert_eq!(c.list_disputes(None, None).len(), 2);
+}
+
+#[test]
+fn confirm_share_reaches_counterparty_tier_and_drops_on_sale() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let a = mint(&mut c, w, "bob.near", 5000);
+    let b = mint(&mut c, w, "carol.near", 5000);
+    assert_eq!(c.get_evidence_tier(a.clone()), "self_asserted");
+    call(&acc("bob.near"), NearToken::from_millinear(10));
+    assert!(panics(|| c.confirm_share(a.clone())), "own share");
+    call(&acc("alice.near"), NearToken::from_millinear(10));
+    assert!(
+        panics(|| c.confirm_share(a.clone())),
+        "no share in the group"
+    );
+    call(&acc("carol.near"), NearToken::from_yoctonear(0));
+    assert!(panics(|| c.confirm_share(a.clone())), "needs a deposit");
+    call(&acc("carol.near"), NearToken::from_millinear(10));
+    c.confirm_share(a.clone());
+    assert_eq!(c.get_evidence_tier(a.clone()), "counterparty_confirmed");
+    let extra = c
+        .nft_token(a.clone())
+        .unwrap()
+        .metadata
+        .unwrap()
+        .extra
+        .unwrap();
+    assert!(extra.contains("counterparty_confirmed"));
+    // B is sold: its new holder has not confirmed A.
+    yocto(&acc("carol.near"));
+    c.nft_transfer(acc("alice.near"), b.clone(), None, None, None);
+    assert_eq!(c.get_evidence_tier(a.clone()), "self_asserted");
+    call(&acc("alice.near"), NearToken::from_millinear(10));
+    c.confirm_share(a.clone());
+    assert_eq!(c.get_evidence_tier(a.clone()), "counterparty_confirmed");
+    assert_eq!(
+        c.get_share(a).unwrap().confirmations,
+        vec![acc("alice.near")]
+    );
+}
+
+#[test]
+fn void_share_keeps_claim_and_sync() {
+    let (mut c, _w, _a, _b, cl, id) = contested_setup();
+    resolve(&mut c, id, Outcome::UpholdExisting);
+    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    let _ = c.sync(cl.clone());
+    let epoch = c.ledgers.get(&cl).unwrap().epoch;
+    callback(ok(b"\"9000\""));
+    assert!(c.on_sync(cl.clone(), U64(epoch)).is_some());
+    yocto(&acc("alice.near"));
+    let _ = c.claim(cl.clone());
+    assert_eq!(ledger(&c, &cl).total_paid_out.0, 9000);
 }

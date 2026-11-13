@@ -87,6 +87,11 @@ pub enum WorkStatus {
         dispute_id: DisputeId,
         original: WorkId,
     },
+    /// Voided by a resolved duplicate-code dispute. Never paid again; its
+    /// shares are Void.
+    Void {
+        dispute_id: DisputeId,
+    },
 }
 
 #[near(serializers = [borsh, json])]
@@ -101,6 +106,8 @@ pub struct Work {
     pub metadata_uri: String,
     pub registered_by: AccountId,
     pub status: WorkStatus,
+    /// Every work + right + territory group with shares of this work.
+    pub groups: Vec<GroupKey>,
     pub created_at: U64,
 }
 
@@ -114,6 +121,9 @@ pub enum ShareStatus {
     Active,
     /// Vault creation or token registration failed; no NFT; bps released.
     Failed,
+    /// Lost a dispute, or its work was voided. The NFT stays as a record,
+    /// cannot move and is never paid; money already known stays claimable.
+    Void,
 }
 
 #[near(serializers = [borsh, json])]
@@ -132,6 +142,12 @@ pub struct Share {
     pub note: Option<String>,
     /// Set by an account with the payer role (evidence tier payer_confirmed).
     pub payer_attestation: Option<Attestation>,
+    /// Open over-allocation dispute this share is part of, as claimant or
+    /// as contested share. Frozen while set.
+    pub dispute: Option<DisputeId>,
+    /// Holders of other shares of the group who confirmed this share
+    /// (evidence tier counterparty_confirmed, computed at view time).
+    pub confirmations: Vec<AccountId>,
     pub last_effective_from: U64,
     pub created_at: U64,
 }
@@ -164,6 +180,8 @@ pub struct Ledger {
     pub total_routed_in: u128,
     /// Forwarded amount that failed, still held by the registry.
     pub undelivered: u128,
+    /// This share's part of payments held in dispute escrow, in the registry.
+    pub escrowed: u128,
     pub inbound_pending: u32,
     pub payout_in_flight: Option<Lock>,
     pub transfer_pending: Option<Lock>,
@@ -180,6 +198,7 @@ pub struct LedgerView {
     pub claimable: U128,
     pub total_routed_in: U128,
     pub undelivered: U128,
+    pub escrowed: U128,
     pub inbound_pending: u32,
     pub payout_in_flight: Option<Lock>,
     pub transfer_pending: Option<Lock>,
@@ -199,13 +218,69 @@ pub struct Group {
     /// (decision 4). Held in the registry's token balance. Only the registrar
     /// can release it, to a share of this group, with a document hash.
     pub unallocated: U128,
+    /// Bps of a minted over-allocation claimant, not paid until resolve.
+    pub claimant_bps: u32,
+    /// At most one open over-allocation dispute per group.
+    pub open_dispute: Option<DisputeId>,
 }
 
 #[near(serializers = [borsh, json])]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum DisputeKind {
-    DuplicateCode { original: WorkId, duplicate: WorkId },
+    DuplicateCode {
+        original: WorkId,
+        duplicate: WorkId,
+    },
+    /// A share pushed its group above 10000 bps. The claimant is not paid
+    /// and the contested shares' new money goes to escrow until resolve.
+    Overallocation {
+        group: GroupKey,
+        claimant: TokenId,
+        contested: Vec<TokenId>,
+    },
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BpsEntry {
+    pub token_id: TokenId,
+    pub bps: Bps,
+}
+
+/// Registrar's decision. Must fit the dispute kind.
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum Outcome {
+    /// Over-allocation: the claimant is voided, escrow goes back to the
+    /// contested shares.
+    UpholdExisting,
+    /// Over-allocation: new bps for the contested shares plus the claimant,
+    /// summing to the contested shares' old total. Escrow is split by them.
+    UpholdClaimant { new_bps: Vec<BpsEntry> },
+    /// Duplicate code: the duplicate work and its shares are voided.
+    VoidDuplicate,
+    /// Duplicate code: both works stay payable (for example two recordings
+    /// wrongly sharing a code, fixed off chain).
+    KeepBoth,
+    /// Duplicate code: the duplicate becomes the payable entry and the
+    /// original work and its shares are voided.
+    SwapPayable,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DisputeStatus {
+    Open,
+    Resolved {
+        outcome: Outcome,
+        doc_hash: Hash32,
+        at: U64,
+    },
+    /// The claimant's mint failed; escrow moved to undelivered for retry.
+    Cancelled,
 }
 
 #[near(serializers = [borsh, json])]
@@ -215,8 +290,7 @@ pub struct Dispute {
     pub kind: DisputeKind,
     pub opened_by: AccountId,
     pub opened_at: U64,
-    /// Resolution lands in block 4.
-    pub resolved: bool,
+    pub status: DisputeStatus,
 }
 
 #[near(serializers = [json])]
