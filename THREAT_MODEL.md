@@ -1,6 +1,6 @@
 # Transfer threat model
 
-Status: written on 2026-11-13, BEFORE any contract code exists in this repo. No contract, script or frontend code has been written yet. Tests named below are planned, not passing. Each row will be marked with its passing test once the code lands.
+Status: written on 2026-11-13, BEFORE any contract code existed in this repo. Block 2 code landed later the same day; rows covered by passing tests say so under "Block 2 status" at the end. Owner decisions 3, 4 and 10 (2026-11-13) changed T23 and T25 and added T34 and T35; those edits are marked.
 
 Scope: every way a seller, a buyer, an agent, a payer, an outside attacker or a privileged role could keep money or access, move money to the wrong place, or lose money, around a rights-share NFT and its vault. Testnet only. Mock USDC only.
 
@@ -174,8 +174,8 @@ Terms used below (full detail in DESIGN.md):
 ### T23. Suspended credential edge cases
 - Attack or fault: (a) suspended member keeps receiving tokens; (b) a suspended organisation's agents keep paying or the org keeps funding; (c) suspension is used to seize property; (d) `nft_transfer_call` returns a token to a sender who was suspended meanwhile; (e) suspended member confirms shares or registers works.
 - Impact: compliance bypass, or loss of property by administrative action.
-- Mitigation: (a) receiver must be active; (b) agent methods check the organisation's credential is active; `fund_allowance` from a suspended org is refunded; (c) suspension never moves a share; the share keeps accruing and the holder may still claim and may transfer out to an active member (pending owner decision, DECISIONS_LOG item 6); (d) the return path in `nft_resolve_transfer` is allowed, because it restores the prior state and the receiver cannot keep a token it refused; (e) register, confirm and attest methods require an active credential.
-- Test: test 15 (suspended member keeps share, accrues, cannot receive); test 24 (suspended holder claims; transfers out; suspended org's agent blocked; return to suspended sender works; suspended member cannot register or confirm).
+- Mitigation: (a) receiver must be active; (b) agent methods check the organisation's credential is active; `fund_allowance` from a suspended org is refunded; (c) suspension never moves a share by itself; the share keeps accruing. Owner decision 3 (2026-11-13): while suspended the holder can neither claim nor transfer out nor receive; only the registrar can move the share, with `registrar_transfer`, 1 yoctoNEAR, a document hash and an event, and only while the holder is suspended (so the registrar cannot move an active member's share); (d) the return path in `nft_resolve_transfer` is allowed, because it restores the prior state and the receiver cannot keep a token it refused; (e) register, confirm and attest methods require an active credential.
+- Test: test 15 (suspended member keeps share, accrues, cannot receive); block 2 unit test `suspended_holder_accrues_but_cannot_claim_send_or_receive` and sandbox test `d3_suspended_holder_frozen_registrar_can_move`; test 24 (suspended holder claims; transfers out; suspended org's agent blocked; return to suspended sender works; suspended member cannot register or confirm).
 
 ### T24. Plain transfer straight into a contested vault during a dispute
 - Attack: a payer (or the contested holder's friend) sends USDC with a plain `ft_transfer` directly to a contested vault, skipping the registry's escrow, and the holder claims it at once.
@@ -186,8 +186,8 @@ Terms used below (full detail in DESIGN.md):
 ### T25. Payment to an under-allocated or over-allocated group
 - Attack or fault: a payer or agent pays a work group whose active shares sum below 100 percent (unallocated part has no owner) or above (no dispute recorded yet because of a pending mint).
 - Impact: money credited to nobody, or over-credited.
-- Mitigation: a group payment is accepted only if active, non-claimant shares sum to exactly 10000 bps. Otherwise `ft_on_transfer` returns the full amount (refund) and `pay_from_allowance` panics before any debit. Pending shares reserve their bps for the 100 percent check so two parallel registrations cannot both slip under the cap.
-- Test: test 26 (under-allocated group refused and refunded; two parallel registrations that together exceed 100 percent open a dispute instead of both minting clean).
+- Mitigation (owner decision 4, 2026-11-13): above 10000 bps a group payment is refused (`ft_on_transfer` returns the full amount; `pay_from_allowance` will panic before any debit). Below 10000 bps each registered share gets exactly floor(amount * bps / 10000) and everything else goes to the group's unallocated escrow, held in `REG`'s token balance and counted in the solvency sum, so no share is over-credited. Only the registrar can release it, to an active share of the same group, with a document hash and an event; the escrow is debited before the forward. Pending shares reserve their bps for the 100 percent check so two parallel registrations cannot both slip under the cap.
+- Test: unit test `under_allocated_group_pays_exact_bps_and_escrows_the_rest`, sandbox test `d4_under_allocated_payment_escrows_unassigned_part`; test 26 ( two parallel registrations that together exceed 100 percent open a dispute instead of both minting clean).
 
 ### T26. Forward from registry to a vault fails
 - Attack or fault: after the registry receives a group payment, one of its `ft_transfer` calls to a vault fails.
@@ -237,6 +237,18 @@ Terms used below (full detail in DESIGN.md):
 - Mitigation: license tokens have no vault, cannot be claimed and are non-transferable in the demo; split math reads only `kind = share`.
 - Test: test 17 (only if licenses are built).
 
+### T34. Stray plain transfers to the registry (owner decision 10)
+- Attack or fault: someone sends mock USDC to `REG` with a plain `ft_transfer` (no `msg`), by mistake or to bait a sweep.
+- Impact: those tokens sit in `REG` unattributed.
+- Mitigation: by design there is no sweep or admin withdraw. No method moves registry funds except the tracked paths (forwards, claims from vaults, and later allowance, escrow and undelivered releases), each bounded by its own counter. Stray tokens stay stuck and only show up as `REG` balance above the solvency sum. This removes a registrar power and the race between a balance read and in-flight forwards.
+- Test: none needed (absence of a method); the solvency check reads the surplus.
+
+### T35. Registrar powers added by decisions 3 and 4
+- Attack: the registrar uses `registrar_transfer` to take an active member's share, or `release_unallocated` to send escrow to the wrong share.
+- Impact: misdirected property or money.
+- Mitigation: `registrar_transfer` works only while the current holder's credential is suspended, needs an active receiver, respects both locks, needs 1 yoctoNEAR and a document hash and emits an event. `release_unallocated` can only pay an active share of the same work, right and territory, never more than that group's escrow, and emits an event with the document hash. The registrar still cannot claim or send money to itself. Multisig with a time delay is roadmap (T12).
+- Test: unit tests `registrar_cannot_move_active_holders_share`, `unallocated_release_must_stay_in_its_group`, and the registrar-only checks inside the decision 3 and 4 tests.
+
 ## Test mapping summary
 
 | Test | Covers |
@@ -277,3 +289,11 @@ Terms used below (full detail in DESIGN.md):
 | `assert_solvent` helper | T31 |
 
 Never cut: T1 to T5 and tests 1, 4, 5, 6, 7 and the zero-keys proof.
+
+## Block 2 status (2026-11-13)
+
+Passing in the sandbox (`contracts/tests/tests/sandbox.rs`): test 1 (T1, T15), 2, 3 (T2), 4 (T2, catalog sale with zero keys before and after), 5 (T10), 6 (T3), 7 (T4, claim and onward transfer both tried during `nft_on_transfer`), 16 (T5), T16 split exactness, decision 3 (T23, T35), decision 4 (T25, T35). Every sandbox test ends with the solvency check (T31). Unit tests in `contracts/registry/src/tests.rs` and `logic.rs` cover the same paths with mocked callbacks, plus failed vault creation and failed token registration (T15, part of test 15b), failed claim rollback (T17 path), failed forward to undelivered (T26), stale sync discard (T21) and `effective_from` bounds (T22).
+
+Test 6 uses a holder contract that sends `claim` and `nft_transfer` in one receipt, so the transfer lands while the payout is in flight; this ordering is deterministic in the single-shard sandbox and the test asserts which call won, so a change in ordering fails loudly.
+
+Not yet covered: tests 8 to 15, 17 to 31 except the unit-level parts above (blocks 3 and 4), and the `verify-keys` and `verify:testnet` scripts (block 5).

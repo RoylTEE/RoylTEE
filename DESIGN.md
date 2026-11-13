@@ -1,6 +1,6 @@
 # Design
 
-Status: block 1 design, written 2026-11-13 before any contract code. Signatures below are the plan; they may change in block 2 and any change will be logged in DECISIONS_LOG.md. Read THREAT_MODEL.md alongside this file.
+Status: block 1 design, written 2026-11-13 before any contract code. Block 2 code landed the same day; where the code differs from the plan below, section 16 says so and DECISIONS_LOG.md records it. Read THREAT_MODEL.md alongside this file.
 
 Product in one line: the verified payout address for every share of every song, human or AI. The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.
 
@@ -53,9 +53,9 @@ Why:
 4. The split and forward code is needed anyway for `pay_from_allowance` and license fees, so this adds no new money path.
 5. Money still physically sits in on-chain balances: per share in vaults; allowance, escrow and undelivered in `REG`'s balance, with the solvency invariant (T31).
 
-Cost: a payer must use `ft_transfer_call` with the right `msg` for a work payment. A plain `ft_transfer` straight to a share vault still works and is picked up by `sync`. A plain `ft_transfer` to `REG` is not attributed; it shows up as `REG` balance above the invariant sum and no method moves it (listed in open questions).
+Cost: a payer must use `ft_transfer_call` with the right `msg` for a work payment. A plain `ft_transfer` straight to a share vault still works and is picked up by `sync`. A plain `ft_transfer` to `REG` is not attributed; it shows up as `REG` balance above the invariant sum and no method moves it. This is by design (owner decision 10, DECISIONS_LOG row 31): there is no sweep, so stray plain transfers to the registry stay stuck. A sweep would be one more way to move registry money, and the only safe version needs a balance read racing in-flight forwards.
 
-Pending owner approval (DECISIONS_LOG item 1). If the owner wants `w<N>.REG`, the fallback is the same vault contract plus a public `distribute(work_id, right_type, territory)` that reads the balance and splits it.
+Approved by the owner on 2026-11-13 (DECISIONS_LOG row 22). If the owner wants `w<N>.REG`, the fallback is the same vault contract plus a public `distribute(work_id, right_type, territory)` that reads the balance and splits it.
 
 ### Vault deployment: decision
 
@@ -460,7 +460,7 @@ Resolve -> Active (or Void) and the cap is lifted.
 
 Rounding rule (every split: work payment, allowance payment, license fee, escrow release):
 
-1. Payment set P = the shares that are paid: Active and Contested shares of the group (not the Claimant), each with bps b_i. A group payment requires sum of b_i over P = 10000 exactly, else it is refused (T25).
+1. Payment set P = the shares that are paid: Active and Contested shares of the group (not the Claimant), each with bps b_i. If sum of b_i over P is above 10000 the payment is refused. If it is below 10000 (owner decision 4), each share still gets x_i = floor(A * b_i / 10000), and U = A - sum(x_i) (the unassigned fraction plus rounding dust) goes to the group's unallocated escrow; steps 3 and 4 below apply only when the sum is exactly 10000.
 2. Credit x_i = floor(A * b_i / 10000) using u128 (A is at most u128; A * 10000 cannot overflow for any realistic mock amount; checked multiplication panics before any state change otherwise).
 3. Remainder R = A - sum(x_i). 0 <= R < |P|.
 4. R goes to the share with the largest b_i; ties go to the lowest token number. That share is the remainder share.
@@ -563,3 +563,35 @@ The track example (nearai/near-hackathon-prompt-examples, tracks/10-nfts.md) ask
 2. "A gated page that only current holders can open." The brief's `/holder` page uses a view-call check on an entered account, which anyone can type. Real gating needs proof of control: a NEP-413 signed message (wallet `signMessage`, Final status in near/NEPs) checked server-side against the account's full-access keys. Pending owner; fallback is to label the page "holder view, not access-controlled".
 3. The example says whoever holds the NFT controls the sub-account and its access rights move with it. This design is deliberately narrower: holders never get keys; control is a registry check at call time. The README must say so and why (T1).
 4. "Start here" links not referenced by the brief: the near-smart-contracts agent skill, Top Level Accounts contracts, and the sharded NFT items draft. The draft's `nft_item_info` idea maps to the optional vault view in section 3. The Top Level Accounts contracts were not reviewed (UNVERIFIED relevance).
+
+## 16. Block 2 as built (2026-11-13)
+
+What changed against the plan above, and why. Each item is also a row in DECISIONS_LOG.md.
+
+1. Vault without near-sdk. `contracts/vault` uses the raw host functions from `near-sys` with `no_std`, no allocator and no JSON parser. The wasm is 7420 bytes (near-sdk version: about 110 KB), so a vault account needs 0.1 NEAR (`VAULT_NEAR`) instead of more than 1 NEAR. `withdraw` takes borsh arguments `(token: String, receiver: String, amount: u128)`; only the parent registry may call it, attached deposit must be zero, account ids are checked for NEAR id characters before being placed in the `ft_transfer` JSON. The view `balance(token)` stays dropped (row 3).
+2. Credentials (minimal): `grant_credential(account, org_name_hash, kyb_ref_hash, doc_hash)` payable, registrar only; registers the member with the token; `on_member_registered` removes the credential if that registration fails. `suspend_credential` and `reinstate_credential` (1 yoctoNEAR, registrar, doc hash). Payer role and agents arrive in block 3.
+3. Suspension (owner decision 3): a suspended holder cannot `claim`, `nft_transfer` or `nft_transfer_call`, and cannot receive. New method:
+
+```rust
+#[payable] pub fn registrar_transfer(&mut self, token_id: TokenId, receiver_id: AccountId, doc_hash: Hash32);
+// 1y, registrar only, only while the current holder is suspended. Receiver must be active.
+// Same lock checks as nft_transfer. Emits nep171 nft_transfer, share_transfer and registrar_transfer {token_id, from, to, doc_hash, by}.
+```
+
+4. Under-allocated groups (owner decision 4): `Group` gained `unallocated: U128`, the registry gained `unallocated_total` (part of the solvency sum). `payment_in` events carry `unallocated`. New method:
+
+```rust
+#[payable] pub fn release_unallocated(&mut self, group: GroupKey, token_id: TokenId, amount: U128, doc_hash: Hash32);
+// 1y, registrar only. token_id must be an Active share of that group. Debits the escrow before the
+// forward; a failed forward goes to that share's undelivered balance. Emits unallocated_released.
+```
+
+   Pending shares in a group are not paid; their bps count as unassigned until they mint. A payment to a group with no active share is refused.
+5. Over-allocation: until block 4 adds the over-allocation dispute, `register_share` refuses a share that would push a group above 10000 bps.
+6. Duplicate codes: `register_work` opens a minimal `DuplicateCode` dispute record and marks the work `DuplicateOpen`; `pay_work` and `pay_share` refuse it. `resolve` is block 4.
+7. `register_share` returns a promise that resolves to `true` when the NFT is minted and `false` when vault creation or token registration failed (share `Failed`, bps released, unused deposit refunded). Required deposit: `VAULT_NEAR` (0.1 NEAR) + `FT_STORAGE_DEPOSIT` (0.00125 NEAR) + registry storage for the share records plus `MINT_RESERVE_BYTES` (1000 bytes), excess refunded.
+8. The registry account must itself be storage-registered with the token contract before it can receive `ft_transfer_call` payments. Block 5 deploy step.
+9. Not yet built (later blocks): `retry_forward`, `release_stale_lock`, `set_share_note`, `confirm_share`, `attest_share`, payer role, agents, allowances, disputes `resolve`, licenses. The lock fields already store `since_block` for `release_stale_lock`.
+10. Build: `rust-toolchain.toml` pins Rust 1.99.1 with the wasm32 target; `scripts/build-wasm.sh` builds with `RUSTFLAGS="--cfg near"` (what cargo-near sets) and copies wasm files to `contracts/res/`. Rust 1.87 and newer emit bulk-memory opcodes, which need protocol 84 or newer (nearcore 2.12+). The sandbox used by near-workspaces 0.24.0 is nearcore 2.14.1. Testnet protocol version is UNVERIFIED until block 5. The registry wasm is 518782 bytes without wasm-opt (about 5.2 NEAR of storage on testnet). The sandbox tests need OpenSSL development headers, because near-workspaces pulls in native-tls through near-jsonrpc-client; openssl-sys finds them with pkg-config, or with `OPENSSL_LIB_DIR` and `OPENSSL_INCLUDE_DIR` set.
+
+Cut order if time gets tight, in addition to the brief's: decision 4 (unallocated escrow) is the first thing to cut back to "refuse unless exactly 10000 bps".
