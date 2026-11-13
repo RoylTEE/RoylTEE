@@ -756,5 +756,5 @@ A share registered by anyone other than the work's `registered_by` is pending (c
 
 ### Sizes
 
-Registry wasm 713328 bytes after the review fixes (674606 before), about 7.13 NEAR of code storage (UNVERIFIED on testnet). Vault wasm 7478 bytes.
+Registry wasm 712984 bytes after the review fixes, built with the path remap in `scripts/build-wasm.sh` (674606 before), about 7.13 NEAR of code storage (UNVERIFIED on testnet). Vault wasm 7478 bytes.
 

@@ -311,7 +311,8 @@ Possible only while step 6 is parked (the registry's full-access key is still pr
 
 ```bash
 bash scripts/build-wasm.sh                                    # prints sha256 of contracts/res/registry.wasm and vault.wasm
-near account view-account-summary $REG $NET now              # balance must cover the larger code (about 0.39 NEAR more storage, UNVERIFIED)
+                                                             # local build on 2026-11-13: registry 0f31232563b1d031ee6d6b6a03060784a018a78fecd812fa68419cb8aabc9e4c, vault 9e9ef97840a3a3e6967565b43a9c2a467c1925153ea8c5577d666c9b16966cda
+near account view-account-summary $REG $NET now              # balance must cover the larger code (about 0.38 NEAR more storage, UNVERIFIED)
 near contract deploy $REG use-file contracts/res/registry.wasm without-init-call $NET $SIGN
 near account view-account-summary $REG $NET now              # SHA-256 equals the local build
 near contract call-function as-read-only $REG get_vault_code_hash json-args '{}' $NET now   # new vault hash
