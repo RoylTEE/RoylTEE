@@ -49,6 +49,9 @@ pub const MINT_RESERVE_BYTES: StorageUsage = 1_000;
 
 pub const MAX_SHARES_PER_GROUP: usize = 16;
 pub const MAX_GROUPS_PER_WORK: usize = 16;
+/// Cap on every entry of a group list, Failed and Void shares included, so
+/// loops over a group stay bounded.
+pub const MAX_GROUP_ENTRIES: usize = 32;
 pub const MAX_URI_LEN: usize = 256;
 pub const MAX_NOTE_LEN: usize = 280;
 pub const MAX_PERIOD_LEN: usize = 32;
@@ -131,6 +134,12 @@ pub struct Registry {
 impl Registry {
     #[init]
     pub fn new(registrar: AccountId, usdc: AccountId, metadata: NFTContractMetadata) -> Self {
+        // Deploy and init are separate actions: only the account itself
+        // (its own key, in the deploy transaction) may initialise (audit M1).
+        require!(
+            env::predecessor_account_id() == env::current_account_id(),
+            "only the registry account itself can initialise"
+        );
         metadata.assert_valid();
         Self {
             registrar,

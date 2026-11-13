@@ -30,6 +30,11 @@ pub struct MockUsdc {
 impl MockUsdc {
     #[init]
     pub fn new(minter: AccountId) -> Self {
+        // Only the token account itself may initialise (audit M1).
+        require!(
+            env::predecessor_account_id() == env::current_account_id(),
+            "only the token account itself can initialise"
+        );
         Self {
             token: FungibleToken::new(b"t".to_vec()),
             minter,
@@ -154,12 +159,23 @@ mod tests {
 
     fn setup() -> MockUsdc {
         testing_env!(VMContextBuilder::new()
+            .current_account_id(accounts(0))
             .predecessor_account_id(accounts(0))
             .attached_deposit(NearToken::from_millinear(10))
             .build());
         let mut c = MockUsdc::new(accounts(0));
         c.storage_deposit(Some(accounts(1)), Some(true));
         c
+    }
+
+    #[test]
+    #[should_panic(expected = "only the token account itself can initialise")]
+    fn stranger_cannot_initialise() {
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(accounts(0))
+            .predecessor_account_id(accounts(2))
+            .build());
+        let _ = MockUsdc::new(accounts(2));
     }
 
     #[test]

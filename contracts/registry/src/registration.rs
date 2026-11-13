@@ -168,6 +168,10 @@ impl Registry {
             })
             .count();
         require!(live < MAX_SHARES_PER_GROUP, "group is full");
+        require!(
+            group.shares.len() < MAX_GROUP_ENTRIES,
+            "group has too many entries, failed and void shares included"
+        );
         let total =
             group.active_bps + group.reserved_bps + group.claimant_bps + u32::from(percent_bps);
         // Above 100 percent the new share becomes a claimant and an

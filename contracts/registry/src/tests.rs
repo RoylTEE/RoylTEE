@@ -55,7 +55,7 @@ fn ok(bytes: &[u8]) -> PromiseResult {
 }
 
 fn setup() -> Registry {
-    call(&registrar(), NearToken::from_yoctonear(0));
+    call(&reg(), NearToken::from_yoctonear(0));
     let mut c = Registry::new(
         registrar(),
         usdc(),
@@ -1873,4 +1873,64 @@ fn void_share_keeps_claim_and_sync() {
     yocto(&acc("alice.near"));
     let _ = c.claim(cl.clone());
     assert_eq!(ledger(&c, &cl).total_paid_out.0, 9000);
+}
+
+// ---------- audit fixes ----------
+
+#[test]
+fn group_entry_list_is_capped_including_failed_shares() {
+    // Failed and Void shares stay in the group's list. Without a cap on the
+    // whole list, every payment and void loop would grow with them.
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    for _ in 0..MAX_GROUP_ENTRIES {
+        call(&acc("alice.near"), NearToken::from_near(1));
+        let _ = c.register_share(
+            w,
+            RightType::Publishing,
+            "WW".into(),
+            100,
+            Basis::Copyright,
+            acc("bob.near"),
+            h('e'),
+            None,
+        );
+        let t = format!("s{}", c.next_share);
+        callback(PromiseResult::Failed);
+        let _ = c.on_vault_created(t, acc("alice.near"));
+    }
+    call(&acc("alice.near"), NearToken::from_near(1));
+    assert!(panics(|| drop(c.register_share(
+        w,
+        RightType::Publishing,
+        "WW".into(),
+        100,
+        Basis::Copyright,
+        acc("bob.near"),
+        h('e'),
+        None
+    ))));
+}
+
+#[test]
+fn only_the_registry_account_itself_can_initialise() {
+    // Deploy and init are separate actions; a stranger must not be able to
+    // init a freshly deployed registry with their own registrar.
+    call(&acc("stranger.near"), NearToken::from_yoctonear(0));
+    let r = std::panic::catch_unwind(|| {
+        Registry::new(
+            acc("stranger.near"),
+            usdc(),
+            NFTContractMetadata {
+                spec: NFT_METADATA_SPEC.to_string(),
+                name: "x".to_string(),
+                symbol: "X".to_string(),
+                icon: None,
+                base_uri: None,
+                reference: None,
+                reference_hash: None,
+            },
+        )
+    });
+    assert!(r.is_err(), "init from another account must fail");
 }
