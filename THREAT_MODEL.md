@@ -1,6 +1,6 @@
 # Transfer threat model
 
-Status: written on 2026-11-13, BEFORE any contract code existed in this repo. Block 2 code landed later the same day; rows covered by passing tests say so under "Block 2 status" at the end. Owner decisions 3, 4 and 10 (2026-11-13) changed T23 and T25 and added T34 and T35; those edits are marked. Block 3 added T36 and T37 and a "Block 3 status" section. Block 4 changed T24 (held deposits by refusing sync instead of a snapshot cap), added T38 and a "Block 4 status" section.
+Status: written on 2026-11-13, BEFORE any contract code existed in this repo. Block 2 code landed later the same day; rows covered by passing tests say so under "Block 2 status" at the end. Owner decisions 3, 4 and 10 (2026-11-13) changed T23 and T25 and added T34 and T35; those edits are marked. Block 3 added T36 and T37 and a "Block 3 status" section. Block 4 changed T24 (held deposits by refusing sync instead of a snapshot cap), added T38 and a "Block 4 status" section. The contract review fixes (branch `fix/contract-review`) changed T6, T7, T11, T12, T13, T15, T19, T20, T21, T24, T35 and T38, added T39 and a "Review fixes status" section; those edits are marked "review".
 
 Scope: every way a seller, a buyer, an agent, a payer, an outside attacker or a privileged role could keep money or access, move money to the wrong place, or lose money, around a rights-share NFT and its vault. Testnet only. Mock USDC only.
 
@@ -26,14 +26,14 @@ Terms used below (full detail in DESIGN.md):
 | `ft_on_transfer` must check that the predecessor is the expected token contract and return the full amount otherwise. | docs.near.org, Security, "Fungible Token Implementation" | Verified 2026-11-12 |
 | `nft_transfer` and `nft_transfer_call` require 1 yoctoNEAR; `nft_resolve_transfer` settles the call path. | NEP-171 text in the near/NEPs repo | Verified 2026-11-12 |
 | A sub-account `x.REG` can only be created by `REG`. | Sharded NFT items draft (houseofstake/tla-contracts, docs/sharded-nft-items.md), "Naming" paragraph | Verified as stated in that draft |
-| Once a sub-account exists, its parent cannot delete it, redeploy its code or add keys to it (only the account itself can). | NEAR runtime behaviour | UNVERIFIED in docs read so far. Proven or disproven by test 21 before we rely on it. |
+| Once a sub-account exists, its parent cannot delete it, redeploy its code or add keys to it (only the account itself can). | NEAR runtime behaviour | Shown in the sandbox by test 21 (`t21_parent_cannot_delete_redeploy_or_key_a_vault`): the parent's DeleteAccount, DeployContract and AddKey on a vault all fail. Not checked against the protocol spec text. |
 
 ## How to read the table
 
 - Attack: what the adversary does.
 - Impact: what they gain or what breaks if unmitigated.
 - Mitigation: what the design does (see DESIGN.md for exact methods and fields).
-- Test: test number from the test plan (1 to 17 are from the brief, 18 and up are added here), plus scripts. `verify-keys` is the script that lists access keys on `REG` and every vault. `verify:testnet` is the read-only live check.
+- Test: test number from the test plan (1 to 17 are from the brief, 18 and up are added here), plus named unit and sandbox tests. Review regression tests live in `contracts/registry/src/review_fixes.rs` (unit) and `contracts/tests/tests/review.rs` (sandbox). The planned `verify-keys` and `verify:testnet` scripts do not exist yet (see T13); until they do, key lists and code hashes are checked by hand with near-cli-rs and recorded in `deployments/testnet.json`.
 
 ## Rows from the brief (T1 to T16)
 
@@ -41,7 +41,7 @@ Terms used below (full detail in DESIGN.md):
 - Attack: the seller (or whoever minted) holds an access key on `s<N>.REG` and uses it to send the USDC out directly, or to delete the account.
 - Impact: total loss of the share's money for every later holder.
 - Mitigation: the vault is created by `REG` in a single batch of `CreateAccount`, `Transfer`, `DeployContract`, with no `AddKey` action, so it never has any key. The vault contract has no method that adds keys, deploys code or deletes the account. Holders never receive a key; control is a registry check, so there is nothing to hand over or rotate.
-- Test: test 1 (mint, then `view_access_key_list` on the vault returns empty). Script `verify-keys` checks every vault on testnet, before and after the catalog-sale scene. `npm run verify:testnet` repeats it read-only.
+- Test: test 1 (mint, then `view_access_key_list` on the vault returns empty). On testnet the vault key lists are read by hand with near-cli-rs; the `verify-keys` script is not written yet.
 
 ### T2. Seller claims after sale
 - Attack: the old holder calls `claim(token_id)` after the NFT moved.
@@ -70,14 +70,14 @@ Terms used below (full detail in DESIGN.md):
 ### T6. Agent key used to move ownership or withdraw
 - Attack: a compromised or prompt-injected agent calls `nft_transfer`, `claim`, `withdraw_allowance`, `grant_role`, split changes or registrar methods.
 - Impact: theft of shares or allowance.
-- Mitigation: two locks. Protocol lock: the agent account holds only a function-call key scoped to `REG` with methods `pay_from_allowance`, `report`, `buy_license`; such a key cannot attach a deposit. Contract lock: every owner and admin method requires exactly 1 yoctoNEAR and an ownership or role check. Agents are never holders (agent accounts cannot receive a credential while they hold an agent role).
+- Mitigation: two locks. Protocol lock: the agent account holds only a function-call key scoped to `REG` with methods `pay_from_allowance` and `report` (there is no `buy_license` method: licenses were cut, review); such a key cannot attach a deposit. Contract lock: every owner and admin method requires exactly 1 yoctoNEAR and an ownership or role check. Agents are never holders (agent accounts cannot receive a credential while they hold an agent role).
 - Test: test 8 (agent calls to `nft_transfer`, `claim`, `withdraw_allowance`, `amend_split` and `grant_role` all fail). Whether near-workspaces can sign with a function-call key to show the protocol-level rejection is UNVERIFIED; if not, test 8 shows the contract-level rejection (0 deposit) and the method-list rejection, and the testnet scripted agent shows the protocol rejection on chain.
 
 ### T7. Agent overspends
 - Attack: agent pays more than intended per transaction or per day.
 - Impact: drains the organisation's allowance.
-- Mitigation: per-agent `per_tx_limit`, rolling 24-hour `daily_limit` (24 hourly buckets) and `max_tx_per_day`, all checked in the contract before any transfer. Allowance is debited before the transfer.
-- Test: test 9 (over per-tx fails; over daily fails; under both passes).
+- Mitigation: per-agent `per_tx_limit`, rolling `daily_limit` and `max_tx_per_day`, all checked in the contract before any transfer. Allowance is debited before the transfer. The window is 24 hourly buckets plus the bucket of the hour 24 hours back, kept in its own storage slot (`l2t:<agent>`), so a payment counts for at least 24 full hours and at most 25 (review L2; before, the limit could be spent twice 23 hours and 1 minute apart). The org pays for the slot at `grant_role`; roles granted before the fix get it at their next payment, paid by the registry.
+- Test: test 9 (over per-tx fails; over daily fails; under both passes); unit tests `l2_rolling_limit_covers_a_full_24_hours`, `l2_tail_counts_within_the_same_hour_and_for_tx_counts`, `per_tx_daily_and_count_limits_with_rolling_window`.
 
 ### T8. Agent pays wrong or attacker payee (prompt injection in metadata, stale cache)
 - Attack: song metadata, a share note or a statement says "pay account X"; the agent passes X.
@@ -100,20 +100,22 @@ Terms used below (full detail in DESIGN.md):
 ### T11. Bad-faith duplicate claim to freeze a rival
 - Attack: a member registers a share that pushes a group over 100 percent, or re-registers an existing ISRC or ISWC, to freeze a rival's income.
 - Impact: rival stops getting paid.
-- Mitigation: only the contested fraction freezes and only new money. Shares the claimant does not name in `contests` keep getting paid. Money already in vaults stays claimable (up to the snapshot, see T24). A duplicate code freezes nothing on the original work; payments to the duplicate work are refused. Only credentialed members can register. Challenger bond and auto-expiry are roadmap, not code.
-- Test: test 14 (only contested fraction escrowed; other shares paid; frozen share cannot transfer; resolve releases escrow). Test 14b (duplicate code: original work still paid; payment to duplicate refused).
+- Mitigation: only the contested fraction freezes and only new money. A claimant above 100 percent must name the contested shares in `contests` (there is no default of "all shares", review H2), and the list must be minimal: dropping its smallest share must leave less than the excess, so a 1 bps claim freezes one share, not the group. A share held by the claimant or by the caller cannot be named, so an incumbent cannot dispute its own share to block a real claimant. Shares still waiting for the work registrant's approval cannot be named (T39: the registrant rejects them instead). Failed and Void shares are pruned from the group's list, so repeated claims cannot fill `MAX_GROUP_ENTRIES` and close the group. Shares not named keep getting paid. Money already in vaults stays claimable (T24). A duplicate code freezes nothing on the original work; payments to the duplicate work are refused. Only credentialed members can register. Residual: a member can still use an accomplice account to open a dispute against a rival's share; it freezes only the named shares' new money until the registrar resolves it. Challenger bond and auto-expiry are roadmap, not code.
+- Test: test 14 (only contested fraction escrowed; other shares paid; frozen share cannot transfer; resolve releases escrow). Test 14b (duplicate code: original work still paid; payment to duplicate refused). Unit tests `h2_one_bps_claim_freezes_only_one_named_share`, `h2_repeat_claims_do_not_close_the_group`, `h2_incumbent_cannot_dispute_its_own_share`, `h2_zero_bps_outcome_is_pruned`, `over_allocation_rules`, `failed_shares_leave_the_group_list`.
 
-### T12. Registrar abuse
+### T12. Registrar abuse (rewritten, review H3)
 - Attack: the registrar grants credentials to accomplices, suspends rivals, or resolves disputes unfairly.
 - Impact: control of who can hold and how disputes end.
-- Mitigation: the registrar cannot move vault money to itself, cannot transfer NFTs, cannot claim. Every registrar action needs 1 yoctoNEAR and emits an event with a document hash. Suspension never moves a share. Production: multisig council with a time delay (roadmap, README only).
-- Test: README section plus test 30 (registrar cannot call `claim` or `nft_transfer` on a share it does not own). Event presence checked in tests 14 and 15.
+- Trust: the registrar is a TRUSTED role in this demo. It is the one key the system relies on. What it can do: grant, suspend, reinstate and remove credentials (including to an accomplice account); suspend a holder and then move that holder's share with `registrar_transfer` to any active member; resolve disputes (decide which side keeps the bps and where escrow goes, within the dispute's parties); release a group's unallocated escrow to any active approved share of that group; refund a void work's unallocated escrow to any account (`refund_unallocated`); approve or reject a pending share as backup signer (T39); send plain deposits out of a rejected share's vault (`recover_rejected_vault`); grant and revoke the payer role; revoke agent roles; sync any share. So a registrar acting in bad faith together with an accomplice member could redirect shares and held money.
+- Controls: the registrar account cannot itself hold a credential (`grant_credential` refuses it, review H3), so it can never be a holder, receive a share or `claim`; it cannot transfer a share of an active member; it cannot touch money already in an active holder's vault; it has no upgrade or sweep method (T13, T34). Every registrar action needs 1 yoctoNEAR (a full-access key) and emits an event with a document hash, so every use of the power is public and attributable. Production plan: a multisig council with a time delay (roadmap, not code).
+- Test: unit test `h3_registrar_cannot_hold_a_credential`; test 30 (registrar cannot call `claim` or `nft_transfer` on a share it does not own). Event presence checked in tests 14 and 15.
 
 ### T13. Contract upgrade swaps the logic
 - Attack: whoever holds a full-access key on `REG` redeploys a contract that pays them.
 - Impact: total loss.
-- Mitigation: no upgrade method in `REG` or the vault. After deploy and init, all full-access keys on `REG` are deleted (needs the owner's yes, it is a delete). Code hashes are published in `deployments/testnet.json` and checked against a local build. Vaults have no keys from birth.
-- Test: script `verify-keys` (REG and vault key lists empty); `npm run verify:testnet` (code hash on chain equals the published hash). Reproducible build tooling for an exact hash match is UNVERIFIED and will be checked in block 5.
+- Mitigation: no upgrade method in `REG` or the vault. Vaults have no keys from birth. Code hashes are published in `deployments/testnet.json` and compared with a local build.
+- Current state (review, Security Suite F-12): the full-access keys on `REG` and on the mock USDC account are STILL PRESENT on testnet. Deleting them is planned but parked (it is a delete and needs the owner's yes), so today whoever holds the `REG` key can redeploy the registry. This is a testnet demo state, not the production design.
+- Test: the `verify-keys` and `verify:testnet` scripts are not written yet; key lists and code hashes are read by hand with near-cli-rs. Reproducible build tooling for an exact hash match is UNVERIFIED.
 
 ### T14. Revoked agent keeps acting
 - Attack: agent keeps calling after the organisation revokes it.
@@ -124,8 +126,8 @@ Terms used below (full detail in DESIGN.md):
 ### T15. Storage griefing / unregistered vault loses USDC
 - Attack: vault is not storage-registered with the token, so incoming transfers fail or the share cannot receive; or an attacker grows registry state cheaply.
 - Impact: payments bounce or are lost; registry runs out of storage balance.
-- Mitigation: `register_share` is two-phase. The share is `Pending` until the vault account is created AND `storage_deposit` on mock USDC succeeds; only then is the NFT minted. If either step fails, the share is marked `Failed`, no NFT exists, its bps reservation is released, and the unused deposit is refunded. Every state-adding call is payable and charges the caller for storage; free calls (`sync`, `retry_forward`, `release_stale_lock`) add no state. Bounded string lengths and per-group share cap.
-- Test: test 1 (vault registered with mock USDC at mint); test 15b (forced registration failure leaves no NFT and refunds).
+- Mitigation: `register_share` is two-phase. The share is `Pending` until the vault account is created AND `storage_deposit` on mock USDC succeeds; only then is the NFT minted. If either step fails, the share is marked `Failed`, no NFT exists, its bps reservation is released, and the unused deposit is refunded. Every state-adding call is payable and charges the caller for storage; free calls (`sync`, `retry_forward`, `release_stale_lock`, `release_stale_mint`) add no state. A share whose mint callbacks never committed no longer blocks its group: after `STALE_MINT_NS` (20 minutes) anyone may call `release_stale_mint`, which fails the share and releases its reserved bps; a late callback then finds the share Failed and mints nothing (review M1). The NEAR attached at registration is not refunded on that path, because it may already be spent on the vault account. Bounded string lengths and per-group share cap.
+- Test: test 1 (vault registered with mock USDC at mint); test 15b (forced registration failure leaves no NFT and refunds); unit test `m1_stale_mint_is_released_and_late_callbacks_mint_nothing`.
 
 ### T16. Rounding loss in splits
 - Attack: repeated payments leak or create units through rounding.
@@ -150,20 +152,21 @@ Terms used below (full detail in DESIGN.md):
 ### T19. Callback failure or gas exhaustion leaves a lock stuck
 - Attack or fault: `on_claim` or `nft_resolve_transfer` runs out of gas or panics, so `payout_in_flight` or `transfer_pending` is never cleared; the share is frozen forever, or a griefer forces this by attaching just enough gas.
 - Impact: share cannot be claimed or transferred; funds stuck.
-- Mitigation: (a) methods that schedule a callback assert enough prepaid gas up front and reserve a fixed amount for the callback; (b) callbacks are small, bounded, do no loops over user-sized data, and never panic (they use `#[callback_result]` and a size-checked result read); (c) each lock stores the block height it was set; after `STALE_LOCK_BLOCKS` anyone may call `release_stale_lock(token_id)`, which clears the lock WITHOUT rolling back any debit and bumps the ledger epoch, then a `sync` reconciles the known balance with the real vault balance. Clearing without rollback can never pay twice: if the withdraw happened the money is gone and the debit is right; if it did not, `sync` finds it again. `STALE_LOCK_BLOCKS` is 1200 (block 3); whether it is long enough under congestion is UNVERIFIED.
+- Mitigation: (a) methods that schedule a callback assert enough prepaid gas up front and reserve a fixed amount for the callback; (b) callbacks are small, bounded, do no loops over user-sized data, and never panic (they use `#[callback_result]` and a size-checked result read); (c) each lock stores the block height it was set; after `STALE_LOCK_BLOCKS` anyone may call `release_stale_lock(token_id)`, which clears the lock WITHOUT rolling back any debit and bumps the ledger epoch, then a `sync` reconciles the known balance with the real vault balance. Clearing without rollback can never pay twice: if the withdraw happened the money is gone and the debit is right; if it did not, `sync` finds it again. `STALE_LOCK_BLOCKS` is 1200 (block 3); whether it is long enough under congestion is UNVERIFIED. Callback gas (review M1): measured in the sandbox at about 2.2 Tgas for `on_forward` (reserved 10, raised from 5), 3.5 for `on_vault_ready` (20), 2.5 for `on_sync` (5) and 2.3 for `on_claim` (10), with a 16-share fan-out still fitting one payment. Not covered: if `on_forward` itself never commits, `inbound_pending` stays above zero and `sync` on that share is refused; `release_stale_lock` does not clear it, because without a recorded forward time and outcome the registry cannot tell whether the money arrived. The registry keeps its counts consistent (the amount stays in `forwards_in_flight_total`), and the 10 Tgas reservation is about 4 times the measured use, so this needs a callback that fails for a reason other than gas.
 - Test: test 20 (unit: callbacks given a failed promise result do not panic; claim with too little gas fails before any state change; stale lock release before the timeout fails, after it succeeds; sync then restores the correct balance).
 
 ### T20. Vault account deleted, redeployed or keyed later
 - Attack: someone deletes `s<N>.REG` (balance goes to a beneficiary), redeploys it, or adds a key.
 - Impact: total loss of the share's money.
-- Mitigation: vault has zero keys; vault contract has only `withdraw` and no method that issues `DeleteAccount`, `DeployContract` or `AddKey`; `REG` has no method that targets an existing vault with anything except a `withdraw` function call. `withdraw` only calls `ft_transfer` on the token argument, so it cannot call `storage_unregister` either. Relies on the runtime rule that a parent cannot act on an existing sub-account (UNVERIFIED, see facts table).
-- Test: test 21 (sandbox: `REG`'s account, using a test-only batch built by the test harness, tries `DeleteAccount` and `DeployContract` on an existing vault and fails; vault code hash unchanged; key list empty). `verify-keys` on testnet.
+- Mitigation: vault has zero keys; vault contract has only `withdraw` and no method that issues `DeleteAccount`, `DeployContract` or `AddKey`; `REG` has no method that targets an existing vault with anything except a `withdraw` function call. `withdraw` only calls `ft_transfer` on the token argument, so it cannot call `storage_unregister` either. Relies on the runtime rule that a parent cannot act on an existing sub-account (shown in the sandbox by test 21). New vaults also export `ft_on_transfer`, which returns "0" and does nothing else (T21).
+- Test: test 21, sandbox `t21_parent_cannot_delete_redeploy_or_key_a_vault` (`REG`'s account signs batches with `DeleteAccount`, `DeployContract` and `AddKey` on an existing vault; all fail; code hash unchanged; key list empty; balance intact). Testnet key lists are read by hand until `verify-keys` exists.
 
 ### T21. Sync race with claim or with an inbound forward
 - Attack or fault: `sync` reads the vault balance while a claim or a routed payment is moving; the callback then writes a stale balance, double-counting an inbound payment or resurrecting money already paid out.
 - Impact: claimable shows more than the vault holds (claim fails) or earned history is wrong.
-- Mitigation: every ledger change bumps a per-share `epoch`. `sync` panics if `payout_in_flight`, `transfer_pending` or `inbound_pending > 0`. `on_sync` discards the result if the epoch changed since the read began (emits `sync_discarded`). If a valid sync sees less than the known balance, it sets the known balance to what it saw and emits `anomaly`.
-- Test: test 22 (sync during in-flight claim refused; sync started then a forward lands: result discarded; earned equals real inflow exactly across a mixed sequence).
+- Mitigation: every ledger change bumps a per-share `epoch`, and so do opening a dispute (for each contested share and the claimant) and `nft_transfer_call` (review L4, Security Suite F-04). `sync` panics if `payout_in_flight`, `transfer_pending` or `inbound_pending > 0`, and only the current holder or the registrar may call it (review H1), so nobody can time a balance read against someone else's vault. `on_sync` discards the result (emits `sync_discarded`) if the epoch changed, if the share is now in a dispute, or if `transfer_pending` is set. If a valid sync sees less than the known balance, it sets the known balance to what it saw and emits `anomaly`.
+- Phantom balance (review H1): `ft_transfer_call` into a vault with no `ft_on_transfer` is refunded a block later, and a sync read in between saw money that then left. New vaults export `ft_on_transfer` returning "0", so the token keeps the transfer and there is no refund to race. The 7 vaults created on testnet before this fix keep the old code (vault code cannot change, T20); there, only the holder (or the registrar) can sync, so the holder could at most race its own vault, which reaches only its own share's balance: a claim of the inflated figure fails cleanly (T17 rollback) and the next sync corrects it. If the holder inflates the figure and a dispute then opens on that share, it can claim a plain deposit that T24 would otherwise hold until resolve; T24 credits that deposit to the same vault's holder after resolve anyway, so this moves timing, not ownership. No other share's money and no escrow is reachable. The figure shown in the UI should be the lower of the known balance and the vault's real balance (front-end change, not done in this branch).
+- Test: test 22 (sync during in-flight claim refused; sync started then a forward lands: result discarded; earned equals real inflow exactly across a mixed sequence); unit tests `h1_sync_is_holder_or_registrar_only`, `l4_inflight_sync_across_dispute_open_is_discarded`, `l4_sync_does_not_land_during_transfer_pending`; sandbox `r01_h1_outsider_cannot_sync_and_new_vaults_keep_transfer_call`.
 
 ### T22. effective_from abuse
 - Attack: seller back-dates or forward-dates `effective_from` on a transfer to claim income for a period after the sale, or to confuse history.
@@ -180,7 +183,7 @@ Terms used below (full detail in DESIGN.md):
 ### T24. Plain transfer straight into a contested vault during a dispute
 - Attack: a payer (or the contested holder's friend) sends USDC with a plain `ft_transfer` directly to a contested vault, skipping the registry's escrow, and the holder claims it at once.
 - Impact: dispute freeze bypassed for direct payments.
-- Mitigation (block 4, replaces the snapshot plan): `sync` is refused on a share in an open dispute, so the ledger only knows money routed through the registry (which goes to escrow for contested shares) plus what it knew before. A plain deposit straight into a contested vault stays in the vault, unattributed and unclaimable, until resolve; then `sync` picks it up for the vault's holder whatever the outcome. Unsynced plain deposits made before the dispute opened are held the same way (conservative). Documented limitation: production payers pay through the registry; direct transfers bypass escrow math.
+- Mitigation (block 4, replaces the snapshot plan): `sync` is refused on a share in an open dispute, so the ledger only knows money routed through the registry (which goes to escrow for contested shares) plus what it knew before. A plain deposit straight into a contested vault stays in the vault, unattributed and unclaimable, until resolve; then `sync` picks it up for the vault's holder whatever the outcome. Unsynced plain deposits made before the dispute opened are held the same way (conservative). A sync already in flight when the dispute opens is discarded (T21, review L4). Production payers pay through the registry; a plain transfer straight into a vault is not split or escrowed by the registry's math, it is credited to that vault's holder by `sync`.
 - Test: sandbox `t14_over_allocation_dispute_freezes_only_contested_fraction` (plain deposit into the contested vault held, sync refused, old balance claimable, after resolve sync and claim pick it up).
 
 ### T25. Payment to an under-allocated or over-allocated group
@@ -198,7 +201,7 @@ Terms used below (full detail in DESIGN.md):
 ### T27. Agent storage spam
 - Attack: an agent submits many tiny payments with fresh statement line ids, growing the idempotency set paid for by `REG`.
 - Impact: registry storage balance drained.
-- Mitigation: `max_tx_per_day` in the role; minimum group payment `MIN_GROUP_PAYMENT`; statement line ids at most 64 bytes and stored as a 32-byte hash; organisation prepays statement-line storage at `grant_role` (100 bytes per line) and each paid line uses one credit; with no credits left the agent cannot pay (block 3).
+- Mitigation: `max_tx_per_day` in the role; minimum payment `MIN_GROUP_PAYMENT`, for group and share payments alike (review L8); statement line ids at most 64 bytes and stored as a 32-byte hash; organisation prepays statement-line storage at `grant_role` (100 bytes per line) and each paid line uses one credit; with no credits left the agent cannot pay (block 3).
 - Test: test 28 (call over `max_tx_per_day` fails; payment below minimum fails).
 
 ### T28. Role and allowance namespace abuse
@@ -222,8 +225,8 @@ Terms used below (full detail in DESIGN.md):
 ### T31. Registry solvency drift
 - Attack or fault: a bug credits allowance, escrow or undelivered balances that `REG` does not actually hold.
 - Impact: later payouts from `REG` fail or pay one party with another's money.
-- Mitigation: invariant `allowance_total + escrow_total + undelivered_total <= ft_balance_of(REG)`. Every debit happens before a transfer, every credit after money arrived. The live check script reads both sides.
-- Test: invariant asserted at the end of every sandbox test (helper `assert_solvent`); `npm run verify:testnet`.
+- Mitigation: invariant `allowance_total + unallocated_total + escrow_total + undelivered_total + forwards_in_flight_total <= ft_balance_of(REG)`. Every debit happens before a transfer, every credit after money arrived.
+- Test: invariant asserted at the end of every sandbox test (helper `assert_solvent`). The live `verify:testnet` script is not written yet; on testnet the two sides are read by hand.
 
 ### T32. Note and metadata used for injection or oversize griefing
 - Attack: holder sets a share note (holder power) containing script, a fake payee or a huge string.
@@ -240,14 +243,15 @@ Terms used below (full detail in DESIGN.md):
 ### T34. Stray plain transfers to the registry (owner decision 10)
 - Attack or fault: someone sends mock USDC to `REG` with a plain `ft_transfer` (no `msg`), by mistake or to bait a sweep.
 - Impact: those tokens sit in `REG` unattributed.
-- Mitigation: by design there is no sweep or admin withdraw. No method moves registry funds except the tracked paths (forwards, claims from vaults, and later allowance, escrow and undelivered releases), each bounded by its own counter. Stray tokens stay stuck and only show up as `REG` balance above the solvency sum. This removes a registrar power and the race between a balance read and in-flight forwards.
+- Mitigation: by design there is no sweep or admin withdraw. No method moves registry funds except the tracked paths (forwards, claims from vaults, allowance withdrawals, escrow and unallocated releases, unallocated refunds of a void work, undelivered retries), each bounded by its own counter. Stray tokens stay stuck and only show up as `REG` balance above the solvency sum. This removes a registrar power and the race between a balance read and in-flight forwards.
 - Test: none needed (absence of a method); the solvency check reads the surplus.
 
 ### T35. Registrar powers added by decisions 3 and 4
 - Attack: the registrar uses `registrar_transfer` to take an active member's share, or `release_unallocated` to send escrow to the wrong share.
 - Impact: misdirected property or money.
-- Mitigation: `registrar_transfer` works only while the current holder's credential is suspended, needs an active receiver, respects both locks, needs 1 yoctoNEAR and a document hash and emits an event. `release_unallocated` can only pay an active share of the same work, right and territory, never more than that group's escrow, and emits an event with the document hash. The registrar still cannot claim or send money to itself. Multisig with a time delay is roadmap (T12).
-- Test: unit tests `registrar_cannot_move_active_holders_share`, `unallocated_release_must_stay_in_its_group`, and the registrar-only checks inside the decision 3 and 4 tests.
+- Trust: the registrar is trusted (T12). The rules below bound HOW it acts; they do not stop a registrar acting in bad faith with an accomplice member from choosing the receiver or the share.
+- Mitigation: `registrar_transfer` works only while the current holder's credential is suspended, needs an active receiver and an approved share, respects both locks, needs 1 yoctoNEAR and a document hash and emits an event. `release_unallocated` can only pay an active, approved share of the same work, right and territory, never more than that group's escrow, and emits an event with the document hash. `refund_unallocated` works only once the work is Void and can send at most that group's escrow, to any account named by the registrar (review L9). `recover_rejected_vault` works only on a rejected share whose ledger is empty. The registrar cannot hold a credential, so it cannot claim or receive a share (review H3). Multisig with a time delay is roadmap (T12).
+- Test: unit tests `registrar_cannot_move_active_holders_share`, `unallocated_release_must_stay_in_its_group`, `l9_registrar_refunds_unallocated_of_a_void_work`, `m2_registrar_recovers_plain_deposits_of_a_rejected_vault`, `h3_registrar_cannot_hold_a_credential`, and the registrar-only checks inside the decision 3 and 4 tests.
 
 ### T36. Late callback after a stale lock release
 - Attack or fault: `release_stale_lock` clears a lock, then the original `on_claim` or `nft_resolve_transfer` finally runs; or a new lock was set in between.
@@ -264,8 +268,14 @@ Terms used below (full detail in DESIGN.md):
 ### T38. Dispute powers used to seize or misroute escrow
 - Attack: a member opens a frivolous over-allocation claim to freeze rivals; or the registrar resolves to redirect escrow; or a claimant whose mint fails leaves contested shares frozen forever.
 - Impact: income frozen or misdirected.
-- Mitigation: only the contested shares are frozen and only for new money; the claimant must name shares whose bps cover the excess; one open dispute per group. `resolve` can only send escrow to the dispute's own parties, by bps that keep the group total unchanged, with 1 yoctoNEAR, a document hash and an event. A failed claimant mint cancels the dispute and moves escrow to undelivered for `retry_forward`. Challenger bond, expiry and appeal stay roadmap (T11, T12).
-- Test: unit tests `over_allocation_rules`, `uphold_claimant_splits_escrow_by_new_bps`, `failed_claimant_mint_cancels_dispute_and_escrow_goes_to_undelivered`; sandbox `t14b_uphold_existing_voids_claimant` (non-registrar resolve fails).
+- Mitigation: only the contested shares are frozen and only for new money; the claimant must name shares whose bps cover the excess, and no more than needed (T11, review H2); the claimant and the caller cannot name their own shares; one open dispute per group. `uphold_existing` removes the voided claimant from the group's list, and a share left with 0 bps after `uphold_claimant` is removed too. `resolve` can only send escrow to the dispute's own parties, by bps that keep the group total unchanged, with 1 yoctoNEAR, a document hash and an event. A failed claimant mint cancels the dispute and moves escrow to undelivered for `retry_forward`. Challenger bond, expiry and appeal stay roadmap (T11, T12).
+- Test: unit tests `over_allocation_rules`, `uphold_claimant_splits_escrow_by_new_bps`, `failed_claimant_mint_cancels_dispute_and_escrow_goes_to_undelivered`, the `h2_` review tests; sandbox `t14b_uphold_existing_voids_claimant` (non-registrar resolve fails).
+
+### T39. Share registered on someone else's work (on-chain split sheet, review M2)
+- Attack: a member registers a share (up to 10000 bps) on a work another member registered, before the real owners do, and collects its payments; the real owner could only open a dispute while the money already paid stayed claimable.
+- Impact: income taken by whoever registers first.
+- Control: a share registered by anyone other than the work's registrant is `pending` approval. While pending it is minted (vault and NFT exist, its bps count toward the 100 percent check) but it is not paid: its part of every group payment and every direct payment is held in the registry's escrow (`escrowed` event, `reason: awaiting_approval`). It cannot be claimed, synced, transferred, confirmed, attested, released to or named in `contests`. The work registrant signs the split sheet with `approve_share` (1 yoctoNEAR): the held money goes to the share's vault and the share is paid normally from then on. `reject_share` voids the share, frees its bps and moves its held money to the group's unallocated escrow, where the registrar releases it to the real owner's share once registered (T25). The registrar is the backup signer for both, with a document hash. A plain deposit sent straight into a rejected share's vault can be sent back by the registrar with `recover_rejected_vault`. Events: `share_approved`, `share_rejected`, `rejected_vault_recovered`; `share_registered` carries `approval` and `registered_by`; `get_share_approval` and the token's `extra` show the state. Shares registered by the work registrant, dispute claimants (approved by the registrar's resolve) and every share that existed before this rule are approved. Approval is kept in its own storage slot (`apv:<token>`), so existing records are unchanged and the deployed registry can be upgraded in place.
+- Test: unit tests `m2_share_by_non_registrant_is_held_until_approved`, `m2_reject_voids_share_and_keeps_money_in_the_group`, `m2_registrant_shares_and_old_shares_are_approved`, `m2_registrar_recovers_plain_deposits_of_a_rejected_vault`, `m2_void_work_moves_held_money_to_unallocated`; sandbox `r02_m2_split_sheet_approval_and_rejection`.
 
 ## Test mapping summary
 
@@ -291,7 +301,7 @@ Terms used below (full detail in DESIGN.md):
 | 18 | T17 |
 | 19 | T18 |
 | 20 | T19 |
-| 21 | T20 |
+| 21 | T20 (sandbox `t21_parent_cannot_delete_redeploy_or_key_a_vault`) |
 | 22 | T21 |
 | 23 | T22 |
 | 24 | T23 |
@@ -302,9 +312,10 @@ Terms used below (full detail in DESIGN.md):
 | 29 | T28 |
 | 30 | T12, T29 |
 | 31 | T32 |
-| `verify-keys` script | T1, T13, T20 |
-| `verify:testnet` script | T1, T13, T31 |
+| `verify-keys` script | T1, T13, T20 (planned, not written) |
+| `verify:testnet` script | T1, T13, T31 (planned, not written) |
 | `assert_solvent` helper | T31 |
+| `review_fixes.rs`, `review.rs` | T7, T11, T12, T15, T19, T21, T24, T27, T35, T38, T39 |
 
 Never cut: T1 to T5 and tests 1, 4, 5, 6, 7 and the zero-keys proof.
 
@@ -338,3 +349,10 @@ Passing in the sandbox (`contracts/tests/tests/disputes.rs`), each ending with t
 Unit tests also cover: contests validation, default contests, a second claim while a dispute is open, `keep_both`, `void_duplicate`, voiding a work only after its share dispute, failed claimant mint (dispute cancelled, escrow to undelivered, retry_forward), Void shares still syncing and claiming, `split_by_total`.
 
 Not yet covered: tests 17 to 31 beyond the unit-level parts, licenses (cut first), AUDIT.md (the audit skill named in the brief is not available here), and the live `verify-keys` and `verify:testnet` scripts (block 5).
+
+## Review fixes status (2026-11-13)
+
+Branch `fix/contract-review`, not deployed. The contracts review findings and Security Suite F-04 are fixed in code, and F-12 in these docs, except the items listed at the end of this section; see the rows marked "review". Regression tests: `contracts/registry/src/review_fixes.rs` (unit, converted from the review's proofs of concept) and `contracts/tests/tests/review.rs` (sandbox: H1, M1 gas, M2, test 21). Other fixes covered there: payer_confirmed only counts while the attesting account still has the payer role, and payer accounts cannot be agents (review L5); a holder suspended before mint gets no NFT and the share fails (review L6).
+
+Not fixed in code, stated here instead: a lost `on_forward` keeps that share's `sync` refused (T19); vaults created before the fix have no `ft_on_transfer` (T21); the full-access keys on `REG` and mock USDC are still present (T13); the registrar is trusted (T12).
+
