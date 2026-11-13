@@ -668,7 +668,7 @@ Callbacks now carry the lock they belong to. `on_claim` gets the lock's `since_b
 
 ### Sizes
 
-The registry wasm is 614394 bytes after block 3 (518782 after block 2), about 6.1 NEAR of storage on testnet at 1e19 yoctoNEAR per byte. A role record plus the first credits: a 0.1 NEAR deposit gave 93 line credits in the sandbox, so the role record costs about 0.007 NEAR.
+The registry wasm is 614394 bytes after block 3 (518782 after block 2), about 6.1 NEAR of storage on testnet at 1e19 yoctoNEAR per byte. Superseded by the size in section 18. A role record plus the first credits: a 0.1 NEAR deposit gave 93 line credits in the sandbox, so the role record costs about 0.007 NEAR.
 
 ### Toolchain note
 
@@ -703,3 +703,7 @@ Held deposits: `sync` is refused while a share is in a dispute, which replaces t
 Events added: `dispute_opened` (kind overallocation: group, claimant, contested), `dispute_frozen` {dispute_id, token_id, claimable_snapshot}, `dispute_resolved` {dispute_id, outcome, doc_hash, released, by}, `dispute_cancelled`, `share_voided`, `work_voided`, `share_confirmed`.
 
 `amend_split` is still not built: a split changes only through `uphold_claimant`.
+
+### Wasm size and code storage
+
+The registry wasm is 674336 bytes after block 4 (614394 after block 3), about 6.7 NEAR of code storage at 1e19 yoctoNEAR per byte (UNVERIFIED on testnet). The audit fixes (AUDIT.md M1, L1) bring it to 674606 bytes, about 6.75 NEAR (UNVERIFIED on testnet). The mock USDC wasm is 181587 bytes, about 1.82 NEAR. Sizes are without wasm-opt; DEPLOY_PLAN.md budgets the measured values plus a margin.
