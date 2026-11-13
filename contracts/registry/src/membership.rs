@@ -24,10 +24,13 @@ impl Registry {
                 && logic::is_hash32(&doc_hash),
             "hashes must be 64 lowercase hex characters"
         );
-        let me = env::current_account_id();
         require!(
-            account != me && !account.as_str().ends_with(&format!(".{me}")) && account != self.usdc,
+            !self.is_system_account(&account),
             "system accounts cannot hold a credential"
+        );
+        require!(
+            self.roles.get(&account).is_none(),
+            "agent accounts cannot hold a credential"
         );
         require!(
             self.credentials.get(&account).is_none(),

@@ -58,21 +58,36 @@ impl Registry {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_CLAIM_CB)
-                    .on_claim(token_id, owner, U128(amount)),
+                    .on_claim(token_id, owner, U128(amount), U64(env::block_height())),
             )
     }
 
-    /// Clears `payout_in_flight`. If the vault's transfer failed, restores the
-    /// debit. Never panics. Returns true if the holder was paid.
+    /// Clears `payout_in_flight` if it is still this claim's lock. If the
+    /// vault's transfer failed, restores the debit. If the lock was already
+    /// cleared by `release_stale_lock`, a late failure still restores the
+    /// debit (the money never left the vault) but leaves any newer lock
+    /// alone. Never panics. Returns true if the holder was paid.
     #[private]
-    pub fn on_claim(&mut self, token_id: TokenId, receiver: AccountId, amount: U128) -> bool {
+    pub fn on_claim(
+        &mut self,
+        token_id: TokenId,
+        receiver: AccountId,
+        amount: U128,
+        lock_block: U64,
+    ) -> bool {
         let ok = callback_result(64).is_some();
         if let Some(l) = self.ledgers.get_mut(&token_id) {
-            l.payout_in_flight = None;
+            let mine = l
+                .payout_in_flight
+                .as_ref()
+                .is_some_and(|k| k.since_block == lock_block && k.amount == amount);
+            if mine {
+                l.payout_in_flight = None;
+            }
             l.epoch += 1;
             if !ok {
                 l.known_balance += amount.0;
-                l.total_paid_out -= amount.0;
+                l.total_paid_out = l.total_paid_out.saturating_sub(amount.0);
             }
         }
         emit(
@@ -80,6 +95,62 @@ impl Registry {
             json!({ "token_id": token_id, "owner": receiver, "amount": amount, "ok": ok }),
         );
         ok
+    }
+
+    /// Re-sends a share's undelivered amount (T26). Anyone may call it. The
+    /// amount is debited before the forward; a second failure puts it back.
+    pub fn retry_forward(&mut self, token_id: TokenId) {
+        require!(
+            self.share(&token_id).status == ShareStatus::Active,
+            "share is not active"
+        );
+        require!(Self::has_gas_for_forwards(1), "not enough gas to forward");
+        let l = self.ledger_mut(&token_id);
+        let amount = l.undelivered;
+        require!(amount > 0, "nothing undelivered");
+        l.undelivered = 0;
+        self.undelivered_total -= amount;
+        self.forward(&token_id, amount);
+        emit(
+            "forward_retried",
+            json!({ "token_id": token_id, "amount": U128(amount) }),
+        );
+    }
+
+    /// Clears a lock older than `STALE_LOCK_BLOCKS` (T19). Anyone may call
+    /// it. A payout lock is cleared WITHOUT rolling back the debit: if the
+    /// withdraw happened the debit is right; if not, `sync` finds the money
+    /// again (and `total_paid_out` overstates by that amount, flagged by an
+    /// `anomaly` event). A transfer lock is cleared and the current owner
+    /// keeps the token.
+    pub fn release_stale_lock(&mut self, token_id: TokenId) {
+        let now = env::block_height();
+        let stale = |k: &Option<Lock>| {
+            k.as_ref()
+                .is_some_and(|k| now >= k.since_block.0.saturating_add(STALE_LOCK_BLOCKS))
+        };
+        let l = self.ledger_mut(&token_id);
+        let mut released = Vec::new();
+        if stale(&l.payout_in_flight) {
+            released.push(("payout_in_flight", l.payout_in_flight.take()));
+        }
+        if stale(&l.transfer_pending) {
+            released.push(("transfer_pending", l.transfer_pending.take()));
+        }
+        require!(!released.is_empty(), "no stale lock");
+        l.epoch += 1;
+        for (kind, lock) in released {
+            emit(
+                "lock_released_stale",
+                json!({ "token_id": token_id, "lock": kind, "detail": lock }),
+            );
+            if kind == "payout_in_flight" {
+                emit(
+                    "anomaly",
+                    json!({ "token_id": token_id, "kind": "payout_lock_released_stale", "detail": "sync to reconcile the vault balance" }),
+                );
+            }
+        }
     }
 
     /// Reads the vault's real token balance and records it, so plain
@@ -212,8 +283,11 @@ impl Registry {
             return PromiseOrValue::Value(amount);
         }
         let result = match serde_json::from_str::<PaymentMsg>(&msg) {
-            Ok(PaymentMsg::PayWork(p)) => self.pay_work(&sender_id, amount.0, p),
-            Ok(PaymentMsg::PayShare(p)) => self.pay_share(&sender_id, amount.0, p),
+            Ok(PaymentMsg::PayWork(p)) => self.pay_work(&sender_id, amount.0, p, None),
+            Ok(PaymentMsg::PayShare(p)) => self.pay_share(&sender_id, amount.0, p, None, None),
+            Ok(PaymentMsg::FundAllowance(agent)) => {
+                self.fund_allowance(&sender_id, amount.0, agent)
+            }
             Err(_) => Err("malformed msg"),
         };
         match result {
@@ -256,7 +330,7 @@ impl Registry {
 }
 
 impl Registry {
-    fn check_statement(
+    pub(crate) fn check_statement(
         period: &str,
         statement_hash: &str,
         line: Option<&String>,
@@ -273,7 +347,7 @@ impl Registry {
         Ok(())
     }
 
-    fn has_gas_for_forwards(n: usize) -> bool {
+    pub(crate) fn has_gas_for_forwards(n: usize) -> bool {
         let need = (GAS_FT_TRANSFER.as_gas() + GAS_FORWARD_CB.as_gas()) * n as u64
             + Gas::from_tgas(10).as_gas();
         env::prepaid_gas()
@@ -282,11 +356,12 @@ impl Registry {
             >= need
     }
 
-    fn pay_work(
+    pub(crate) fn pay_work(
         &mut self,
         payer: &AccountId,
         amount: u128,
         p: PayWork,
+        agent: Option<&AccountId>,
     ) -> Result<(), &'static str> {
         Self::check_statement(&p.period, &p.statement_hash, p.statement_line_id.as_ref())?;
         if amount < MIN_GROUP_PAYMENT {
@@ -338,8 +413,9 @@ impl Registry {
         emit(
             "payment_in",
             json!({
-                "source": "direct",
+                "source": if agent.is_some() { "allowance" } else { "direct" },
                 "payer": payer,
+                "agent": agent,
                 "target": { "work_id": key.work_id, "right_type": key.right_type, "territory": key.territory },
                 "amount": U128(amount),
                 "period": p.period,
@@ -352,13 +428,15 @@ impl Registry {
         Ok(())
     }
 
-    fn pay_share(
+    pub(crate) fn pay_share(
         &mut self,
         payer: &AccountId,
         amount: u128,
         p: PayShare,
+        agent: Option<&AccountId>,
+        line: Option<&String>,
     ) -> Result<(), &'static str> {
-        Self::check_statement(&p.period, &p.statement_hash, None)?;
+        Self::check_statement(&p.period, &p.statement_hash, line)?;
         if amount == 0 {
             return Err("zero amount");
         }
@@ -380,13 +458,14 @@ impl Registry {
         emit(
             "payment_in",
             json!({
-                "source": "direct",
+                "source": if agent.is_some() { "allowance" } else { "direct" },
                 "payer": payer,
+                "agent": agent,
                 "target": { "token_id": p.token_id },
                 "amount": U128(amount),
                 "period": p.period,
                 "statement_hash": p.statement_hash,
-                "statement_line_id": null,
+                "statement_line_id": line,
                 "credits": [{ "token_id": p.token_id, "amount": U128(amount) }],
             }),
         );
@@ -395,7 +474,7 @@ impl Registry {
 
     /// Sends `amount` from the registry to the share's vault and settles it
     /// in `on_forward`. Zero credits are skipped.
-    fn forward(&mut self, token_id: &TokenId, amount: u128) {
+    pub(crate) fn forward(&mut self, token_id: &TokenId, amount: u128) {
         if amount == 0 {
             return;
         }

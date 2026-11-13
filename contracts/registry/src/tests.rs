@@ -265,7 +265,7 @@ fn claim_debits_before_call_and_settles() {
     assert!(l.payout_in_flight.is_some());
 
     callback(ok(b""));
-    assert!(c.on_claim(t.clone(), acc("bob.near"), U128(700_000)));
+    assert!(c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(0)));
     let l = ledger(&c, &t);
     assert!(l.payout_in_flight.is_none());
     assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
@@ -280,7 +280,7 @@ fn failed_claim_rolls_back_exactly() {
     yocto(&acc("bob.near"));
     let _ = c.claim(t.clone());
     callback(PromiseResult::Failed);
-    assert!(!c.on_claim(t.clone(), acc("bob.near"), U128(700_000)));
+    assert!(!c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(0)));
     let l = ledger(&c, &t);
     assert!(l.payout_in_flight.is_none());
     assert_eq!((l.known_balance.0, l.total_paid_out.0), (700_000, 0));
@@ -336,7 +336,7 @@ fn transfer_blocked_while_payout_in_flight_then_allowed() {
     assert!(blocked.is_err());
 
     callback(ok(b""));
-    c.on_claim(t.clone(), acc("bob.near"), U128(700_000));
+    c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(0));
     yocto(&acc("bob.near"));
     c.nft_transfer(acc("carol.near"), t.clone(), None, None, None);
     assert_eq!(c.owner_of(&t), Some(acc("carol.near")));
@@ -435,7 +435,13 @@ fn transfer_call_lock_blocks_claim_and_resolve_returns_token() {
     }
 
     callback(ok(b"true"));
-    assert!(!c.nft_resolve_transfer(acc("bob.near"), acc("carol.near"), t.clone(), None));
+    assert!(!c.nft_resolve_transfer(
+        acc("bob.near"),
+        acc("carol.near"),
+        t.clone(),
+        None,
+        Some(U64(0))
+    ));
     assert_eq!(c.owner_of(&t), Some(acc("bob.near")));
     let l = ledger(&c, &t);
     assert!(l.transfer_pending.is_none());
@@ -457,7 +463,13 @@ fn resolve_keeps_token_when_receiver_returns_false() {
         None,
     );
     callback(ok(b"false"));
-    assert!(c.nft_resolve_transfer(acc("bob.near"), acc("carol.near"), t.clone(), None));
+    assert!(c.nft_resolve_transfer(
+        acc("bob.near"),
+        acc("carol.near"),
+        t.clone(),
+        None,
+        Some(U64(0))
+    ));
     assert_eq!(c.owner_of(&t), Some(acc("carol.near")));
 }
 
@@ -476,7 +488,13 @@ fn resolve_returns_token_when_receiver_fails() {
         None,
     );
     callback(PromiseResult::Failed);
-    assert!(!c.nft_resolve_transfer(acc("bob.near"), acc("carol.near"), t.clone(), None));
+    assert!(!c.nft_resolve_transfer(
+        acc("bob.near"),
+        acc("carol.near"),
+        t.clone(),
+        None,
+        Some(U64(0))
+    ));
     assert_eq!(c.owner_of(&t), Some(acc("bob.near")));
 }
 
@@ -872,4 +890,490 @@ fn failed_member_registration_removes_credential() {
     callback(PromiseResult::Failed);
     assert!(!c.on_member_registered(acc("dave.near")));
     assert!(!c.is_active_member(acc("dave.near")));
+}
+
+// ---------- block 3: agents, allowances, holder note, payer role, locks ----------
+
+const FAR: u64 = 4_000_000_000_000_000_000;
+const HOUR: u64 = 3_600_000_000_000;
+
+fn agent() -> AccountId {
+    acc("pay.alice.near")
+}
+
+fn at(predecessor: &AccountId, deposit: NearToken, ts: u64, height: u64) {
+    testing_env!(ctx(predecessor, deposit)
+        .block_timestamp(ts)
+        .block_height(height)
+        .build());
+}
+
+fn grant(c: &mut Registry, per_tx: u128, daily: u128, max_tx: u32) {
+    call(&acc("alice.near"), NearToken::from_millinear(100));
+    c.grant_role(
+        agent(),
+        vec![AgentMethod::PayFromAllowance, AgentMethod::Report],
+        U128(per_tx),
+        U128(daily),
+        max_tx,
+        U64(FAR),
+    );
+}
+
+fn fund(c: &mut Registry, from: &str, amount: u128) -> PromiseOrValue<U128> {
+    call(&usdc(), NearToken::from_yoctonear(0));
+    let msg = json!({ "fund_allowance": agent() });
+    c.ft_on_transfer(acc(from), U128(amount), msg.to_string())
+}
+
+fn target(w: WorkId) -> PayTarget {
+    PayTarget::Work {
+        work_id: w,
+        right_type: RightType::Publishing,
+        territory: "WW".into(),
+    }
+}
+
+fn pay_at(c: &mut Registry, t: PayTarget, amount: u128, line: &str, ts: u64) {
+    at(&agent(), NearToken::from_yoctonear(0), ts, 0);
+    c.pay_from_allowance(t, U128(amount), line.to_string(), "2026-Q3".into(), h('f'));
+}
+
+fn try_pay(c: &mut Registry, t: PayTarget, amount: u128, line: &str, ts: u64) -> bool {
+    !panics(|| pay_at(c, t, amount, line, ts))
+}
+
+#[test]
+fn grant_role_requires_direct_sub_account_and_credits_lines() {
+    let mut c = setup();
+    call(&acc("alice.near"), NearToken::from_millinear(100));
+    assert!(panics(|| c.grant_role(
+        acc("pay.bob.near"),
+        vec![AgentMethod::PayFromAllowance],
+        U128(1),
+        U128(1),
+        1,
+        U64(FAR)
+    )));
+    call(&acc("alice.near"), NearToken::from_millinear(100));
+    assert!(panics(|| c.grant_role(
+        acc("a.b.alice.near"),
+        vec![AgentMethod::PayFromAllowance],
+        U128(1),
+        U128(1),
+        1,
+        U64(FAR)
+    )));
+    call(&acc("alice.near"), NearToken::from_millinear(100));
+    assert!(
+        panics(|| c.grant_role(
+            agent(),
+            vec![AgentMethod::PayFromAllowance],
+            U128(2),
+            U128(1),
+            1,
+            U64(FAR)
+        )),
+        "per_tx above daily is refused"
+    );
+    call(&acc("outsider.near"), NearToken::from_millinear(100));
+    assert!(
+        panics(|| c.grant_role(
+            acc("pay.outsider.near"),
+            vec![AgentMethod::PayFromAllowance],
+            U128(1),
+            U128(1),
+            1,
+            U64(FAR)
+        )),
+        "non members cannot grant roles"
+    );
+    grant(&mut c, 100_000, 300_000, 5);
+    let r = c.get_role(agent()).unwrap();
+    assert!(
+        r.line_credits > 50 && r.line_credits < 100,
+        "{}",
+        r.line_credits
+    );
+    assert_eq!(
+        (r.org, r.allowance.0, r.revoked),
+        (acc("alice.near"), 0, false)
+    );
+    // A second grant while active is refused.
+    assert!(panics(|| grant(&mut c, 1, 1, 1)));
+    // An agent cannot later receive a credential.
+    call(&registrar(), NearToken::from_near(1));
+    assert!(panics(|| drop(c.grant_credential(
+        agent(),
+        h('a'),
+        h('b'),
+        h('c')
+    ))));
+}
+
+#[test]
+fn only_the_org_can_fund_and_allowance_is_counted() {
+    let mut c = setup();
+    grant(&mut c, 100_000, 300_000, 5);
+    assert!(matches!(
+        fund(&mut c, "bob.near", 50_000),
+        PromiseOrValue::Value(U128(50_000))
+    ));
+    assert!(matches!(
+        fund(&mut c, "alice.near", 500_000),
+        PromiseOrValue::Value(U128(0))
+    ));
+    assert_eq!(c.get_role(agent()).unwrap().allowance.0, 500_000);
+    assert_eq!(c.get_accounting().allowance_total.0, 500_000);
+}
+
+#[test]
+fn agent_pays_registered_shares_only_and_once_per_line() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t1 = mint(&mut c, w, "bob.near", 6000);
+    let t2 = mint(&mut c, w, "carol.near", 4000);
+    grant(&mut c, 100_000, 300_000, 5);
+    let _ = fund(&mut c, "alice.near", 500_000);
+    let credits = c.get_role(agent()).unwrap().line_credits;
+
+    pay_at(&mut c, target(w), 100_000, "L-1", 0);
+    let logs = get_logs().join("\n");
+    assert!(logs.contains("\"source\":\"allowance\""));
+    assert!(logs.contains("allowance_spent"));
+    callback(ok(b""));
+    c.on_forward(t1.clone(), U128(60_000));
+    callback(ok(b""));
+    c.on_forward(t2.clone(), U128(40_000));
+    assert_eq!(ledger(&c, &t1).known_balance.0, 60_000);
+    assert_eq!(ledger(&c, &t2).known_balance.0, 40_000);
+    let r = c.get_role(agent()).unwrap();
+    assert_eq!((r.allowance.0, r.line_credits), (400_000, credits - 1));
+    assert_eq!(c.get_accounting().allowance_total.0, 400_000);
+    assert!(c.is_statement_line_used(acc("alice.near"), "L-1".into()));
+
+    // Same line again: refused, nothing moves.
+    assert!(!try_pay(&mut c, target(w), 100_000, "L-1", 0));
+    assert_eq!(c.get_role(agent()).unwrap().allowance.0, 400_000);
+    // Pay one share directly by token id.
+    assert!(try_pay(
+        &mut c,
+        PayTarget::Share { token_id: t2 },
+        1,
+        "L-2",
+        0
+    ));
+}
+
+#[test]
+fn per_tx_daily_and_count_limits_with_rolling_window() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let _ = mint(&mut c, w, "bob.near", 10_000);
+    grant(&mut c, 100_000, 250_000, 3);
+    let _ = fund(&mut c, "alice.near", 1_000_000);
+    let t0 = 10 * HOUR;
+
+    assert!(!try_pay(&mut c, target(w), 100_001, "a", t0), "per tx");
+    assert!(try_pay(&mut c, target(w), 100_000, "b", t0));
+    assert!(try_pay(&mut c, target(w), 100_000, "c", t0 + HOUR));
+    assert!(
+        !try_pay(&mut c, target(w), 60_000, "d", t0 + 2 * HOUR),
+        "daily"
+    );
+    assert!(try_pay(&mut c, target(w), 50_000, "e", t0 + 2 * HOUR));
+    assert!(
+        !try_pay(&mut c, target(w), 10_000, "f", t0 + 3 * HOUR),
+        "daily or count"
+    );
+    // 24 hours after the first payment its hour drops out of the window.
+    assert!(try_pay(&mut c, target(w), 100_000, "g", t0 + 24 * HOUR));
+    let r = c.get_role(agent()).unwrap();
+    assert_eq!((r.spent_last_24h.0, r.tx_last_24h), (250_000, 3));
+    assert_eq!(r.allowance.0, 650_000);
+}
+
+#[test]
+fn count_limit_alone_blocks() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let _ = mint(&mut c, w, "bob.near", 10_000);
+    grant(&mut c, 100_000, 1_000_000, 2);
+    let _ = fund(&mut c, "alice.near", 1_000_000);
+    assert!(try_pay(&mut c, target(w), 10_000, "a", 0));
+    assert!(try_pay(&mut c, target(w), 10_000, "b", 0));
+    assert!(!try_pay(&mut c, target(w), 10_000, "c", 0));
+}
+
+#[test]
+fn allowance_and_minimum_payment_are_enforced() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let _ = mint(&mut c, w, "bob.near", 10_000);
+    grant(&mut c, 100_000, 1_000_000, 10);
+    let _ = fund(&mut c, "alice.near", 50_000);
+    assert!(
+        !try_pay(&mut c, target(w), 60_000, "a", 0),
+        "over allowance"
+    );
+    assert!(
+        !try_pay(&mut c, target(w), MIN_GROUP_PAYMENT - 1, "b", 0),
+        "below minimum"
+    );
+    assert!(!c.is_statement_line_used(acc("alice.near"), "b".into()));
+    assert_eq!(c.get_role(agent()).unwrap().allowance.0, 50_000);
+}
+
+#[test]
+fn revoked_expired_suspended_and_wrong_method_are_blocked() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let _ = mint(&mut c, w, "bob.near", 10_000);
+    call(&acc("alice.near"), NearToken::from_millinear(100));
+    c.grant_role(
+        agent(),
+        vec![AgentMethod::Report],
+        U128(100_000),
+        U128(100_000),
+        5,
+        U64(5 * HOUR),
+    );
+    let _ = fund(&mut c, "alice.near", 100_000);
+    assert!(
+        !try_pay(&mut c, target(w), 10_000, "a", 0),
+        "method not allowed"
+    );
+    at(&agent(), NearToken::from_yoctonear(0), 0, 0);
+    c.report("a".into(), h('1'));
+    assert!(
+        panics(|| {
+            at(&agent(), NearToken::from_yoctonear(0), 5 * HOUR, 0);
+            c.report("a".into(), h('1'));
+        }),
+        "expired"
+    );
+
+    // Re-grant after revoke keeps the allowance.
+    yocto(&registrar());
+    c.revoke_role(agent());
+    assert!(matches!(
+        fund(&mut c, "alice.near", 1),
+        PromiseOrValue::Value(U128(1))
+    ));
+    grant(&mut c, 100_000, 100_000, 5);
+    assert_eq!(c.get_role(agent()).unwrap().allowance.0, 100_000);
+    assert!(try_pay(&mut c, target(w), 10_000, "b", 0));
+    yocto(&acc("alice.near"));
+    c.revoke_role(agent());
+    assert!(!try_pay(&mut c, target(w), 10_000, "c", 0), "revoked");
+
+    grant(&mut c, 100_000, 100_000, 5);
+    yocto(&registrar());
+    c.suspend_credential(acc("alice.near"), h('9'));
+    assert!(!try_pay(&mut c, target(w), 10_000, "d", 0), "org suspended");
+    yocto(&acc("alice.near"));
+    assert!(panics(|| drop(c.withdraw_allowance(agent(), U128(1)))));
+}
+
+#[test]
+fn agent_cannot_use_owner_methods() {
+    let mut c = setup();
+    grant(&mut c, 100_000, 100_000, 5);
+    let _ = fund(&mut c, "alice.near", 100_000);
+    yocto(&agent());
+    assert!(panics(|| c.revoke_role(agent())));
+    yocto(&agent());
+    assert!(panics(|| drop(c.withdraw_allowance(agent(), U128(1)))));
+    call(&agent(), NearToken::from_millinear(10));
+    assert!(panics(|| c.add_line_credits(agent())));
+    call(&agent(), NearToken::from_millinear(100));
+    assert!(panics(|| c.grant_role(
+        acc("x.pay.alice.near"),
+        vec![AgentMethod::Report],
+        U128(1),
+        U128(1),
+        1,
+        U64(FAR)
+    )));
+}
+
+#[test]
+fn line_credits_run_out_and_can_be_topped_up() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let _ = mint(&mut c, w, "bob.near", 10_000);
+    call(&acc("alice.near"), NearToken::from_millinear(10));
+    c.grant_role(
+        agent(),
+        vec![AgentMethod::PayFromAllowance],
+        U128(100_000),
+        U128(1_000_000),
+        100,
+        U64(FAR),
+    );
+    let _ = fund(&mut c, "alice.near", 1_000_000);
+    let n = c.get_role(agent()).unwrap().line_credits;
+    for i in 0..n {
+        assert!(try_pay(&mut c, target(w), 10_000, &format!("l{i}"), 0));
+    }
+    assert!(!try_pay(&mut c, target(w), 10_000, "more", 0));
+    call(&acc("alice.near"), NearToken::from_millinear(1));
+    c.add_line_credits(agent());
+    assert!(try_pay(&mut c, target(w), 10_000, "more", 0));
+}
+
+#[test]
+fn failed_allowance_withdrawal_restores() {
+    let mut c = setup();
+    grant(&mut c, 100_000, 100_000, 5);
+    let _ = fund(&mut c, "alice.near", 100_000);
+    yocto(&acc("alice.near"));
+    let _ = c.withdraw_allowance(agent(), U128(70_000));
+    assert_eq!(c.get_accounting().allowance_total.0, 30_000);
+    callback(PromiseResult::Failed);
+    assert!(!c.on_allowance_withdrawn(agent(), acc("alice.near"), U128(70_000)));
+    assert_eq!(c.get_role(agent()).unwrap().allowance.0, 100_000);
+    assert_eq!(c.get_accounting().allowance_total.0, 100_000);
+}
+
+#[test]
+fn note_is_holder_only_and_never_changes_payouts() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = mint(&mut c, w, "bob.near", 10_000);
+    call(&acc("alice.near"), NearToken::from_millinear(10));
+    assert!(panics(|| c.set_share_note(t.clone(), "x".into())));
+    call(&acc("bob.near"), NearToken::from_yoctonear(0));
+    assert!(panics(|| c.set_share_note(t.clone(), "x".into())));
+    call(&acc("bob.near"), NearToken::from_millinear(10));
+    assert!(panics(|| c.set_share_note(t.clone(), "n".repeat(281))));
+    call(&acc("bob.near"), NearToken::from_millinear(10));
+    c.set_share_note(t.clone(), "pay carol.near instead".into());
+    assert_eq!(
+        c.get_share(t.clone()).unwrap().note.as_deref(),
+        Some("pay carol.near instead")
+    );
+    let vault_before = c.get_share(t.clone()).unwrap().vault;
+    pay_share(&mut c, &t, 50_000);
+    assert_eq!(ledger(&c, &t).known_balance.0, 50_000);
+    assert_eq!(c.get_share(t.clone()).unwrap().vault, vault_before);
+    call(&acc("bob.near"), NearToken::from_yoctonear(1));
+    c.set_share_note(t.clone(), String::new());
+    assert!(c.get_share(t).unwrap().note.is_none());
+}
+
+#[test]
+fn payer_role_attests_evidence_tier() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = mint(&mut c, w, "bob.near", 10_000);
+    call(&acc("payer.near"), NearToken::from_millinear(10));
+    assert!(panics(|| c.attest_share(t.clone(), h('7'))));
+    yocto(&acc("alice.near"));
+    assert!(panics(|| c.grant_payer_role(acc("payer.near"), h('6'))));
+    yocto(&registrar());
+    c.grant_payer_role(acc("payer.near"), h('6'));
+    assert!(c.is_payer(acc("payer.near")));
+    call(&acc("payer.near"), NearToken::from_millinear(10));
+    c.attest_share(t.clone(), h('7'));
+    let extra = c
+        .nft_token(t.clone())
+        .unwrap()
+        .metadata
+        .unwrap()
+        .extra
+        .unwrap();
+    assert!(extra.contains("payer_confirmed"), "{extra}");
+    yocto(&registrar());
+    c.revoke_payer_role(acc("payer.near"), h('6'));
+    assert!(!c.is_payer(acc("payer.near")));
+}
+
+#[test]
+fn retry_forward_resends_undelivered() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = mint(&mut c, w, "bob.near", 10_000);
+    call(&usdc(), NearToken::from_yoctonear(0));
+    let msg =
+        json!({ "pay_share": { "token_id": t, "period": "2026-Q3", "statement_hash": h('f') } });
+    let _ = c.ft_on_transfer(acc("payer.near"), U128(80_000), msg.to_string());
+    callback(PromiseResult::Failed);
+    assert!(!c.on_forward(t.clone(), U128(80_000)));
+    assert_eq!(c.get_accounting().undelivered_total.0, 80_000);
+    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    c.retry_forward(t.clone());
+    assert_eq!(c.get_accounting().undelivered_total.0, 0);
+    assert_eq!(c.get_accounting().forwards_in_flight_total.0, 80_000);
+    callback(ok(b""));
+    assert!(c.on_forward(t.clone(), U128(80_000)));
+    assert_eq!(ledger(&c, &t).known_balance.0, 80_000);
+    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    assert!(panics(|| c.retry_forward(t)), "nothing left to retry");
+}
+
+#[test]
+fn stale_payout_lock_released_only_after_timeout_and_late_callback_is_safe() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = mint(&mut c, w, "bob.near", 10_000);
+    pay_share(&mut c, &t, 700_000);
+    at(&acc("bob.near"), NearToken::from_yoctonear(1), 0, 100);
+    let _ = c.claim(t.clone());
+    at(
+        &acc("anyone.near"),
+        NearToken::from_yoctonear(0),
+        0,
+        100 + STALE_LOCK_BLOCKS - 1,
+    );
+    assert!(panics(|| c.release_stale_lock(t.clone())), "too early");
+    at(
+        &acc("anyone.near"),
+        NearToken::from_yoctonear(0),
+        0,
+        100 + STALE_LOCK_BLOCKS,
+    );
+    c.release_stale_lock(t.clone());
+    assert!(ledger(&c, &t).payout_in_flight.is_none());
+    assert!(get_logs().join("\n").contains("lock_released_stale"));
+
+    // A new claim cannot start (nothing claimable), but a late success of
+    // the old claim must not touch state beyond the epoch.
+    callback(ok(b""));
+    assert!(c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(100)));
+    let l = ledger(&c, &t);
+    assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
+}
+
+#[test]
+fn late_resolve_after_stale_release_keeps_current_owner() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = mint(&mut c, w, "bob.near", 10_000);
+    at(&acc("bob.near"), NearToken::from_yoctonear(1), 0, 10);
+    let _ = c.nft_transfer_call(
+        acc("carol.near"),
+        t.clone(),
+        None,
+        None,
+        String::new(),
+        None,
+    );
+    at(
+        &acc("anyone.near"),
+        NearToken::from_yoctonear(0),
+        0,
+        10 + STALE_LOCK_BLOCKS,
+    );
+    c.release_stale_lock(t.clone());
+    assert!(ledger(&c, &t).transfer_pending.is_none());
+    callback(PromiseResult::Failed);
+    assert!(c.nft_resolve_transfer(
+        acc("bob.near"),
+        acc("carol.near"),
+        t.clone(),
+        None,
+        Some(U64(10))
+    ));
+    assert_eq!(c.owner_of(&t), Some(acc("carol.near")));
 }

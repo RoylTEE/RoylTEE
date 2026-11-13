@@ -89,7 +89,13 @@ impl Registry {
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_RESOLVE_TRANSFER)
                     .with_unused_gas_weight(0)
-                    .nft_resolve_transfer(sender, receiver_id, token_id, None),
+                    .nft_resolve_transfer(
+                        sender,
+                        receiver_id,
+                        token_id,
+                        None,
+                        Some(U64(env::block_height())),
+                    ),
             )
             .into()
     }
@@ -106,8 +112,19 @@ impl Registry {
         receiver_id: AccountId,
         token_id: TokenId,
         approved_account_ids: Option<HashMap<AccountId, u64>>,
+        lock_block: Option<U64>,
     ) -> bool {
         let _ = approved_account_ids;
+        // Act only if the pending lock is still ours. If it was released as
+        // stale, the current owner keeps the token and a newer lock stays.
+        let mine = self.ledgers.get(&token_id).is_some_and(|l| {
+            l.transfer_pending
+                .as_ref()
+                .is_some_and(|k| Some(k.since_block) == lock_block && k.account == receiver_id)
+        });
+        if !mine {
+            return true;
+        }
         if let Some(l) = self.ledgers.get_mut(&token_id) {
             l.transfer_pending = None;
         }
@@ -364,7 +381,9 @@ impl Registry {
             "percent_bps": share.percent_bps,
             "basis": share.basis,
             "provenance": provenance,
-            "evidence_tier": "self_asserted",
+            "evidence_tier": if share.payer_attestation.is_some() { "payer_confirmed" } else { "self_asserted" },
+            "payer_attestation": share.payer_attestation,
+            "note": share.note,
             "status": share.status,
             "vault": share.vault,
             "earned": v.earned,

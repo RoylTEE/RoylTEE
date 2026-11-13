@@ -180,6 +180,7 @@ impl Registry {
                 holder_at_mint: holder.clone(),
                 registered_by: caller.clone(),
                 note: None,
+                payer_attestation: None,
                 last_effective_from: now,
                 created_at: now,
             },

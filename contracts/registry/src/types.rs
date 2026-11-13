@@ -130,8 +130,18 @@ pub struct Share {
     pub holder_at_mint: AccountId,
     pub registered_by: AccountId,
     pub note: Option<String>,
+    /// Set by an account with the payer role (evidence tier payer_confirmed).
+    pub payer_attestation: Option<Attestation>,
     pub last_effective_from: U64,
     pub created_at: U64,
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Attestation {
+    pub payer: AccountId,
+    pub statement_hash: Hash32,
+    pub at: U64,
 }
 
 #[near(serializers = [borsh, json])]
@@ -233,6 +243,74 @@ pub struct Config {
 pub enum PaymentMsg {
     PayWork(PayWork),
     PayShare(PayShare),
+    /// Credits the allowance of this agent. Sender must be the agent's organisation.
+    FundAllowance(AccountId),
+}
+
+/// What an agent pays. There is no payee: the registry resolves vaults (T8).
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum PayTarget {
+    Work {
+        work_id: WorkId,
+        right_type: RightType,
+        territory: String,
+    },
+    Share {
+        token_id: TokenId,
+    },
+}
+
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentMethod {
+    PayFromAllowance,
+    Report,
+}
+
+pub const ROLLING_HOURS: usize = 24;
+
+/// One agent's role inside the registry. Limits are in token base units.
+#[near(serializers = [borsh])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AgentRole {
+    pub org: AccountId,
+    pub methods: Vec<AgentMethod>,
+    pub per_tx_limit: u128,
+    pub daily_limit: u128,
+    pub max_tx_per_day: u32,
+    /// Nanoseconds. The role is expired from this time on.
+    pub expires_at: u64,
+    pub revoked: bool,
+    /// Held in the registry's token balance, counted in allowance_total.
+    pub allowance: u128,
+    /// Statement lines this role may still record; each is prepaid storage.
+    pub line_credits: u32,
+    /// Rolling 24 hour window, one bucket per hour.
+    pub spent: [u128; ROLLING_HOURS],
+    pub counts: [u32; ROLLING_HOURS],
+    pub bucket_hour: u64,
+    pub granted_at: u64,
+}
+
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RoleView {
+    pub agent: AccountId,
+    pub org: AccountId,
+    pub methods: Vec<AgentMethod>,
+    pub per_tx_limit: U128,
+    pub daily_limit: U128,
+    pub max_tx_per_day: u32,
+    pub expires_at: U64,
+    pub revoked: bool,
+    pub expired: bool,
+    pub allowance: U128,
+    pub line_credits: u32,
+    pub spent_last_24h: U128,
+    pub tx_last_24h: u32,
 }
 
 #[near(serializers = [json])]

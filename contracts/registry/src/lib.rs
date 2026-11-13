@@ -11,12 +11,14 @@ use near_contract_standards::non_fungible_token::metadata::NFTContractMetadata;
 use near_contract_standards::non_fungible_token::NonFungibleToken;
 use near_sdk::json_types::{U128, U64};
 use near_sdk::serde_json::{self, json, Value};
-use near_sdk::store::{IterableMap, LazyOption, LookupMap};
+use near_sdk::store::{IterableMap, LazyOption, LookupMap, LookupSet};
 use near_sdk::{
     env, near, require, AccountId, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise,
     StorageUsage,
 };
 
+mod agents;
+mod holder;
 pub mod logic;
 mod membership;
 mod money;
@@ -54,6 +56,14 @@ pub const MIN_GROUP_PAYMENT: u128 = 10_000;
 /// effective_from may be at most 30 days ahead of the block time.
 pub const MAX_EFFECTIVE_FUTURE_NS: u64 = 30 * 24 * 3600 * 1_000_000_000;
 
+/// A lock older than this many blocks may be cleared by anyone (T19).
+/// About 20 minutes at one block per second. Long enough under congestion: UNVERIFIED.
+pub const STALE_LOCK_BLOCKS: u64 = 1_200;
+/// Storage prepaid per statement line id (a 32-byte hash in a set, with margin).
+pub const LINE_STORAGE_BYTES: StorageUsage = 100;
+pub const MAX_TX_PER_DAY: u32 = 1_000;
+pub const NS_PER_HOUR: u64 = 3_600 * 1_000_000_000;
+
 pub const GAS_CREATE_VAULT_CB: Gas = Gas::from_tgas(40);
 pub const GAS_STORAGE_DEPOSIT: Gas = Gas::from_tgas(10);
 pub const GAS_VAULT_READY_CB: Gas = Gas::from_tgas(20);
@@ -81,6 +91,9 @@ enum Key {
     Ledgers,
     Groups,
     Disputes,
+    Roles,
+    Payers,
+    StatementLines,
 }
 
 #[near(contract_state)]
@@ -97,6 +110,10 @@ pub struct Registry {
     ledgers: LookupMap<TokenId, Ledger>,
     groups: LookupMap<GroupKey, Group>,
     disputes: IterableMap<DisputeId, Dispute>,
+    roles: LookupMap<AccountId, AgentRole>,
+    payers: LookupSet<AccountId>,
+    /// sha256(org || 0x00 || statement_line_id) of every line paid (T9).
+    statement_lines: LookupSet<Vec<u8>>,
     /// Solvency counters (T31). Allowance and escrow arrive in blocks 3 and 4.
     allowance_total: u128,
     unallocated_total: u128,
@@ -132,6 +149,9 @@ impl Registry {
             ledgers: LookupMap::new(Key::Ledgers),
             groups: LookupMap::new(Key::Groups),
             disputes: IterableMap::new(Key::Disputes),
+            roles: LookupMap::new(Key::Roles),
+            payers: LookupSet::new(Key::Payers),
+            statement_lines: LookupSet::new(Key::StatementLines),
             allowance_total: 0,
             unallocated_total: 0,
             escrow_total: 0,
@@ -229,6 +249,11 @@ impl Registry {
                 ..
             })
         )
+    }
+
+    pub(crate) fn is_system_account(&self, account: &AccountId) -> bool {
+        let me = env::current_account_id();
+        account == &me || account.as_str().ends_with(&format!(".{me}")) || account == &self.usdc
     }
 
     fn assert_active_caller(&self) -> AccountId {

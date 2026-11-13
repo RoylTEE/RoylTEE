@@ -102,6 +102,27 @@ pub fn is_territory(s: &str) -> bool {
     s.len() == 2 && s.bytes().all(|b| b.is_ascii_uppercase())
 }
 
+/// Advances a rolling window of hourly buckets to `now_hour`, clearing the
+/// buckets of hours that fell out of the window. Returns the new bucket hour.
+pub fn roll_window<T: Copy + Default, const N: usize>(
+    buckets: &mut [T; N],
+    bucket_hour: u64,
+    now_hour: u64,
+) -> u64 {
+    if now_hour <= bucket_hour {
+        return bucket_hour;
+    }
+    let gap = now_hour - bucket_hour;
+    if gap >= N as u64 {
+        *buckets = [T::default(); N];
+    } else {
+        for h in bucket_hour + 1..=now_hour {
+            buckets[(h % N as u64) as usize] = T::default();
+        }
+    }
+    now_hour
+}
+
 /// Parses "s<N>" into N.
 pub fn share_number(token_id: &str) -> Option<u64> {
     token_id.strip_prefix('s')?.parse().ok()
@@ -215,6 +236,24 @@ mod tests {
         );
         assert!(split_partial(10, &[(1, 5000), (2, 5001)]).is_none());
         assert!(split_partial(10, &[]).is_none());
+    }
+
+    #[test]
+    fn rolling_window_clears_only_expired_hours() {
+        let mut b = [0u32; 24];
+        b[10] = 5;
+        b[11] = 7;
+        assert_eq!(roll_window(&mut b, 11, 11), 11);
+        assert_eq!(b.iter().sum::<u32>(), 12);
+        // 23 hours later: hour 10 (index 10) is still inside, hour 34 clears index 10.
+        roll_window(&mut b, 11, 33);
+        assert_eq!(b[10], 5);
+        assert_eq!(b[11], 7);
+        roll_window(&mut b, 33, 34);
+        assert_eq!(b[10], 0);
+        assert_eq!(b[11], 7);
+        roll_window(&mut b, 34, 100);
+        assert_eq!(b.iter().sum::<u32>(), 0);
     }
 
     #[test]
