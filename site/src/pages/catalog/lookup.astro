@@ -9,7 +9,8 @@ import App from '../../layouts/App.astro';
         <input id="q" name="q" type="search" autocomplete="off" spellcheck="false" placeholder="ZZRYL2600001, s2 or buyer-pub.royltee-dev.testnet" />
         <button class="btn" type="submit">Look up</button>
       </div>
-      <p class="caption">Try <a class="link" href="?q=ZZRYL2600001">ZZRYL2600001</a>, <a class="link" href="?q=s5">s5</a> or <a class="link" href="?q=buyer-pub.royltee-dev.testnet">buyer-pub.royltee-dev.testnet</a>. The search runs in your browser over every work and share read from testnet; the contract has no lookup by code.</p>
+      <div class="tries"><span class="caption">Try</span><a class="try" href="?q=ZZRYL2600001">ZZRYL2600001</a><a class="try" href="?q=s5">s5</a><a class="try" href="?q=buyer-pub.royltee-dev.testnet">buyer-pub</a></div>
+      <p class="caption">The search runs in your browser over every work and share read from testnet; the contract has no lookup by code.</p>
     </form>
   </section>
   <div class="stack" data-lookup aria-live="polite"><p class="loading">Reading the catalog</p></div>
@@ -20,4 +21,7 @@ import App from '../../layouts/App.astro';
   .lookup-form label { font-weight: 600; font-size: var(--fs-14); }
   .lookup-row { display: flex; gap: var(--s2); flex-wrap: wrap; }
   .lookup-row input { flex: 1 1 16rem; min-width: 0; min-height: 2.75rem; padding: 0 var(--s3); border: 1px solid var(--edge-strong, var(--edge)); border-radius: var(--r-ctl); font: inherit; font-family: var(--mono); font-size: var(--fs-14); background: var(--paper, #fff); color: var(--text); }
+  .tries { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s2); }
+  .try { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 var(--s3); border: 1px solid var(--edge); border-radius: var(--r-ctl); font-family: var(--mono); font-size: var(--fs-12); color: var(--text); text-decoration: none; background: var(--surface); }
+  .try:hover { background: var(--surface-2); }
 </style>
