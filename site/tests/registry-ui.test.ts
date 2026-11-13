@@ -98,7 +98,7 @@ describe('app shell: menu by purpose', () => {
   });
   it('every app page names a known area, and admin stays out of the menu', () => {
     const keys = AREAS.map((a) => a.key);
-    for (const f of ['dashboard', 'catalog/index', 'catalog/splits', 'shares/index', 'shares/accounts', 'shares/claims', 'share', 'activity', 'agents', 'disputes', 'registrar', 'verify', 'member', 'help', 'docs', 'whitepaper', 'admin']) {
+    for (const f of ['dashboard', 'catalog/index', 'catalog/splits', 'catalog/lookup', 'shares/index', 'shares/accounts', 'shares/claims', 'share', 'activity', 'agents', 'disputes', 'registrar', 'verify', 'member', 'help', 'docs', 'whitepaper', 'admin']) {
       const m = src(`pages/${f}.astro`).match(/<App area="([a-z]+)"/);
       expect(m, f).not.toBeNull();
       expect(keys, f).toContain(m![1]);

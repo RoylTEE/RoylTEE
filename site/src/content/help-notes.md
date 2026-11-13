@@ -104,6 +104,7 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 - [Disputes](/disputes)
 - [Registrar](/registrar)
 - [Your shares](/member)
+- [Look up a code, share or account](/catalog/lookup/)
 - [Verify the deployment](/verify)
 - [Docs](/docs)
 - [Whitepaper placeholder](/whitepaper)

@@ -11,9 +11,10 @@ export const GROUPS = ['Registry', 'Oversight', 'You', 'Support'] as const;
 
 export const AREAS: Area[] = [
   { key: 'overview', label: 'Overview', group: 'Registry', purpose: 'Statement and totals', href: '/dashboard/', tabs: [] },
-  { key: 'catalog', label: 'Catalog', group: 'Registry', purpose: 'Works, rights and split sheets', href: '/catalog/', tabs: [
+  { key: 'catalog', label: 'Catalog', group: 'Registry', purpose: 'Works, split sheets, lookup', href: '/catalog/', tabs: [
     { key: 'works', label: 'Works and rights', href: '/catalog/' },
     { key: 'splits', label: 'Split sheets', href: '/catalog/splits/' },
+    { key: 'lookup', label: 'Lookup', href: '/catalog/lookup/' },
   ] },
   { key: 'shares', label: 'Shares', group: 'Registry', purpose: 'Ledger, share accounts and claims', href: '/shares/', tabs: [
     { key: 'ledger', label: 'Ledger', href: '/shares/' },
