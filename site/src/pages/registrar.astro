@@ -1,15 +1,8 @@
 ---
 import App from '../layouts/App.astro';
 import ActivityTable from '../components/ActivityTable.astro';
+import PowerTable from '../components/PowerTable.astro';
 import { REGISTRAR, accountUrl } from '../data/testnet';
-/* Registrar methods checked against the deployed contract code (exported wasm functions) on 2026-11-13. */
-const can = [
-  ['grant_credential, suspend_credential, reinstate_credential', 'Admit, pause and restore verified members. Credentials cannot be transferred.'],
-  ['resolve', 'Decide a dispute with a document hash. Only the contested money was held.'],
-  ['grant_payer_role, revoke_payer_role', 'Name which accounts may pay works through the registry.'],
-  ['release_unallocated', 'Release money that reached the registry for no share, within fixed rules.'],
-  ['registrar_transfer', 'Move the share of a suspended member, with a document hash.'],
-];
 const cannot = ['Hold a credential', 'Claim from any share account', "Move an active member's share", 'Sign for a share account (they have no keys)'];
 ---
 <App area="registrar" title="Registrar log" intro="The registrar is a trusted role in this demo. Every registrar action is an event with a document hash.">
@@ -32,12 +25,7 @@ const cannot = ['Hold a credential', 'Claim from any share account', "Move an ac
   </section>
   <section class="panel" aria-labelledby="pw-h">
     <div class="panel-head"><h2 id="pw-h">What the registrar can and cannot do</h2></div>
-    <div class="table-wrap">
-      <table class="ledger rows-sm">
-        <thead><tr><th>Contract methods</th><th>What it is for</th></tr></thead>
-        <tbody>{can.map(([m, w]) => <tr><td class="p mono small">{m}</td><td class="m wrap">{w}</td></tr>)}</tbody>
-      </table>
-    </div>
+    <PowerTable who="registrar" />
     <div class="panel-body">
       <p class="label">Cannot</p>
       <div class="method-list">{cannot.map((c) => <span class="method no">{c}</span>)}</div>

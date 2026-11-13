@@ -1,5 +1,6 @@
 ---
 import App from '../layouts/App.astro';
+import PowerTable from '../components/PowerTable.astro';
 ---
 <App area="shares" title="Share" crumb="Share" intro="One rights share NFT: who holds it, the account it controls, and every recorded move.">
   <div class="share-head" data-share-head><p class="loading">Reading testnet</p></div>
@@ -14,12 +15,8 @@ import App from '../layouts/App.astro';
       <div data-summary><p class="loading">Reading testnet</p></div>
       <div class="stack">
         <h2 class="h-sm">What the holder can do</h2>
-        <ul class="plain-list">
-          <li>Claim the balance of the share account. Only the current holder can, and the money goes to that holder.</li>
-          <li>Transfer the share to another verified member. Unclaimed money goes with it.</li>
-          <li>Set a short public note. Payouts and agents never read it.</li>
-        </ul>
-        <div><a class="btn primary" href="/member#holdings">Claim in Your shares</a></div>
+        <PowerTable who="holder" />
+        <p class="caption">Marketplace approvals (nft_approve) are disabled by design, so no outside contract can list or move a share.</p>
       </div>
     </div>
   </section>
@@ -44,11 +41,11 @@ import App from '../layouts/App.astro';
   .sub-tabs { display: flex; gap: var(--s1); overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--edge); }
   .sub-tabs a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 var(--s3); font-size: var(--fs-14); font-weight: 600; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; margin-bottom: -1px; }
   .sub-tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--ink); }
-  .share-summary { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; gap: var(--s6); }
+  .share-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; gap: var(--s6); }
   .h-sm { font-size: var(--fs-18) !important; }
   .stmt .ledger, [data-account] .ledger { border: 1px solid var(--rule); border-radius: var(--r-ctl); }
   .step-sim { margin-left: var(--s2); }
   .plain-list { margin: 0; padding-left: 1.1rem; display: grid; gap: var(--s2); font-size: var(--fs-14); }
   [data-tab-panel] { scroll-margin-top: 7rem; }
-  @media (max-width: 991px) { .share-summary { grid-template-columns: 1fr; } }
+  @media (max-width: 1365px) { .share-summary { grid-template-columns: 1fr; } }
 </style>

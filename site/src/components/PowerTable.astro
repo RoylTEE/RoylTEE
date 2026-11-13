@@ -1,0 +1,26 @@
+---
+/* Powers for one kind of account, with where each one lives in this UI or a plain "CLI only" label. */
+import { powersFor, CLI_ONLY, type Power } from '../data/powers';
+interface Props { who: Power['who'] }
+const rows = powersFor(Astro.props.who);
+---
+<div class="table-wrap">
+  <table class="ledger rows-sm powers-t">
+    <thead><tr><th>Method</th><th>What it does</th><th>In this UI</th></tr></thead>
+    <tbody>
+      {rows.map((p) => (
+        <tr>
+          <td class="p mono small">{p.method}</td>
+          <td class="m wrap">{p.what}</td>
+          <td class="p-end">{p.ui ? <a class="link" href={p.ui}>Open</a> : <span class="badge cli">{CLI_ONLY}</span>}{p.note && <span class={p.note === 'UNVERIFIED' ? 'badge unv' : p.note.startsWith('Simulated') ? 'badge sim' : 'badge plain'}>{p.note}</span>}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+<style is:global>
+  .badge.cli { background: var(--paper-2); color: var(--muted); border: 1px dashed var(--edge); }
+  .powers-t td.p-end { white-space: nowrap; }
+  .powers-t td.p-end .badge + .badge, .powers-t td.p-end a + .badge { margin-left: var(--s2); }
+  @media (max-width: 767px) { .powers-t td.p { white-space: normal; flex: 1 1 10rem; min-width: 0; } }
+</style>

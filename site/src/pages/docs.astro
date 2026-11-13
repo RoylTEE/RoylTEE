@@ -1,5 +1,6 @@
 ---
 import App from '../layouts/App.astro';
+import PowerTable from '../components/PowerTable.astro';
 import { REGISTRY, TOKEN, REGISTRAR, AGENTS, PAYER, ROLE_OF, accountUrl } from '../data/testnet';
 const accounts: [string, string][] = [
   [REGISTRY, 'Registry contract: works, share NFTs, ledger, roles, disputes'],
@@ -11,7 +12,6 @@ const accounts: [string, string][] = [
   ['s1.reg.royltee-dev.testnet to s7', 'One share account per share NFT, zero access keys'],
 ];
 const views = ['get_config', 'nft_tokens', 'nft_token', 'get_work', 'get_share', 'get_ledger', 'get_accounting', 'list_disputes', 'get_role', 'get_credential', 'is_payer', 'ft_balance_of'];
-const holder = [['claim', 'Pay the share account balance to the current holder. 1 yoctoNEAR.'], ['nft_transfer', 'Move the share to another verified member. Unclaimed money goes with it.'], ['set_share_note', 'A short public note. Payouts and agents never read it.']];
 const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \\
   -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"s2.reg.royltee-dev.testnet"}}'`;
 ---
@@ -30,12 +30,10 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
       <p class="small muted">Free and read only. The registry pages call them from your browser through the public testnet RPC.</p></div>
     </section>
     <section class="panel" aria-labelledby="h-h">
-      <div class="panel-head"><h2 id="h-h">What a holder signs</h2></div>
-      <div class="table-wrap"><table class="ledger rows-sm">
-        <thead><tr><th>Method</th><th>What it does</th></tr></thead>
-        <tbody>{holder.map(([m, w]) => <tr><td class="p mono small">{m}</td><td class="m wrap">{w}</td></tr>)}</tbody>
-      </table></div>
-      <p class="panel-foot">Split sheet approval (approve_share, reject_share) is in the contract code but not on the deployed build yet.</p>
+      <div class="panel-head"><h2 id="h-h">Payer and maintenance powers</h2></div>
+      <PowerTable who="payer" />
+      <PowerTable who="anyone" />
+      <p class="panel-foot">Holder powers are on each share page, organisation powers on Agents, registrar powers on the Registrar log.</p>
     </section>
   </div>
   <section class="panel" aria-labelledby="c-h">
