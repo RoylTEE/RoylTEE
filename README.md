@@ -157,7 +157,7 @@ Test suites (counts from `npm test` and the site's `npm test` on the merged tree
 
 | Suite | Where | Count |
 |---|---|---|
-| Registry unit tests | `contracts/registry/src/tests.rs`, `review_fixes.rs`, `logic.rs` | 100 |
+| Registry unit tests | `contracts/registry/src/tests.rs`, `review_fixes.rs`, `logic.rs` | 101 |
 | Vault unit tests | `contracts/vault/src/lib.rs` | 5 |
 | Mock USDC unit tests | `contracts/mock-usdc/src/lib.rs` | 4 |
 | Sandbox: core transfer path | `contracts/tests/tests/sandbox.rs` | 11 |
