@@ -1,0 +1,12 @@
+---
+import { PROJECT_NAME } from '../consts';
+---
+<span class="logo" aria-label={PROJECT_NAME}>
+  <span class="logo-word">{PROJECT_NAME}</span><span class="logo-dot" aria-hidden="true"></span>
+</span>
+<style>
+  /* Placeholder text wordmark in our own type. Final logo comes later. */
+  .logo { display: inline-flex; align-items: baseline; gap: .2rem; color: inherit; }
+  .logo-word { font-family: var(--mono); font-weight: 700; font-size: 1.4rem; letter-spacing: -.06em; line-height: 1; }
+  .logo-dot { width: .38rem; height: .38rem; border-radius: 1px; background: var(--amber); transform: translateY(-.05rem); }
+</style>

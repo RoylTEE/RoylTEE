@@ -1,0 +1,65 @@
+---
+import Base from '../layouts/Base.astro';
+import { PROJECT_NAME } from '../consts';
+---
+<Base title={`Help . ${PROJECT_NAME}`} description="Ask the RoylTEE help guide or contact support with a NEAR testnet wallet.">
+  <section class="help pad">
+    <div class="help-in">
+      <span class="tag-sim">Simulated</span>
+      <h1>Help</h1>
+      <p class="lead">Ask about shares, vaults, payments and the testnet demo. The guide answers from the project notes and says so when something is not built.</p>
+      <div class="panel" id="chat">
+        <div class="panel-head"><h2>Help chat</h2><button type="button" class="btn no-chip outline" data-chat-reset>New chat</button></div>
+        <div class="chat-log" data-chat-log aria-live="polite"></div>
+        <form data-chat-form>
+          <label class="sr" for="chat-input">Your question</label>
+          <textarea id="chat-input" name="message" maxlength="1500" rows="3" placeholder="For example: what happens to unclaimed money when a share is sold?" required></textarea>
+          <div class="row"><button class="btn no-chip dark" type="submit">Ask</button><span class="muted small" data-chat-status></span></div>
+        </form>
+        <p class="muted small">Use demo details only. Chat text is not stored by this site. Answers can be wrong; the design docs are the source of truth.</p>
+      </div>
+      <div class="panel" id="support" data-support data-state="out">
+        <h2>Contact support</h2>
+        <p>Sign in with a NEAR testnet wallet to open a ticket. No email and no personal data. Your wallet signs a message that never becomes a transaction. A sign in lasts 15 minutes.</p>
+        <div class="row out-only"><button type="button" class="btn no-chip dark" data-sign-in>Sign in with NEAR wallet</button></div>
+        <div class="in-only">
+          <div class="row"><span class="mono small" data-who></span><button type="button" class="btn no-chip outline" data-sign-out>Sign out</button></div>
+          <form data-ticket-form>
+            <label for="t-subject">Subject</label>
+            <input id="t-subject" name="subject" maxlength="120" required />
+            <label for="t-message">Message</label>
+            <textarea id="t-message" name="message" maxlength="2000" rows="5" required></textarea>
+            <p class="muted small">Never include a seed phrase, private key, email address, phone number or card number. The form refuses anything that looks like one.</p>
+            <button class="btn no-chip dark" type="submit">Send ticket</button>
+          </form>
+          <h3>My tickets</h3>
+          <ul class="tickets" data-tickets></ul>
+        </div>
+        <p class="muted small" data-support-status aria-live="polite"></p>
+        <p class="muted small">Tickets live in private server storage, tied only to your wallet account id. They are never on chain or in logs, and they are deleted 30 days after they close.</p>
+      </div>
+    </div>
+  </section>
+</Base>
+<script>import '../scripts/help.ts';</script>
+<style is:global>
+  .help { padding-top: 7rem; padding-bottom: 8rem; }
+  .help-in { max-width: 46rem; margin: 0 auto; display: grid; gap: 1.5rem; }
+  .panel { background: #fff; border: 1px solid var(--line); border-radius: 20px; padding: 1.5rem; display: grid; gap: 1rem; }
+  .panel-head, .row { display: flex; gap: 1rem; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .panel textarea, .panel input { width: 100%; font: inherit; padding: .75rem; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+  .panel form { display: grid; gap: .6rem; }
+  .chat-log { display: grid; gap: .75rem; max-height: 28rem; overflow: auto; }
+  .chat-log:empty { display: none; }
+  .turn { padding: .75rem 1rem; border-radius: 12px; background: var(--bg); }
+  .turn.user { background: #fff4dd; }
+  .turn .who { font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+  .turn a, .reply a { text-decoration: underline; }
+  .small { font-size: .85rem; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  [data-state="out"] .in-only, [data-state="in"] .out-only { display: none; }
+  .tickets { list-style: none; padding: 0; margin: 0; display: grid; gap: .75rem; }
+  .ticket { border: 1px solid var(--line); border-radius: 12px; padding: 1rem; display: grid; gap: .4rem; }
+  .ticket-head { display: flex; justify-content: space-between; gap: 1rem; }
+  .reply { border-left: 3px solid var(--amber); padding-left: .75rem; }
+</style>

@@ -1,0 +1,36 @@
+{
+  "name": "royltee-site",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "astro dev --host 127.0.0.1 --port 4321",
+    "build": "astro build",
+    "preview": "astro preview --host 127.0.0.1 --port 4322",
+    "test": "vitest run",
+    "typecheck": "astro check",
+    "test:samples": "vitest run tests/samples.test.ts",
+    "scan:wording": "node scripts/check-wording.mjs"
+  },
+  "keywords": [],
+  "author": "RoylTEE Labs <dev@royltee.invalid>",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@astrojs/check": "^0.9.12",
+    "@fontsource-variable/inter-tight": "^5.3.0",
+    "@fontsource-variable/jetbrains-mono": "^5.3.0",
+    "@types/node": "^24.19.2",
+    "astro": "^7.4.11",
+    "gsap": "^3.15.1",
+    "near-api-js": "^7.5.3",
+    "typescript": "^6.0.3",
+    "vitest": "^5.1.0"
+  },
+  "private": true,
+  "dependencies": {
+    "@astrojs/vercel": "^11.0.21",
+    "@hot-labs/near-connect": "^0.12.0",
+    "@scure/base": "^2.0.0",
+    "@scure/bip39": "^2.4.0"
+  }
+}

@@ -70,3 +70,5 @@ Dates are in UTC. "Owner" is the project owner. Items the brief already fixes ar
 | 63 | 2026-11-13 | Registry and mock USDC `new` require the caller to be the contract account itself, and the deploy plan deploys and inits in one transaction (AUDIT M1). | builder, audit fix |
 | 64 | 2026-11-13 | A group's token list is capped at 32 entries including Failed and Void ones (`MAX_GROUP_ENTRIES`), on top of 16 live shares (AUDIT L1). | builder, audit fix |
 | 65 | 2026-11-13 | Deploy plan drafted: fresh accounts under `royltee-dev.testnet`, funded by 3 faucet accounts; full-access keys deleted on both the registry and mock USDC accounts. Not run. | pending owner |
+| 66 | 2026-11-13 | Share NFT symbol is `ROYLT` (final; replaces the `RRS` placeholder of row 30). `config/project.json` `isPlaceholder` set to false. | owner, 2026-11-13 |
+| 67 | 2026-11-13 | near-cli-rs 0.31.1 installed on the build machine from the official release tarball, sha256 checked against the release checksum files. DEPLOY_PLAN command paths checked against its `--help`; agent calls sign with `--signer-public-key`. No account created, no transaction. | owner, 2026-11-13 |

@@ -1,0 +1,918 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RoylTEE: dashboard mockup v3, light (example data)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f6f6f3; --bg2:#ffffff; --panel:#ffffff; --panel2:#f7f7f4; --line:#e7e6e1; --line2:#d8d6cf;
+  --text:#16150f; --muted:#5f5c54; --dim:#8f8b80;
+  --amber:#f5a524; --amber2:#8f5400; --tint:#fdf1dc; --tint2:#f8dfae; --teal:#138a7c; --red:#d03d44; --green:#23885a; --violet:#6b5bd6;
+  --sim:#f7d046; --ink:#16150f;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: "Inter Tight", "Inter", "Helvetica Neue", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --spring: cubic-bezier(.34,1.56,.64,1);
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 var(--sans);-webkit-font-smoothing:antialiased}
+a{color:inherit}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}
+/* banner + top bar */
+.banner{height:26px;display:flex;align-items:center;justify-content:center;gap:10px;background:repeating-linear-gradient(135deg,#fdf0d2 0 12px,#fae7bd 12px 24px);color:var(--sim);font:600 11px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;border-bottom:1px solid #ecd3a0}
+.top{height:54px;display:flex;align-items:center;gap:14px;padding:0 20px;background:var(--bg2);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;letter-spacing:.01em}
+.logo svg{display:block}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font:600 11px/1.2 var(--sans);border:1px solid var(--line2);color:var(--muted)}
+.pill.net{color:var(--teal);border-color:#b3e0da;background:#e6f5f3}
+.pill.net::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--teal);box-shadow:0 0 8px var(--teal)}
+.sim{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;background:var(--sim);color:#1d1600;font:700 10px/1.3 var(--sans);letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.top .search{margin-left:28px;flex:0 0 340px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--line);display:flex;align-items:center;padding:0 12px;color:var(--dim);font-size:12px;gap:8px}
+.top .right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.acct{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border:1px solid var(--line);border-radius:999px;font:12px var(--mono);color:var(--muted)}
+.av{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font:700 10px var(--sans);color:#111}
+/* shell */
+.shell{display:grid;grid-template-columns:206px 1fr;min-height:calc(100vh - 80px)}
+nav{border-right:1px solid var(--line);background:var(--bg2);padding:16px 12px;position:sticky;top:54px;height:calc(100vh - 80px)}
+nav .sec{font:600 10px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--dim);padding:10px 10px 6px}
+nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:var(--muted);text-decoration:none;font-weight:500;margin-bottom:2px}
+nav a svg{opacity:.8}
+nav a.on{background:var(--panel2);color:var(--text);box-shadow:inset 2px 0 0 var(--amber)}
+nav a .n{margin-left:auto;font:11px var(--mono);color:var(--dim)}
+nav .foot{position:absolute;bottom:14px;left:12px;right:12px;font-size:11px;color:var(--dim);border-top:1px solid var(--line);padding-top:12px}
+main{padding:18px 22px 40px;min-width:0}
+.h1row{display:flex;align-items:flex-end;gap:14px;margin-bottom:14px}
+h1{font-size:20px;margin:0;font-weight:700;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:12.5px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;position:relative}
+.card .hd{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line)}
+.card .hd h2{margin:0;font-size:13px;font-weight:650;letter-spacing:.01em}
+.card .hd .r{margin-left:auto;display:flex;gap:8px;align-items:center}
+.eyebrow{font:600 10px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+.grid{display:grid;gap:16px}
+/* now playing */
+.np{display:grid;grid-template-columns:56px 1fr 230px 120px;align-items:center;gap:16px;padding:12px 16px;margin-bottom:16px;background:linear-gradient(90deg,#fdf6e8,#ffffff 40%);border-color:#efdcb6}
+.np .art{width:56px;height:56px;border-radius:6px;overflow:hidden}
+.np .t{font-weight:650;font-size:14px}
+.np .meta{font-size:12px;color:var(--muted)}
+.vu{display:flex;flex-direction:column;gap:5px}
+.vu .ch{display:flex;align-items:center;gap:6px;font:10px var(--mono);color:var(--dim)}
+.vu .bar{flex:1;display:grid;grid-template-columns:repeat(28,1fr);gap:2px;height:9px}
+.vu .bar i{background:#ecebe6;border-radius:1px}
+.vu .bar i.on{background:var(--green)}
+.vu .bar i.on.y{background:var(--amber)}
+.vu .bar i.on.r{background:var(--red)}
+.spec{height:40px;display:flex;align-items:flex-end;gap:2px}
+.spec i{flex:1;background:linear-gradient(to top,var(--amber),#ff7a3d);border-radius:1px;min-height:2px;opacity:.85}
+.demoaudio{font:600 10px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--amber2);border:1px dashed #ecd3a0;padding:2px 7px;border-radius:4px;white-space:nowrap}
+/* songs */
+.songs{grid-template-columns:repeat(3,1fr);margin-bottom:16px}
+.song{padding:14px;display:flex;flex-direction:column;gap:12px}
+.song .top2{display:grid;grid-template-columns:92px 1fr;gap:14px}
+.song .art{width:92px;height:92px;border-radius:8px;overflow:hidden;position:relative;box-shadow:0 6px 18px rgba(23,21,15,.14)}
+.song .title{font-size:15px;font-weight:700;margin:2px 0 2px}
+.song .artist{color:var(--muted);font-size:12px}
+.prov{display:inline-flex;align-items:center;gap:5px;font:600 10.5px var(--sans);padding:2px 8px;border-radius:999px;margin-top:8px}
+.prov.human{background:#e9f6ef;color:#1d7a4f;border:1px solid #b6e0cb}
+.prov.ai_assisted{background:#efedfd;color:#4b3fb8;border:1px solid #cfc9f5}
+.prov.fully_ai{background:#fbeefd;color:#8e2ba0;border:1px solid #e9c5ef}
+.player{display:grid;grid-template-columns:34px 1fr;gap:10px;align-items:center}
+.play{width:34px;height:34px;border-radius:50%;border:0;background:var(--amber);color:#1a1200;display:grid;place-items:center;cursor:pointer;box-shadow:0 0 0 0 rgba(245,165,36,.5);transition:transform .15s}
+.play:hover{transform:scale(1.07)}
+.play.on{box-shadow:0 0 0 6px rgba(245,165,36,.12)}
+.wave{width:100%;height:34px;display:block;cursor:pointer}
+.prog{display:flex;align-items:center;gap:8px;font:10.5px var(--mono);color:var(--dim)}
+.prog .track{flex:1;height:3px;background:#ecebe6;border-radius:2px;overflow:hidden}
+.prog .fill{height:100%;width:0;background:var(--amber)}
+.credits{border-top:1px dashed var(--line2);padding-top:10px;display:grid;grid-template-columns:72px 1fr;row-gap:4px;column-gap:10px;font-size:11.5px}
+.credits dt{color:var(--dim);font:600 10px var(--sans);letter-spacing:.08em;text-transform:uppercase;padding-top:2px}
+.credits dd{margin:0;font-family:var(--mono);font-size:11.5px;color:#2b2922;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.splits{margin-top:2px}
+.split{display:grid;grid-template-columns:1fr 46px;gap:8px;align-items:center;margin:5px 0}
+.split .lb{font-size:11.5px;display:flex;gap:6px;align-items:center;min-width:0}
+.split .lb .who{font-family:var(--mono);color:#2b2922;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.split .lb .tag{font:600 9.5px var(--sans);color:var(--dim);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+.split .pc{font:600 11.5px var(--mono);text-align:right}
+.split .bar{grid-column:1/3;height:4px;background:#ecebe6;border-radius:2px;overflow:hidden;margin-top:-2px}
+.split .bar b{display:block;height:100%}
+.tier{font:600 9.5px var(--sans);padding:1px 6px;border-radius:3px;background:#f2f1ec;color:var(--muted);border:1px solid var(--line2);white-space:nowrap}
+/* main 2-col rows */
+.row2{grid-template-columns:minmax(0,1.62fr) minmax(0,1fr);margin-bottom:16px;align-items:start}
+/* sale scene */
+.stage{position:relative;height:340px;margin:14px 16px 0;border-radius:10px;background:
+  radial-gradient(600px 220px at 50% 110%,rgba(245,165,36,.08),transparent 70%),
+  repeating-linear-gradient(90deg,transparent 0 47px,rgba(23,21,15,.04) 47px 48px),#fbfbf9;border:1px solid var(--line);overflow:hidden}
+.lane{position:absolute;top:14px;bottom:14px;width:250px;border-radius:10px;border:1px dashed var(--line2);padding:12px;background:rgba(23,21,15,.012);transition:border-color .4s, background .4s}
+.lane.l{left:14px}.lane.r{right:14px}
+.lane.glow{border-color:var(--teal);border-style:solid;background:rgba(47,214,192,.05)}
+.lane .who{display:flex;gap:8px;align-items:center}
+.lane .who .av{width:30px;height:30px;font-size:11px}
+.lane .nm{font-weight:650;font-size:12.5px}
+.lane .ac{font:10.5px var(--mono);color:var(--muted);white-space:nowrap}
+.lane .cred{position:absolute;left:12px;bottom:12px;right:12px;display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim)}
+.lane .cred b{color:var(--green);font-weight:600}
+.lane .role{position:absolute;top:12px;right:12px}
+.nft{position:absolute;width:184px;height:118px;border-radius:12px;padding:10px 12px;color:#fff;z-index:5;
+  background:linear-gradient(135deg,rgba(255,255,255,.14),rgba(255,255,255,0) 40%),linear-gradient(140deg,#e2622b,#b8336a 55%,#5b2a86);
+  box-shadow:0 14px 30px rgba(23,21,15,.18),0 0 0 1px rgba(255,255,255,.12) inset;will-change:transform}
+.nft .k{font:700 9.5px var(--sans);letter-spacing:.12em;text-transform:uppercase;opacity:.85}
+.nft .tt{font-weight:750;font-size:14px;margin-top:3px}
+.nft .rt{font-size:11.5px;opacity:.92}
+.nft .pc{position:absolute;right:12px;bottom:9px;font:800 24px var(--sans);letter-spacing:-.02em}
+.nft .id{position:absolute;left:12px;bottom:10px;font:10px var(--mono);opacity:.85}
+.nft .owner{position:absolute;left:-40px;right:-40px;white-space:nowrap;top:-22px;text-align:center;font:10.5px var(--mono);color:var(--muted)}
+.payer{position:absolute;left:50%;top:14px;transform:translateX(-50%);width:200px;padding:9px 12px;border-radius:10px;background:var(--panel2);border:1px solid var(--line2);text-align:center}
+.payer .nm{font-weight:650;font-size:12px}
+.vault{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:250px;padding:12px 14px 12px;border-radius:12px;background:linear-gradient(180deg,#ffffff,#ffffff);border:1px solid var(--line2);box-shadow:0 10px 30px rgba(23,21,15,.10)}
+.vault .lbl{display:flex;align-items:center;gap:8px}
+.vault .bal{font:700 24px var(--mono);margin:6px 0 2px;letter-spacing:-.02em;transition:color .3s}
+.vault .bal small{font-size:12px;color:var(--muted);font-weight:500}
+.vault .ctl{font-size:11px;color:var(--muted)}
+.vault .ctl b{font-family:var(--mono);color:var(--teal);font-weight:600}
+.keys{position:absolute;top:-11px;right:10px;background:#e7f6ee;border:1px solid #a9dcc2;color:#1d7a4f;font:700 10.5px var(--mono);padding:3px 8px;border-radius:999px;box-shadow:0 0 0 3px #fbfbf9}
+.keys.ping{animation:ping .9s ease}
+@keyframes ping{0%{box-shadow:0 0 0 3px #fbfbf9,0 0 0 3px rgba(62,207,142,.6)}100%{box-shadow:0 0 0 3px #fbfbf9,0 0 0 14px rgba(62,207,142,0)}}
+.packet{position:absolute;z-index:6;padding:5px 10px;border-radius:999px;font:700 11px var(--mono);white-space:nowrap;opacity:0;pointer-events:none}
+.packet.pay{background:var(--amber);color:#1a1200;box-shadow:0 0 18px rgba(245,165,36,.5)}
+.packet.claim{background:#ffffff;color:var(--text);border:1px solid var(--line2)}
+.packet.out{background:var(--green);color:#03170d;box-shadow:0 0 18px rgba(62,207,142,.45)}
+.verdict{position:absolute;z-index:7;padding:6px 11px;border-radius:8px;font:700 11.5px var(--sans);opacity:0;white-space:nowrap;pointer-events:none}
+.verdict.no{background:#fdecec;color:#b8323a;border:1px solid #f0b9bc}
+.verdict.ok{background:#e7f6ee;color:#1d7a4f;border:1px solid #a9dcc2}
+.track-line{position:absolute;left:272px;right:272px;top:170px;height:0;border-top:2px dotted #c9c6bd}
+.track-line::after{content:"nft_transfer (1 yocto)";position:absolute;left:50%;transform:translate(-50%,-22px);font:10.5px var(--mono);color:var(--dim);white-space:nowrap}
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 16px 14px}
+.step{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--bg2);transition:all .35s;position:relative;overflow:hidden}
+.step .n{font:700 10px var(--mono);color:var(--dim)}
+.step .s{font-size:12px;font-weight:600;margin-top:1px}
+.step .d{font-size:10.5px;color:var(--muted)}
+.step.on{border-color:#ecd3a0;background:#fdf3e1}
+.step.on .n{color:var(--amber)}
+.step.done .n{color:var(--green)}
+.step.done.bad .n{color:var(--red)}
+.step i{position:absolute;left:0;bottom:0;height:2px;background:var(--amber);width:0}
+.btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line2);background:var(--panel2);color:var(--text);padding:6px 12px;border-radius:8px;font:600 12px var(--sans);cursor:pointer}
+.btn:hover{border-color:var(--amber)}
+.btn.amber{background:var(--amber);color:#1a1200;border-color:var(--amber)}
+/* agent */
+.agent .who{display:flex;gap:12px;align-items:center;padding:14px 16px 10px}
+.bot{width:46px;height:46px;border-radius:12px;background:linear-gradient(145deg,#ffffff,#f2f2ef);border:1px solid #d8d6cf;display:grid;place-items:center;position:relative}
+.bot::after{content:"";position:absolute;inset:-4px;border-radius:15px;border:1px solid rgba(47,214,192,.5);animation:breathe 2.4s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.15;transform:scale(.97)}50%{opacity:.9;transform:scale(1.02)}}
+.agent .nm{font-weight:650}
+.agent .ac{font:11px var(--mono);color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:5px;padding:0 16px 10px}
+.chip{font:10.5px var(--mono);padding:2px 7px;border-radius:4px;background:#eaf6f4;border:1px solid #c9e7e2;color:#11665c}
+.chip.x{color:#5f5c54;background:#f2f1ec;border-color:var(--line);text-decoration:line-through;text-decoration-color:#f0b9bc}
+.term{margin:0 16px;height:210px;border-radius:9px;background:#07090b;border:1px solid #1d232a;padding:22px 12px 10px;font:11.2px/1.6 var(--mono);overflow:hidden;position:relative}
+.term::before{content:"pay-agent.log";position:absolute;right:10px;top:6px;font-size:9.5px;color:#3a434e}
+.term .ln{white-space:pre-wrap;opacity:0;transform:translateY(4px);animation:lnin .35s forwards}
+@keyframes lnin{to{opacity:1;transform:none}}
+.term .ts{color:#4d5763}
+.term .ok{color:var(--green)} .term .no{color:var(--red)} .term .ig{color:var(--amber)} .term .cm{color:#2b2922} .term .dm{color:#6c7683}
+.term .cur{display:inline-block;width:7px;height:13px;background:var(--teal);vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.meters{padding:12px 16px 14px;display:grid;gap:10px}
+.meter .top3{display:flex;justify-content:space-between;font-size:11.5px;margin-bottom:5px}
+.meter .top3 span:last-child{font-family:var(--mono);color:#2b2922}
+.meter .segs{display:grid;grid-template-columns:repeat(30,1fr);gap:2px;height:8px}
+.meter .segs i{background:#ecebe6;border-radius:1px}
+.meter .segs i.on{background:var(--teal)}
+.meter .segs i.on.y{background:var(--amber)}
+.meter .segs i.on.r{background:var(--red)}
+/* table */
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{white-space:nowrap;font:600 10px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--dim);text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid #efeee9;vertical-align:middle}
+tr:last-child td{border-bottom:0}
+td .ev{display:inline-flex;align-items:center;gap:6px;font:600 11px var(--mono)}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+.st{font:600 10px var(--sans);padding:2px 7px;border-radius:999px;white-space:nowrap}
+.st.ok{background:#e7f6ee;color:#1d7a4f}.st.no{background:#fdecec;color:#b8323a}
+.xl{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:6px;border:1px solid var(--line2);color:var(--muted)}
+.xl:hover{color:var(--teal);border-color:var(--teal)}
+.kv{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line)}
+.kv div{padding:10px 14px;border-right:1px solid var(--line)}
+.kv div:last-child{border-right:0}
+.kv b{display:block;font:700 16px var(--mono);margin-top:2px}
+/* disputes */
+.dsp{padding:14px 16px}
+.stack{display:flex;height:22px;border-radius:5px;overflow:hidden;margin:10px 0 4px;position:relative;width:100%}
+.stack span{height:100%;display:grid;place-items:center;font:700 10px var(--mono);color:#111}
+.scale{position:relative;height:16px;font:10px var(--mono);color:var(--dim)}
+.scale b{position:absolute;top:0;transform:translateX(-50%);font-weight:500}
+.cap{position:absolute;top:-5px;bottom:-2px;width:0;border-left:2px dashed var(--red)}
+.legend{display:grid;gap:6px;margin-top:10px;font-size:11.5px}
+.legend div{display:flex;align-items:center;gap:8px}
+.legend .v{margin-left:auto;font-family:var(--mono)}
+.escrow{margin-top:12px;padding:10px 12px;border-radius:9px;background:#fdf3e1;border:1px solid #ecd3a0;display:flex;align-items:center;gap:10px}
+.escrow b{font:700 16px var(--mono);color:var(--amber2)}
+.foot2{text-align:center;color:var(--dim);font-size:11px;margin-top:22px}
+.legal{font-size:11px;color:var(--dim);padding:10px 16px 14px;border-top:1px solid var(--line)}
+
+/* ===== v2 shell restyle: sidebar, top bar, thin lines, small radius, compact rows ===== */
+.shell{grid-template-columns:236px 1fr;min-height:calc(100vh - 26px);transition:grid-template-columns .25s ease}
+.shell.collapsed{grid-template-columns:64px 1fr}
+.side{position:sticky;top:0;height:calc(100vh - 26px);display:flex;flex-direction:column;background:var(--bg2);border-right:1px solid var(--line);min-width:0;overflow:hidden}
+.side-top{display:flex;align-items:center;justify-content:space-between;gap:8px;height:52px;padding:0 12px 0 16px;border-bottom:1px solid var(--line)}
+.side .logo{gap:9px;font-size:13.5px;white-space:nowrap}
+.side .logo .ph{color:var(--dim);font-weight:500;font-size:10.5px}
+.collapse{width:24px;height:24px;display:grid;place-items:center;border-radius:5px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;flex:none;transition:transform .25s,color .15s,border-color .15s}
+.collapse:hover{color:var(--text);border-color:var(--line2)}
+.side-scroll{flex:1;overflow:auto;padding:6px 10px 10px}
+.side .sec{font:600 9.5px var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--dim);padding:16px 10px 6px;white-space:nowrap}
+.ni{display:flex;align-items:center;gap:10px;height:32px;padding:0 10px;border-radius:6px;color:var(--muted);text-decoration:none;font-weight:500;font-size:12.5px;white-space:nowrap;border:1px solid transparent;margin-bottom:1px;transition:background-color .15s,color .15s}
+.ni svg{flex:none;opacity:.85}
+.ni:hover{background:#f4f3ef;color:var(--text)}
+.ni.on{background:var(--tint);border-color:var(--tint2);color:var(--amber2)}
+.ni.on svg{color:var(--amber2);opacity:1}
+.ni .n{margin-left:auto;font:10.5px var(--mono);color:var(--dim)}
+.ni .soon{margin-left:auto;font:600 9px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);border:1px solid var(--line);border-radius:4px;padding:1px 5px}
+.side-foot{border-top:1px solid var(--line);padding:10px}
+.side-foot .note{font-size:10.5px;line-height:1.4;color:var(--dim);margin:2px 6px 10px}
+.shell.collapsed .lbl,.shell.collapsed .sec,.shell.collapsed .ni .n,.shell.collapsed .ni .soon,.shell.collapsed .ni .sim,.shell.collapsed .note{display:none}
+.shell.collapsed .side-top{padding:0;justify-content:center;flex-direction:column;gap:4px;height:72px}
+.shell.collapsed .collapse{transform:rotate(180deg)}
+.shell.collapsed .ni{justify-content:center;padding:0}
+.shell.collapsed .side-scroll .ni:first-of-type{margin-top:10px}
+.col{min-width:0;display:flex;flex-direction:column}
+.top{height:52px;padding:0 20px;gap:12px;position:sticky;top:0;background:rgba(255,255,255,.94);backdrop-filter:blur(8px)}
+.crumb{display:flex;align-items:center;gap:6px;font-size:12.5px;white-space:nowrap}
+.crumb svg{color:var(--dim)}
+.crumb b{font-weight:600}
+.top .search{margin-left:8px;flex:0 1 300px;height:30px;border-radius:6px}
+.top .right{gap:8px}
+.top .pill{border-radius:6px}
+.obtn,.pbtn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px;border-radius:6px;font:600 12px var(--sans);text-decoration:none;cursor:pointer;white-space:nowrap;transition:border-color .15s,background-color .15s,color .15s}
+.obtn{border:1px solid var(--line2);background:transparent;color:var(--text)}
+.obtn svg{width:14px;height:14px;color:var(--muted)}
+.obtn:hover{border-color:var(--muted);background:#f6f5f1}
+.obtn .cnt{font:600 10px var(--mono);color:var(--red);background:#fdecec;border-radius:4px;padding:1px 5px}
+.pbtn{border:1px solid var(--ink);background:var(--ink);color:#fff}
+.pbtn:hover{background:#2e2b22;border-color:#2e2b22}
+.acct{border-radius:6px;padding:3px 10px 3px 3px}
+.av{border-radius:5px}
+/* thinner lines, smaller radius, compact rows; card designs and colors stay as they were */
+.card{border-radius:8px}
+.card .hd{padding:10px 14px}
+.btn{border-radius:6px;padding:5px 11px}
+.song .art{border-radius:6px}
+th{padding:7px 12px;background:#faf9f6}
+td{padding:6px 12px;border-bottom:1px solid var(--line)}
+tbody tr:hover td{background:#faf9f6}
+.banner{position:sticky;top:0;z-index:30}
+.side{top:26px}
+.top{top:26px}
+[id]{scroll-margin-top:90px}
+.top .pill,.acct,.top .search{white-space:nowrap}
+.top .search{min-width:0;overflow:hidden}
+@media (max-width:1500px){.top .pill:not(.net){display:none}}
+/* severity style pills */
+.st{display:inline-flex;align-items:center;gap:5px;font:600 10px/1.5 var(--sans);letter-spacing:.02em;padding:1px 7px 1px 6px;border-radius:4px;border:1px solid transparent}
+.st::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.st.ok{background:#eaf6f0;color:#1d7a4f;border-color:#b6e0cb}
+.st.no{background:#fdeeee;color:#b8323a;border-color:#f1c3c6}
+.pill{border-radius:6px}
+
+.banner{color:#6b4a00}
+/* ===== v3 light: wordmark, tabs, overview cards, share list, detail drawer ===== */
+body{font-feature-settings:"cv05" 1}
+.wm{font:700 17px/1 var(--mono);letter-spacing:-.06em;color:var(--ink);display:inline-flex;align-items:baseline;gap:2px}
+.wm i{width:5px;height:5px;background:var(--amber);border-radius:1px;display:inline-block}
+.shell.collapsed .wm{font-size:0}.shell.collapsed .wm::before{content:"R";font-size:17px}
+.side{background:#fff}
+.top{border-bottom:1px solid var(--line)}
+.tabs{display:flex;gap:22px;border-bottom:1px solid var(--line);margin:4px 0 16px}
+.tabs a{padding:9px 0 10px;font-weight:600;font-size:12.5px;color:var(--muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a.on{color:var(--text);border-color:var(--ink)}
+.tabs .sp{margin-left:auto;display:flex;gap:8px;align-items:center;padding-bottom:6px}
+.ov{display:grid;grid-template-columns:1.05fr .95fr 1.5fr 1.2fr;gap:12px;margin-bottom:16px}
+.oc{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;min-height:178px}
+.oc .h{display:flex;align-items:center;gap:8px;font-weight:600;font-size:12.5px}
+.oc .h .q{margin-left:auto}
+.ex{font:600 9px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--dim);border:1px dashed var(--line2);border-radius:4px;padding:1px 5px;white-space:nowrap}
+.big{display:flex;align-items:baseline;gap:6px;margin-top:auto}
+.big b{font:600 40px/1 var(--sans);letter-spacing:-.04em}
+.big span{font:500 22px/1 var(--sans);color:var(--dim);letter-spacing:-.02em}
+.oc .cap2{font-size:11.5px;color:var(--muted)}
+.ring{display:flex;gap:14px;align-items:center;margin-top:auto}
+.ring ul{list-style:none;margin:0;padding:0;display:grid;gap:6px;font-size:11.5px}
+.ring li{white-space:nowrap;display:flex;align-items:center;gap:7px}.ring li b{margin-left:auto;font:600 11px var(--mono);padding-left:12px}
+.seg{display:inline-flex;border:1px solid var(--line2);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:#fff;padding:3px 8px;font:600 10.5px var(--sans);color:var(--muted);cursor:pointer}
+.seg button+button{border-left:1px solid var(--line2)}
+.seg button.on{background:var(--tint);color:var(--amber2)}
+.lc{width:100%;height:100px;display:block;margin-top:auto}
+.sevbar{display:flex;height:10px;border-radius:3px;overflow:hidden;gap:2px;margin-top:auto}
+.sevbar i{display:block}
+.sevl{display:grid;gap:6px;font-size:11.5px}
+.sevl div{display:flex;align-items:center;gap:8px}
+.sevl b{margin-left:auto;font:600 11px var(--mono)}
+.sev{display:inline-flex;align-items:center;gap:5px;font:600 10px/1.5 var(--sans);padding:1px 7px 1px 6px;border-radius:4px;border:1px solid transparent;white-space:nowrap}
+.sev::before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}
+.sev.hi{background:#fdecec;color:#b8323a;border-color:#f0b9bc}
+.sev.md{background:#fdf1dc;color:#8f5400;border-color:#f3d39b}
+.sev.lo{background:#eef3fb;color:#3c5f99;border-color:#c9d8ef}
+/* share list */
+.rows td{cursor:pointer}
+.rows tr.sel td{background:var(--tint)}
+.rows .who{font-family:var(--mono);font-size:11.5px}
+.bps{font:600 11px var(--mono)}
+.chev{color:var(--dim)}
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(23,21,15,.18);opacity:0;pointer-events:none;transition:opacity .25s;z-index:40}
+.drawer{position:fixed;top:26px;right:0;bottom:0;width:520px;max-width:92vw;background:#fff;border-left:1px solid var(--line);box-shadow:-20px 0 40px rgba(23,21,15,.08);transform:translateX(100%);transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:41;display:flex;flex-direction:column}
+body.dopen .scrim{opacity:1;pointer-events:auto}
+body.dopen .drawer{transform:none}
+.dr-h{display:flex;align-items:flex-start;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.dr-h .t{font-weight:700;font-size:15px}
+.dr-h .s{font:11.5px var(--mono);color:var(--muted)}
+.dr-x{margin-left:auto;width:28px;height:28px;border-radius:6px;border:1px solid var(--line2);background:#fff;cursor:pointer;color:var(--muted)}
+.dr-b{overflow:auto;padding:14px 18px 24px;display:grid;gap:18px}
+.chips2{display:flex;flex-wrap:wrap;gap:6px}
+.chip2{font:500 11px var(--sans);padding:3px 8px;border-radius:5px;background:#f4f3ef;border:1px solid var(--line);color:var(--text)}
+.chip2 b{font-weight:600;color:var(--muted);margin-right:4px}
+.dr-sec h3{font-size:12.5px;margin:0 0 8px;display:flex;align-items:center;gap:8px}
+.dr-sec table{border:1px solid var(--line);border-radius:8px;border-collapse:separate;border-spacing:0;overflow:hidden}
+.kv3{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line);border-radius:8px}
+.kv3 div{padding:9px 12px;border-right:1px solid var(--line)}.kv3 div:last-child{border-right:0}
+.kv3 b{display:block;font:600 15px var(--mono);margin-top:2px}
+@media (max-width:1300px){.ov{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="banner">Mockup, example data <span style="opacity:.6">|</span> not the real frontend <span style="opacity:.6">|</span> nothing here reads the chain</div>
+<div class="shell">
+<aside class="side" id="side">
+  <div class="side-top">
+    <div class="logo"><span class="wm">RoylTEE<i></i></span></div>
+    <button class="collapse" id="collapse" aria-label="Collapse sidebar"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg></button>
+  </div>
+  <div class="side-scroll">
+    <div class="sec">Registry</div>
+    <a class="ni on" href="#catalog" title="Dashboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span class="lbl">Dashboard</span></a>
+    <a class="ni" href="#songs" title="Catalog"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg><span class="lbl">Catalog</span><span class="n">3</span></a>
+    <a class="ni" href="#sharelist" title="Shares"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/></svg><span class="lbl">Shares</span><span class="n">9</span></a>
+    <a class="ni" href="#history" title="Payments"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v10H3z"/><circle cx="12" cy="12" r="2.5"/><path d="M6 10v4M18 10v4"/></svg><span class="lbl">Payments</span></a>
+    <a class="ni" href="#agents" title="Agents"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="7" width="14" height="11" rx="3"/><path d="M12 3v4M9 12h.01M15 12h.01"/></svg><span class="lbl">Agents</span><span class="n">1</span></a>
+    <a class="ni" href="#disputes" title="Disputes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/></svg><span class="lbl">Disputes</span><span class="n" style="color:var(--red)">1</span></a>
+    <div class="sec">Management</div>
+    <a class="ni" href="#members-soon" title="Members"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5.5 6.5-5.5s5.5 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 010 7M18 14.5c1.7.8 3 2.6 3.5 5.5"/></svg><span class="lbl">Members</span><span class="soon">soon</span></a>
+    <a class="ni" href="#credentials-soon" title="Credentials"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z"/><path d="M9 12l2 2 4-4"/></svg><span class="lbl">Credentials</span><span class="soon">soon</span></a>
+    <a class="ni" href="#history" title="Event Log"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg><span class="lbl">Event Log</span></a>
+    <a class="ni" href="#settings-soon" title="Settings"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg><span class="lbl">Settings</span><span class="soon">soon</span></a>
+    <div class="sec">Off chain</div>
+    <a class="ni" href="#" title="Statements"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h7M9 17h5"/></svg><span class="lbl">Statements</span><span class="sim" style="margin-left:auto">Sim</span></a>
+    <a class="ni" href="#" title="KYB"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7l8-4z"/><path d="M9 12l2 2 4-4"/></svg><span class="lbl">KYB</span><span class="sim" style="margin-left:auto">Sim</span></a>
+  </div>
+  <div class="side-foot">
+    <p class="note">Every number on this page is example data. Live build reads testnet via view calls.</p>
+    <a class="ni" href="/help#support" title="Support"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 015 .5c0 1.7-2.5 2-2.5 3.5M12 17h.01"/></svg><span class="lbl">Support</span></a>
+    <a class="ni" href="#logout-placeholder" title="Log out"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4M6 12h10"/></svg><span class="lbl">Log out</span></a>
+  </div>
+</aside>
+<div class="col">
+<header class="top">
+  <div class="crumb"><span class="muted">Registry</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg><b id="crumbNow">Dashboard</b></div>
+  <span class="pill net">NEAR testnet</span>
+  <div class="search"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search ISRC, ISWC, share id, account</div>
+  <div class="right">
+    <span class="pill">registry <span class="mono" style="color:#2b2922">royltee-demo.testnet</span></span>
+    <a class="obtn" href="#disputes"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h.01"/></svg>Disputes <span class="cnt">1</span></a>
+    <a class="obtn" href="#history"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/></svg>Event log</a>
+    <button class="pbtn" id="topReplay"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>Replay sale</button>
+    <div class="acct"><span class="av" style="background:#9b8cff">LB</span>label.rr-demo.testnet</div>
+  </div>
+</header>
+<main>
+  <div class="h1row" id="catalog">
+    <div><div class="eyebrow">Catalog</div><h1>The verified payout address for every share of every song, human or AI.</h1></div>
+  </div>
+  <div class="sub" style="margin:-8px 0 14px">The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.</div>
+
+  <div class="tabs" id="tabs">
+    <a class="on" href="#catalog">Overview</a><a href="#sharelist">Shares</a><a href="#disputes">Disputes</a><a href="#history">Activity</a>
+    <div class="sp"><span class="ex">Example data</span><a class="obtn" href="#agents">Agents</a><button class="pbtn" id="exportBtn" title="Mockup only, nothing is exported">Export</button></div>
+  </div>
+  <div class="ov">
+    <div class="oc">
+      <div class="h">Keyless vaults <span class="q ex">Example data</span></div>
+      <div class="big"><b>9</b><span>/ 9</span></div>
+      <div class="cap2">shares whose vault has zero access keys</div>
+    </div>
+    <div class="oc">
+      <div class="h">Works by provenance <span class="q ex">Example data</span></div>
+      <div class="ring"><svg width="86" height="86" viewBox="0 0 42 42" id="ringSvg"></svg>
+        <ul id="ringLeg"></ul></div>
+    </div>
+    <div class="oc">
+      <div class="h">mUSDC routed to vaults <span class="sim">Simulated</span><span class="q seg" id="rng"><button data-r="1">1M</button><button data-r="3" class="on">3M</button><button data-r="6">6M</button></span></div>
+      <svg class="lc" id="lc" viewBox="0 0 300 100" preserveAspectRatio="none"></svg>
+      <div class="cap2" id="lcCap"></div>
+    </div>
+    <div class="oc">
+      <div class="h">Open issues <span class="q ex">Example data</span></div>
+      <div class="sevl">
+        <div><span class="sev hi">High</span>over-allocation dispute, work 3<b>1</b></div>
+        <div><span class="sev md">Medium</span>agent payment rejected, line repeated<b>1</b></div>
+        <div><span class="sev lo">Low</span>payee hint in metadata ignored<b>1</b></div>
+      </div>
+      <div class="sevbar"><i style="flex:1;background:#d03d44"></i><i style="flex:1;background:#f5a524"></i><i style="flex:1;background:#7f9ccc"></i></div>
+    </div>
+  </div>
+
+  <div class="grid" style="margin-bottom:16px">
+    <div class="card" id="sharelist">
+      <div class="hd"><h2>Shares</h2><span class="muted" style="font-size:12px">click a row for details</span><div class="r"><span class="ex">Example data</span></div></div>
+      <table class="rows"><thead><tr><th>Share</th><th>Work</th><th>Right</th><th>Holder</th><th>Basis</th><th style="text-align:right">Points</th><th>Status</th><th></th></tr></thead><tbody id="srows"></tbody></table>
+    </div>
+  </div>
+
+  <!-- now playing -->
+  <div class="card np">
+    <div class="art" id="npArt"></div>
+    <div>
+      <div class="eyebrow">Now playing <span class="demoaudio" style="margin-left:8px">demo audio, synthesized</span></div>
+      <div class="t" id="npTitle">Harbour Lights</div>
+      <div class="meta"><span id="npMeta">Writer A, Writer B</span> <span class="mono" style="margin-left:8px;color:var(--dim)" id="npCode">ISRC US-RR1-26-00001</span></div>
+    </div>
+    <div class="vu" id="vu">
+      <div class="ch">L <div class="bar" id="vuL"></div></div>
+      <div class="ch">R <div class="bar" id="vuR"></div></div>
+    </div>
+    <div class="spec" id="spec"></div>
+  </div>
+
+  <!-- songs -->
+  <div class="grid songs" id="songs"></div>
+
+  <!-- sale -->
+  <div class="grid" style="margin-bottom:16px">
+    <div class="card" id="shares">
+      <div class="hd">
+        <h2>Catalog sale</h2><span class="muted" style="font-size:12px">Share s1: Harbour Lights, Writer A, 50% publishing</span>
+        <div class="r"><button class="btn amber" id="replay"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.3 0 6 2.7 6 6s-2.7 6-6 6-6-2.7-6-6H4c0 4.4 3.6 8 8 8s8-3.6 8-8-3.6-8-8-8z"/></svg>Replay sale</button></div>
+      </div>
+      <div class="stage" id="stage">
+        <div class="lane l" id="laneA">
+          <div class="who"><span class="av" style="background:#f08a5d">WA</span><div><div class="nm">Writer A <span class="muted" style="font-weight:500">(seller)</span></div><div class="ac">writer-a.rr-demo.testnet</div></div></div>
+          <div class="cred"><span>credential <b>active</b></span><span class="sim">KYB sim</span></div>
+        </div>
+        <div class="lane r" id="laneB">
+          <div class="who"><span class="av" style="background:#2fd6c0">BP</span><div><div class="nm">Buyer publisher</div><div class="ac">buyer-pub.rr-demo.testnet</div></div></div>
+          <div class="cred"><span>credential <b>active</b></span><span class="sim">KYB sim</span></div>
+        </div>
+        <div class="track-line"></div>
+        <div class="payer" id="payer"><div class="nm">Payer <span class="sim">Simulated</span></div><div class="ac mono muted" style="font-size:10.5px">payer.rr-demo.testnet</div></div>
+        <div class="vault" id="vault">
+          <span class="keys" id="keys">vault access keys: 0</span>
+          <div class="lbl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5f5c54" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><span class="mono" style="font-size:11px;color:#2b2922">s1.royltee-demo.testnet</span></div>
+          <div class="bal" id="vbal">0.00 <small>mUSDC</small></div>
+          <div class="ctl">withdraw only by registry, to current owner: <b id="vown">writer-a</b></div>
+        </div>
+        <div class="nft" id="nft">
+          <div class="owner" id="nftOwner">owner: writer-a.rr-demo.testnet</div>
+          <div class="k">Share NFT, NEP-171</div>
+          <div class="tt">Harbour Lights</div>
+          <div class="rt">Writer A, publishing, World</div>
+          <div class="id">token s1</div>
+          <div class="pc">50%</div>
+        </div>
+        <div class="packet pay" id="pPay">+120.00 mUSDC</div>
+        <div class="packet claim" id="pSeller">claim(s1)</div>
+        <div class="packet claim" id="pBuyer">claim(s1)</div>
+        <div class="packet out" id="pOut">120.00 mUSDC</div>
+        <div class="verdict no" id="vNo">rejected: not current owner</div>
+        <div class="verdict ok" id="vOk">claimed: 120.00 mUSDC to buyer-pub</div>
+      </div>
+      <div class="steps" id="steps">
+        <div class="step"><div class="n">01</div><div class="s">Sale: nft_transfer</div><div class="d">writer-a to buyer-pub, effective 2026-10-01</div><i></i></div>
+        <div class="step"><div class="n">02</div><div class="s">Payment lands</div><div class="d">simulated payer, Q3 statement, split to vault</div><i></i></div>
+        <div class="step"><div class="n">03</div><div class="s">Seller claims</div><div class="d">owner read at call time: fails</div><i></i></div>
+        <div class="step"><div class="n">04</div><div class="s">Buyer claims</div><div class="d">vault pays current owner, keys still 0</div><i></i></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- agent + history -->
+  <div class="grid row2" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)">
+    <div class="card agent" id="agents">
+      <div class="hd"><h2>Pay agent</h2><span class="pill" style="color:var(--amber2);border-color:#ecd3a0">scripted agent</span><div class="r"><span class="st ok" id="agState">running</span></div></div>
+      <div class="who">
+        <div class="bot"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2fd6c0" stroke-width="1.7"><rect x="4" y="7" width="16" height="12" rx="3"/><path d="M12 3v4"/><circle cx="12" cy="3" r="1" fill="#2fd6c0"/><path d="M9 13h.01M15 13h.01" stroke-width="3" stroke-linecap="round"/><path d="M9.5 16.2h5"/></svg></div>
+        <div><div class="nm">Payment agent of Demo Label</div><div class="ac">pay-agent.label.rr-demo.testnet</div><div style="font-size:11px;color:var(--dim)">one function-call key, receiver royltee-demo.testnet, no deposit possible</div></div>
+      </div>
+      <div class="chips"><span class="chip">pay_from_allowance</span><span class="chip">report</span><span class="chip x">nft_transfer</span><span class="chip x">claim</span><span class="chip x">set_splits</span><span class="chip x">withdraw_allowance</span></div>
+      <div class="term" id="term"></div>
+      <div class="meters">
+        <div class="meter"><div class="top3"><span>Per payment limit <span class="muted">(largest today)</span></span><span>480.00 / 500.00</span></div><div class="segs" data-v="0.96"></div></div>
+        <div class="meter"><div class="top3"><span>Rolling 24h limit</span><span id="dayTxt">900.00 / 1,000.00</span></div><div class="segs" id="daySegs" data-v="0.9"></div></div>
+        <div class="meter"><div class="top3"><span>Role expiry</span><span>4d 6h left of 7d</span></div><div class="segs" data-v="0.61" data-c="t"></div></div>
+        <div style="display:flex;justify-content:space-between;font-size:11.5px;border-top:1px solid var(--line);padding-top:10px"><span class="muted">Allowance left in registry</span><span class="mono" style="font-weight:700">1,100.00 mUSDC <span class="muted" style="font-weight:400">of 2,000.00 funded</span></span></div>
+      </div>
+    </div>
+
+    <div class="card" id="disputes">
+      <div class="hd"><h2>Disputes</h2><div class="r"><span class="st no">1 open</span></div></div>
+      <div class="dsp">
+        <div style="display:flex;gap:10px;align-items:center">
+          <div class="art3" style="width:40px;height:40px;border-radius:6px;overflow:hidden" id="dArt"></div>
+          <div><div style="font-weight:650">Null Horizon <span class="prov fully_ai" style="margin:0 0 0 4px">fully AI</span></div>
+          <div class="mono muted" style="font-size:11px">dispute #1, master, World, ISRC US-RR1-26-00003</div></div>
+        </div>
+        <div style="margin-top:16px;font-size:11.5px" class="muted">Registered shares now sum to <b style="color:var(--red)">130%</b>. Only the contested 30% freezes, and only new money.</div>
+        <div style="position:relative;margin-top:14px">
+          <div class="stack">
+            <span style="width:30.77%;background:#9b8cff">ai-co 30%</span>
+            <span style="width:23.08%;background:repeating-linear-gradient(135deg,#f5a524 0 6px,#d98a10 6px 12px)">contested 30%</span>
+            <span style="width:23.08%;background:repeating-linear-gradient(135deg,#f2555a 0 6px,#c73d42 6px 12px);color:#fff">claim 30%</span>
+            <span style="width:23.07%;background:#2fd6c0">label 40%</span>
+          </div>
+          <div class="cap" style="left:76.92%"></div>
+          <div class="scale"><b style="left:0;transform:none">0</b><b style="left:76.92%;color:var(--red)">100%</b><b style="right:0;left:auto;transform:none">130%</b></div>
+        </div>
+        <div class="legend">
+          <div><span class="dot" style="background:#9b8cff"></span>ai-co.rr-demo.testnet, undisputed part <span class="v">paid 60.00</span></div>
+          <div><span class="dot" style="background:#2fd6c0"></span>label.rr-demo.testnet, 40% <span class="v">paid 80.00</span></div>
+          <div><span class="dot" style="background:var(--red)"></span>claimant.rr-demo.testnet, duplicate claim <span class="v">frozen</span></div>
+        </div>
+        <div class="escrow">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8f5400" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+          <div><div class="eyebrow" style="color:#8f5400">Dispute escrow</div><b>60.00</b> <span class="muted">mUSDC of 200.00 paid in</span></div>
+          <span class="st no" style="margin-left:auto">share s7 cannot transfer</span>
+        </div>
+        <div style="margin-top:12px;font-size:11px;color:var(--muted)">Basis: <span class="tier">contract</span> fully AI tracks record a payment entitlement and provenance, not ownership of a work.</div>
+        <div style="margin-top:10px;display:flex;gap:8px;align-items:center;font-size:11px"><span class="muted">Next:</span><span class="mono">resolve(1, outcome, doc_hash)</span><span class="muted">registrar only, emits an event</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="grid" style="margin-bottom:16px">
+    <div class="card" id="history">
+      <div class="hd"><h2>Token history</h2><span class="mono muted" style="font-size:11.5px">s1, Harbour Lights, publishing 50%</span><div class="r"><span class="tier">counterparty_confirmed</span><span class="prov human" style="margin:0">human</span></div></div>
+      <div class="kv">
+        <div><span class="eyebrow">Current holder</span><b style="font-size:13px;color:var(--teal)">buyer-pub.rr-demo.testnet</b></div>
+        <div><span class="eyebrow">Earned</span><b>320.00</b></div>
+        <div><span class="eyebrow">Paid out</span><b>320.00</b></div>
+        <div><span class="eyebrow">Claimable</span><b>0.00</b></div>
+      </div>
+      <table>
+        <thead><tr><th>Event</th><th>Detail</th><th style="text-align:right">mUSDC</th><th>Result</th><th>Time (UTC)</th><th></th></tr></thead>
+        <tbody id="hist"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="foot2">RoylTEE. Mockup, example data. Built at NEAR HACKATHON. Mock USDC (testnet), symbol mUSDC. Audio is synthesized in the browser, no recordings.</div>
+</main>
+</div>
+</div>
+
+<script>
+/* ---------- data (EXAMPLE) ---------- */
+const SONGS=[
+ {id:1,title:"Harbour Lights",artist:"Writer A, Writer B",prov:"human",provL:"human",
+  isrc:"US-RR1-26-00001",iswc:"T-900.000.001-1",label:"Demo Label (example)",pub:"buyer-pub (from 2026-10-01)",
+  splits:[["writer-a","publishing","50%",50,"#f08a5d","copyright"],["writer-b","publishing","50%",50,"#f5a524","copyright"],["label","master","100%",100,"#9b8cff","copyright"]],
+  tier:"counterparty_confirmed",
+  art:"sunset",
+  music:{bpm:92,wave:"triangle",bwave:"sine",lead:[64,null,67,69,71,null,69,67,64,null,62,64,67,null,null,null],bass:[40,null,null,null,45,null,null,null,43,null,null,null,38,null,null,null],cut:2400}},
+ {id:2,title:"Glass Circuit",artist:"ai-co with Writer B",prov:"ai_assisted",provL:"AI-assisted",
+  isrc:"US-RR1-26-00002",iswc:"T-900.000.002-2",label:"Demo Label (example)",pub:"writer-b",
+  splits:[["writer-b","publishing","60%",60,"#f5a524","copyright"],["ai-co","publishing","40%",40,"#2fd6c0","contract"],["label","master","100%",100,"#9b8cff","copyright"]],
+  tier:"payer_confirmed",
+  art:"circuit",
+  music:{bpm:118,wave:"square",bwave:"sawtooth",lead:[72,76,79,76,74,null,71,74,72,76,79,83,81,null,79,null],bass:[45,null,45,null,41,null,41,null,43,null,43,null,40,null,47,null],cut:1500}},
+ {id:3,title:"Null Horizon",artist:"ai-co model output",prov:"fully_ai",provL:"fully AI",
+  isrc:"US-RR1-26-00003",iswc:"none (no human author)",label:"Demo Label (example)",pub:"n/a",
+  splits:[["ai-co","master","60%",60,"#9b8cff","contract"],["label","master","40%",40,"#2fd6c0","contract"],["claimant","master","30%",30,"#f2555a","disputed"]],
+  tier:"self_asserted",
+  art:"horizon",
+  music:{bpm:76,wave:"sine",bwave:"triangle",lead:[69,72,76,81,null,79,76,72,67,71,74,79,null,76,74,71],bass:[33,null,null,null,null,null,null,null,31,null,null,null,null,null,null,null],cut:3200,pad:true}}
+];
+
+function art(kind,size){
+  const u="g"+Math.random().toString(36).slice(2,7);
+  if(kind==="sunset") return `<svg viewBox="0 0 100 100" width="100%" height="100%" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="${u}a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2b1a4a"/><stop offset=".55" stop-color="#d9534f"/><stop offset="1" stop-color="#f7b267"/></linearGradient></defs><rect width="100" height="100" fill="url(#${u}a)"/><circle cx="50" cy="62" r="20" fill="#ffd38a" opacity=".95"/>${[0,1,2,3,4,5].map(i=>`<rect x="0" y="${66+i*5}" width="100" height="${2+i*.4}" fill="#2b1a4a" opacity="${.35+i*.1}"/>`).join("")}<text x="8" y="16" font-family="Helvetica,Arial" font-weight="800" font-size="9" fill="#fff" opacity=".9" letter-spacing="1">HARBOUR</text><text x="8" y="26" font-family="Helvetica,Arial" font-weight="300" font-size="9" fill="#fff" opacity=".9" letter-spacing="1">LIGHTS</text></svg>`;
+  if(kind==="circuit") return `<svg viewBox="0 0 100 100" width="100%" height="100%"><defs><linearGradient id="${u}b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b2b3a"/><stop offset="1" stop-color="#3b1361"/></linearGradient></defs><rect width="100" height="100" fill="url(#${u}b)"/>${Array.from({length:9},(_,i)=>`<path d="M${8+i*10} 100 V${40+((i*37)%40)} H${14+i*10}" stroke="${i%2?"#2fd6c0":"#c084fc"}" stroke-width="1.4" fill="none" opacity=".8"/><circle cx="${14+i*10}" cy="${40+((i*37)%40)}" r="1.8" fill="#fff"/>`).join("")}<rect x="30" y="14" width="40" height="24" rx="3" fill="none" stroke="#fff" stroke-opacity=".7"/><text x="50" y="30" text-anchor="middle" font-family="Helvetica,Arial" font-weight="800" font-size="8" fill="#fff" letter-spacing="1">GLASS</text></svg>`;
+  return `<svg viewBox="0 0 100 100" width="100%" height="100%"><defs><radialGradient id="${u}c" cx=".5" cy=".85" r=".9"><stop offset="0" stop-color="#ff6ad5"/><stop offset=".35" stop-color="#7a2cff"/><stop offset="1" stop-color="#090418"/></radialGradient></defs><rect width="100" height="100" fill="url(#${u}c)"/>${Array.from({length:10},(_,i)=>`<path d="M0 ${60+i*4} Q50 ${50+i*5} 100 ${60+i*4}" stroke="#fff" stroke-opacity="${.08+i*.05}" fill="none"/>`).join("")}<text x="50" y="22" text-anchor="middle" font-family="Courier New,monospace" font-weight="700" font-size="8" fill="#fff" opacity=".85" letter-spacing="2">NULL//HORIZON</text></svg>`;
+}
+
+/* ---------- song cards ---------- */
+const songsEl=document.getElementById("songs");
+SONGS.forEach((s,i)=>{
+  const c=document.createElement("div");c.className="card song";
+  c.innerHTML=`
+   <div class="top2">
+     <div class="art">${art(s.art)}</div>
+     <div style="min-width:0">
+       <div class="eyebrow">Work ${s.id}</div>
+       <div class="title">${s.title}</div>
+       <div class="artist">${s.artist}</div>
+       <span class="prov ${s.prov}">${s.provL}</span>
+       <span class="tier" style="margin-left:4px">${s.tier}</span>
+     </div>
+   </div>
+   <div class="player">
+     <button class="play" data-i="${i}" aria-label="Play ${s.title}"></button>
+     <div><canvas class="wave" data-i="${i}"></canvas>
+     <div class="prog"><span class="cur">0:00</span><div class="track"><div class="fill"></div></div><span class="dur"></span></div></div>
+   </div>
+   <dl class="credits">
+     <dt>ISRC</dt><dd>${s.isrc}</dd>
+     <dt>ISWC</dt><dd>${s.iswc}</dd>
+     <dt>Label</dt><dd>${s.label}</dd>
+     <dt>Publisher</dt><dd>${s.pub}</dd>
+     <dt>Splits</dt><dd class="splits" style="white-space:normal">${s.splits.map(p=>`
+       <div class="split"><div class="lb"><span class="who">${p[0]}</span><span class="tag">${p[1]}</span>${p[5]==="disputed"?'<span class="st no">disputed</span>':`<span class="tag" style="color:#8f8b80">${p[5]}</span>`}</div><div class="pc" style="color:${p[5]==="disputed"?"var(--red)":"inherit"}">${p[2]}</div><div class="bar"><b style="width:${Math.min(p[3],100)}%;background:${p[4]}"></b></div></div>`).join("")}</dd>
+   </dl>`;
+  songsEl.appendChild(c);
+});
+var ICON_PLAY; // hoisting guard
+</script>
+<script>
+/* the ICON constants must exist before cards render; re-render play icons */
+const PLAY='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const PAUSE='<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4" height="15" rx="1"/><rect x="14" y="4.5" width="4" height="15" rx="1"/></svg>';
+document.querySelectorAll(".play").forEach(b=>b.innerHTML=PLAY);
+document.getElementById("npArt").innerHTML=art("sunset");
+document.getElementById("dArt").innerHTML=art("horizon");
+
+/* ---------- waveforms ---------- */
+function rng(seed){return()=>{seed=(seed*16807)%2147483647;return seed/2147483647}}
+const WAVES=SONGS.map((s,i)=>{const r=rng(31+i*977);const n=90;const L=s.music.lead;return Array.from({length:n},(_,k)=>{const step=Math.floor(k/n*16);const on=L[step]!=null?1:.45;const env=.55+.45*Math.sin(k/n*Math.PI);return Math.max(.12,Math.min(1,(.35+r()*.65)*on*env*1.15))})});
+const progress=[0,0,0];
+function drawWave(i){
+  const cv=document.querySelector(`canvas.wave[data-i="${i}"]`);const dpr=window.devicePixelRatio||1;
+  const w=cv.clientWidth,h=cv.clientHeight;if(cv.width!==w*dpr){cv.width=w*dpr;cv.height=h*dpr}
+  const x=cv.getContext("2d");x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,w,h);
+  const b=WAVES[i],bw=w/b.length;
+  b.forEach((v,k)=>{const bh=v*h;x.fillStyle=(k/b.length)<progress[i]?"#f5a524":"#c9c6bd";x.fillRect(k*bw+.5,(h-bh)/2,Math.max(1,bw-1.6),bh)});
+}
+/* ---------- Web Audio synth (legally safe: generated in browser) ---------- */
+let AC=null,master,analyser,splitter,anL,anR,cur=-1,timer=null,nextT=0,stepIdx=0,startT=0;
+const mtof=m=>440*Math.pow(2,(m-69)/12);
+function ensureAC(){
+  if(AC)return;AC=new (window.AudioContext||window.webkitAudioContext)();
+  master=AC.createGain();master.gain.value=.22;
+  analyser=AC.createAnalyser();analyser.fftSize=256;
+  splitter=AC.createChannelSplitter(2);anL=AC.createAnalyser();anR=AC.createAnalyser();anL.fftSize=anR.fftSize=512;
+  const pan=AC.createStereoPanner?AC.createStereoPanner():null;
+  master.connect(analyser);analyser.connect(AC.destination);master.connect(splitter);splitter.connect(anL,0);splitter.connect(anR,1);
+}
+function voice(f,t,dur,type,vol,cut,panv){
+  const o=AC.createOscillator(),g=AC.createGain(),fl=AC.createBiquadFilter();
+  o.type=type;o.frequency.value=f;fl.type="lowpass";fl.frequency.value=cut;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(vol,t+.012);g.gain.exponentialRampToValueAtTime(.0008,t+dur);
+  let out=g;if(AC.createStereoPanner){const p=AC.createStereoPanner();p.pan.value=panv||0;g.connect(p);out=p}
+  o.connect(fl);fl.connect(g);out.connect(master);o.start(t);o.stop(t+dur+.05);
+}
+function hat(t,vol){const len=.04,buf=AC.createBuffer(1,AC.sampleRate*len,AC.sampleRate),d=buf.getChannelData(0);for(let k=0;k<d.length;k++)d[k]=(Math.random()*2-1)*(1-k/d.length);const s=AC.createBufferSource(),f=AC.createBiquadFilter(),g=AC.createGain();s.buffer=buf;f.type="highpass";f.frequency.value=7000;g.gain.value=vol;s.connect(f);f.connect(g);g.connect(master);s.start(t)}
+function kick(t){const o=AC.createOscillator(),g=AC.createGain();o.frequency.setValueAtTime(120,t);o.frequency.exponentialRampToValueAtTime(40,t+.15);g.gain.setValueAtTime(.9,t);g.gain.exponentialRampToValueAtTime(.001,t+.25);o.connect(g);g.connect(master);o.start(t);o.stop(t+.3)}
+function sched(){
+  const m=SONGS[cur].music,sd=60/m.bpm/2;
+  while(nextT<AC.currentTime+.12){
+    const s=stepIdx%16;
+    if(m.lead[s]!=null)voice(mtof(m.lead[s]),nextT,m.pad?sd*2.6:sd*1.6,m.wave,m.wave==="square"?.12:.32,m.cut,(s%2?.25:-.25));
+    if(m.bass[s]!=null)voice(mtof(m.bass[s]),nextT,m.pad?sd*8:sd*3,m.bwave,m.bwave==="sawtooth"?.14:.4,m.pad?600:900,0);
+    if(m.pad&&s%8===0){[0,7,12].forEach(iv=>voice(mtof(57+iv+(s?-2:0)),nextT,sd*8,"sine",.07,1800,iv?.5:-.5))}
+    if(!m.pad){if(s%4===0)kick(nextT);if(s%2===1)hat(nextT,cur===1?.12:.06)}else if(s%4===2)hat(nextT,.03);
+    nextT+=sd;stepIdx++;
+  }
+}
+function loopDur(i){return 16*60/SONGS[i].music.bpm/2}
+function fmt(t){t=Math.max(0,t);return Math.floor(t/60)+":"+String(Math.floor(t%60)).padStart(2,"0")}
+function setNP(i){const s=SONGS[i];document.getElementById("npArt").innerHTML=art(s.art);npTitle.textContent=s.title;npMeta.textContent=s.artist;npCode.textContent="ISRC "+s.isrc}
+function stop(){if(timer)clearInterval(timer);timer=null;document.querySelectorAll(".play").forEach(b=>{b.innerHTML=PLAY;b.classList.remove("on")});cur=-1}
+function play(i,fromFrac){
+  ensureAC();AC.resume();const was=cur;stop();if(was===i&&fromFrac==null)return;
+  cur=i;setNP(i);const sd=60/SONGS[i].music.bpm/2;stepIdx=Math.floor((fromFrac||progress[i])*16)%16;
+  nextT=AC.currentTime+.05;startT=nextT-stepIdx*sd;timer=setInterval(sched,25);sched();
+  const b=document.querySelector(`.play[data-i="${i}"]`);b.innerHTML=PAUSE;b.classList.add("on");
+}
+document.querySelectorAll(".play").forEach(b=>b.onclick=()=>play(+b.dataset.i));
+document.querySelectorAll("canvas.wave").forEach(cv=>cv.onclick=e=>{const r=cv.getBoundingClientRect();const f=(e.clientX-r.left)/r.width;progress[+cv.dataset.i]=f;play(+cv.dataset.i,f)});
+SONGS.forEach((s,i)=>{document.querySelectorAll(".song")[i].querySelector(".dur").textContent=fmt(loopDur(i))+" loop"});
+/* idle preview values so static screenshots look alive */
+progress[0]=.38;progress[1]=.0;progress[2]=.0;
+
+/* ---------- VU + spectrum ---------- */
+const vuL=document.getElementById("vuL"),vuR=document.getElementById("vuR"),spec=document.getElementById("spec");
+[vuL,vuR].forEach(b=>{for(let k=0;k<28;k++){const i=document.createElement("i");if(k>=19)i.className=k>=25?"r":"y";b.appendChild(i)}});
+for(let k=0;k<32;k++)spec.appendChild(document.createElement("i"));
+function setVU(el,v){const n=Math.round(v*28);[...el.children].forEach((c,k)=>c.classList.toggle("on",k<n))}
+const fbuf=new Uint8Array(128),tb=new Float32Array(512);
+function rms(an){an.getFloatTimeDomainData(tb);let s=0;for(const v of tb)s+=v*v;return Math.sqrt(s/tb.length)}
+let idleT=0;
+function frame(ts){
+  if(cur>=0&&AC){
+    const p=((AC.currentTime-startT)%loopDur(cur))/loopDur(cur);progress[cur]=p;
+    const card=document.querySelectorAll(".song")[cur];card.querySelector(".fill").style.width=(p*100)+"%";card.querySelector(".cur").textContent=fmt(p*loopDur(cur));
+    setVU(vuL,Math.min(1,rms(anL)*5.5));setVU(vuR,Math.min(1,rms(anR)*5.5));
+    analyser.getByteFrequencyData(fbuf);[...spec.children].forEach((c,k)=>c.style.height=Math.max(2,fbuf[k*2+2]/255*40)+"px");
+  }else{
+    /* gentle idle meter so the page never looks dead (no audio) */
+    idleT=ts/1000;const a=.48+.12*Math.sin(idleT*3.1)+.06*Math.sin(idleT*7.3),b=.45+.12*Math.sin(idleT*2.7+1)+.06*Math.sin(idleT*6.1);
+    setVU(vuL,a);setVU(vuR,b);[...spec.children].forEach((c,k)=>c.style.height=(6+22*Math.abs(Math.sin(idleT*1.3+k*.55))*Math.exp(-k/22))+"px");
+  }
+  SONGS.forEach((s,i)=>{drawWave(i);if(cur!==i){const card=document.querySelectorAll(".song")[i];card.querySelector(".fill").style.width=(progress[i]*100)+"%";card.querySelector(".cur").textContent=fmt(progress[i]*loopDur(i))}});
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* ---------- agent meters + terminal ---------- */
+document.querySelectorAll(".meter .segs").forEach(el=>{const v=+el.dataset.v;const n=Math.round(v*30);for(let k=0;k<30;k++){const i=document.createElement("i");if(k<n){i.className="on"+(el.dataset.c==="t"?"":(k>=27?" r":k>=22?" y":""))}el.appendChild(i)}});
+const LOG=[
+ ["dm","$ node agent/pay.js --org label --period 2026-Q3"],
+ ["cm","fund_allowance by label.rr-demo.testnet: 2,000.00 mUSDC  ","ok","ok"],
+ ["cm","pay_from_allowance work 2, line #A-1043, 120.00 mUSDC  ","ok","paid, split to 3 vaults"],
+ ["cm","pay_from_allowance work 2, line #A-1043 again  ","no","rejected (already paid)"],
+ ["cm","metadata says \"pay account x.testnet\"  ","ig","ignored, payees come from registry"],
+ ["cm","pay_from_allowance work 1, line #A-1047, 300.00 mUSDC  ","ok","paid"],
+ ["cm","pay_from_allowance work 2, line #A-1051, 650.00 mUSDC  ","no","rejected (over per-payment limit 500.00)"],
+ ["cm","pay_from_allowance work 3, line #A-1052, 480.00 mUSDC  ","ok","paid, 30% to dispute escrow"],
+ ["cm","pay_from_allowance work 1, line #A-1060, 200.00 mUSDC  ","no","rejected (over daily limit)"],
+ ["cm","nft_transfer s1 with agent key  ","no","blocked (needs 1 yocto, function-call key cannot attach)"],
+ ["cm","report period 2026-Q3, 3 paid, 4 refused  ","ok","logged"]
+];
+const term=document.getElementById("term");let li=0,clock=2*3600+41*60;
+function addLine(){
+  if(li>=LOG.length){li=1;}
+  const L=LOG[li++];clock+=7+Math.floor(Math.random()*20);
+  const ts=`${String(Math.floor(clock/3600)%24).padStart(2,"0")}:${String(Math.floor(clock/60)%60).padStart(2,"0")}:${String(clock%60).padStart(2,"0")}`;
+  const d=document.createElement("div");d.className="ln";
+  d.innerHTML=`<span class="ts">${ts}</span> <span class="${L[0]}">${L[1]}</span>`+(L[2]?`<span class="${L[2]}">${L[2]==="ok"?"\u2713 ":L[2]==="no"?"\u2717 ":"! "}${L[3]}</span>`:"");
+  const c=term.querySelector(".cur");if(c)c.remove();
+  term.appendChild(d);const cu=document.createElement("span");cu.className="cur";d.appendChild(document.createTextNode(" "));d.appendChild(cu);
+  while(term.scrollHeight>term.clientHeight+2&&term.children.length>1)term.removeChild(term.firstChild);
+}
+for(let k=0;k<8;k++)addLine();
+setInterval(addLine,1700);
+
+/* ---------- history ---------- */
+const H=[
+ ["mint","#9b8cff","register_share s1 to writer-a, vault created, 0 keys","","ok","2026-11-12 07:02"],
+ ["payment_in","#f5a524","payer, 2026-Q2, stmt 0x7c1e...9a02 <span class='sim'>Simulated</span>","+200.00","ok","2026-11-12 07:20"],
+ ["claim","#3ecf8e","writer-a claims while owner","-200.00","ok","2026-11-12 07:31"],
+ ["transfer","#2fd6c0","writer-a to buyer-pub, effective_from 2026-10-01","","ok","2026-11-13 02:12"],
+ ["payment_in","#f5a524","payer, 2026-Q3, stmt 0x41bd...0e77 <span class='sim'>Simulated</span>","+120.00","ok","2026-11-13 02:14"],
+ ["claim","#f2555a","writer-a claims after sale: not current owner","0.00","no","2026-11-13 02:15"],
+ ["claim","#3ecf8e","buyer-pub claims (balance travelled with token)","-120.00","ok","2026-11-13 02:16"],
+ ["keys_check","#5f5c54","view_access_key_list s1.royltee-demo.testnet: []","","ok","2026-11-13 02:16"]
+];
+const XL='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>';
+document.getElementById("hist").innerHTML=H.map(r=>`<tr><td><span class="ev"><span class="dot" style="background:${r[1]}"></span>${r[0]}</span></td><td style="color:#2b2922">${r[2]}</td><td class="mono" style="text-align:right;color:${r[3].startsWith("+")?"var(--amber2)":r[3].startsWith("-")?"var(--green)":"var(--muted)"}">${r[3]}</td><td><span class="st ${r[4]}">${r[4]==="ok"?"success":"failed"}</span></td><td class="mono muted" style="white-space:nowrap">${r[5]}</td><td><a class="xl" href="#" title="Open on testnet explorer (example)">${XL}</a></td></tr>`).join("");
+
+/* ---------- catalog sale animation ---------- */
+const stage=document.getElementById("stage"),nft=document.getElementById("nft");
+const $=id=>document.getElementById(id);
+function rect(el){const s=stage.getBoundingClientRect(),r=el.getBoundingClientRect();return{x:r.left-s.left,y:r.top-s.top,w:r.width,h:r.height,cx:r.left-s.left+r.width/2,cy:r.top-s.top+r.height/2}}
+let runId=0,anims=[];
+const wait=(ms,id)=>new Promise((res,rej)=>setTimeout(()=>id===runId?res():rej("stale"),ms));
+function place(el,x,y){el.style.left=x+"px";el.style.top=y+"px"}
+function anim(el,kf,opt){const a=el.animate(kf,Object.assign({fill:"forwards"},opt));anims.push(a);return a.finished}
+function setStep(n,state){const st=[...document.querySelectorAll(".step")];st.forEach((s,k)=>{if(k===n){s.className="step on";const bar=s.querySelector("i");bar.style.transition="none";bar.style.width="0";requestAnimationFrame(()=>{bar.style.transition="width 2.2s linear";bar.style.width="100%"})}})}
+function doneStep(n,bad){const s=document.querySelectorAll(".step")[n];s.className="step done"+(bad?" bad":"");s.querySelector("i").style.width="0"}
+function countTo(el,from,to,ms){const t0=performance.now();return new Promise(r=>{const f=t=>{const p=Math.min(1,(t-t0)/ms);const e=1-Math.pow(1-p,3);el.innerHTML=(from+(to-from)*e).toFixed(2)+" <small>mUSDC</small>";p<1?requestAnimationFrame(f):r()};requestAnimationFrame(f)})}
+function pingKeys(){const k=$("keys");k.classList.remove("ping");void k.offsetWidth;k.classList.add("ping")}
+function reset(){
+  anims.forEach(a=>a.cancel());anims=[];
+  const A=rect($("laneA"));place(nft,A.x+(A.w-184)/2,112);nft.style.transform="";
+  ["pPay","pSeller","pBuyer","pOut","vNo","vOk"].forEach(i=>{$(i).style.opacity=0});const ps0=$("pSeller");ps0.style.background="";ps0.style.color="";ps0.style.borderColor="";
+  $("vbal").innerHTML="0.00 <small>mUSDC</small>";$("vown").textContent="writer-a";$("nftOwner").textContent="owner: writer-a.rr-demo.testnet";
+  $("laneA").classList.remove("glow");$("laneB").classList.remove("glow");
+  document.querySelectorAll(".step").forEach(s=>{s.className="step";s.querySelector("i").style.width="0"});
+}
+async function runSale(){
+  const id=++runId;reset();pingKeys();
+  try{
+    $("laneA").classList.add("glow");
+    await wait(900,id);
+    // 1. transfer with spring + arc
+    setStep(0);const A=rect($("laneA")),B=rect($("laneB"));const dx=B.x-A.x;
+    $("nftOwner").textContent="nft_transfer pending...";
+    await anim(nft,[{transform:"translate(0,0) rotate(0) scale(1)"},{transform:`translate(${dx*.25}px,-30px) rotate(-5deg) scale(1.07)`,offset:.25},{transform:`translate(${dx*.8}px,-22px) rotate(3deg) scale(1.06)`,offset:.72},{transform:`translate(${dx}px,0) rotate(0) scale(1)`}],{duration:1900,easing:"cubic-bezier(.45,.05,.25,1)"});
+    anim(nft,[{transform:`translate(${dx}px,0) scale(1)`},{transform:`translate(${dx}px,6px) scale(.97,1.03)`,offset:.35},{transform:`translate(${dx}px,-3px) scale(1.01)`,offset:.7},{transform:`translate(${dx}px,0) scale(1)`}],{duration:500,easing:"ease-out"});
+    $("laneA").classList.remove("glow");$("laneB").classList.add("glow");
+    $("nftOwner").textContent="owner: buyer-pub.rr-demo.testnet";$("vown").textContent="buyer-pub";pingKeys();doneStep(0);
+    await wait(800,id);
+    // 2. payment drops from simulated payer into vault
+    setStep(1);const P=rect($("payer")),V=rect($("vault")),pp=$("pPay");
+    place(pp,P.cx-55,P.y+P.h+4);pp.style.opacity=1;
+    await anim(pp,[{transform:"translateY(0) scale(.6)",opacity:0},{transform:"translateY(0) scale(1)",opacity:1,offset:.15},{transform:`translateY(${V.y-P.y-P.h-14}px) scale(1)`,opacity:1,offset:.75},{transform:`translateY(${V.y-P.y-P.h-2}px) scale(.4)`,opacity:0}],{duration:1500,easing:"cubic-bezier(.5,0,.75,0)"});
+    anim($("vault"),[{transform:"translateX(-50%) scale(1)"},{transform:"translateX(-50%) scale(1.05)"},{transform:"translateX(-50%) scale(1)"}],{duration:450,easing:"cubic-bezier(.34,1.56,.64,1)",fill:"none"});
+    await countTo($("vbal"),0,120,700);doneStep(1);
+    await wait(500,id);
+    // 3. seller claim bounces
+    setStep(2);const ps=$("pSeller");const sx=A.x+A.w/2-30,sy=V.cy-14;place(ps,sx,sy);
+    const tx=V.x-sx-70;
+    await anim(ps,[{transform:"translateX(0)",opacity:0},{transform:"translateX(0)",opacity:1,offset:.1},{transform:`translateX(${tx}px)`,opacity:1}],{duration:850,easing:"cubic-bezier(.5,0,.9,.5)"});
+    anim($("vault"),[{transform:"translateX(-50%)"},{transform:"translateX(calc(-50% + 5px))"},{transform:"translateX(calc(-50% - 5px))"},{transform:"translateX(calc(-50% + 3px))"},{transform:"translateX(-50%)"}],{duration:360,fill:"none"});
+    ps.style.background="#fdecec";ps.style.color="#b8323a";ps.style.borderColor="#f0b9bc";
+    const vn=$("vNo");place(vn,A.x+8,V.y-36);
+    anim(vn,[{opacity:0,transform:"translateY(8px) scale(.9)"},{opacity:1,transform:"translateY(0) scale(1)"}],{duration:420,easing:"cubic-bezier(.34,1.56,.64,1)"});
+    await anim(ps,[{transform:`translateX(${tx}px)`},{transform:"translateX(-10px)",offset:.7},{transform:"translateX(0)",opacity:.0}],{duration:900,easing:"cubic-bezier(.34,1.56,.64,1)"});
+    doneStep(2,true);pingKeys();
+    await wait(900,id);
+    // 4. buyer claim succeeds
+    setStep(3);const pb=$("pBuyer");const bx=B.x+B.w/2-30,by=V.cy-14;place(pb,bx,by);
+    const tb2=(V.x+V.w)-bx+6;
+    await anim(pb,[{transform:"translateX(0)",opacity:0},{transform:"translateX(0)",opacity:1,offset:.1},{transform:`translateX(${tb2}px)`,opacity:1},],{duration:800,easing:"cubic-bezier(.5,0,.9,.5)"});
+    anim(pb,[{opacity:1},{opacity:0}],{duration:200});
+    const po=$("pOut");place(po,V.x+V.w-40,V.cy-14);
+    countTo($("vbal"),120,0,900);
+    await anim(po,[{transform:"translate(0,0) scale(.7)",opacity:0},{transform:"translate(10px,-8px) scale(1)",opacity:1,offset:.2},{transform:`translate(${B.cx-(V.x+V.w)-10}px,${B.y+B.h-110-V.cy}px) scale(1)`,opacity:1,offset:.85},{transform:`translate(${B.cx-(V.x+V.w)-10}px,${B.y+B.h-110-V.cy}px) scale(.6)`,opacity:0}],{duration:1400,easing:"cubic-bezier(.34,1.3,.64,1)"});
+    const vo=$("vOk");place(vo,B.x+B.w-240,B.y+B.h-84);
+    anim(vo,[{opacity:0,transform:"translateY(8px) scale(.9)"},{opacity:1,transform:"translateY(0) scale(1)"}],{duration:420,easing:"cubic-bezier(.34,1.56,.64,1)"});
+    doneStep(3);pingKeys();
+  }catch(e){}
+}
+$("replay").onclick=runSale;
+window.addEventListener("load",()=>setTimeout(runSale,600));
+window.addEventListener("resize",()=>{SONGS.forEach((s,i)=>drawWave(i))});
+</script>
+
+<script>
+/* v2 shell: collapse, active item on scroll, top bar replay button */
+(function(){
+  const shell=document.querySelector('.shell');
+  document.getElementById('collapse').onclick=()=>shell.classList.toggle('collapsed');
+  document.getElementById('topReplay').onclick=()=>{const r=document.getElementById('replay');document.getElementById('shares').scrollIntoView({behavior:'smooth',block:'center'});r.click();};
+  const links=[...document.querySelectorAll('.side-scroll .ni[href^="#"]')].filter(a=>a.getAttribute('href').length>1&&document.querySelector(a.getAttribute('href')));
+  const crumb=document.getElementById('crumbNow');
+  function setOn(a){document.querySelectorAll('.ni.on').forEach(x=>x.classList.remove('on'));a.classList.add('on');crumb.textContent=a.querySelector('.lbl').textContent;}
+  links.forEach(a=>a.addEventListener('click',e=>{e.preventDefault();document.querySelector(a.getAttribute('href')).scrollIntoView({behavior:'smooth',block:'start'});setOn(a);}));
+  const order=['#catalog','#sharelist','#songs','#shares','#agents','#disputes','#history'];
+  addEventListener('scroll',()=>{let cur=order[0];for(const id of order){const el=document.querySelector(id);if(el&&el.getBoundingClientRect().top<160)cur=id;}if(innerHeight+scrollY>=document.documentElement.scrollHeight-4)cur=order[order.length-1];const a=links.find(l=>l.getAttribute('href')===cur);if(a&&!a.classList.contains('on'))setOn(a);},{passive:true});
+})();
+</script>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Share details">
+  <div class="dr-h"><div><div class="eyebrow">Share detail <span class="ex" style="margin-left:6px">Example data</span></div><div class="t" id="drT"></div><div class="s" id="drS"></div></div><button class="dr-x" id="drX" aria-label="Close">&#10005;</button></div>
+  <div class="dr-b">
+    <div class="chips2" id="drChips"></div>
+    <div class="kv3" id="drKv"></div>
+    <div class="dr-sec"><h3>Payouts and issues</h3><table><thead><tr><th>Item</th><th>Detail</th><th>Severity</th><th style="text-align:right">mUSDC</th></tr></thead><tbody id="drIss"></tbody></table></div>
+    <div class="dr-sec"><h3>Who holds it, and who can act</h3><table><thead><tr><th>Account</th><th>Role</th><th>Can claim</th><th>Can move</th></tr></thead><tbody id="drAcc"></tbody></table></div>
+    <div class="cap2 muted" style="font-size:11px">Vault account: <span class="mono" id="drVault"></span>. Access keys: 0. Mockup, example data. Testnet only, Mock USDC (testnet).</div>
+  </div>
+</aside>
+<script>
+/* v3: overview charts, share list, detail drawer (all example data) */
+(function(){
+  const $=id=>document.getElementById(id);
+  // ring: works by provenance (from SONGS)
+  const prov=[["human","#23885a"],["ai_assisted","#6b5bd6"],["fully_ai","#c03fd0"]];
+  const lbl={human:"human",ai_assisted:"AI-assisted",fully_ai:"fully AI"};
+  const cnt=prov.map(([k])=>SONGS.filter(x=>x.prov===k).length);const tot=cnt.reduce((a,b)=>a+b,0);
+  let off=25,ring='<circle cx="21" cy="21" r="15.9" fill="none" stroke="#ecebe6" stroke-width="5"/>';
+  prov.forEach(([k,c],i)=>{const pc=cnt[i]/tot*100;ring+=`<circle cx="21" cy="21" r="15.9" fill="none" stroke="${c}" stroke-width="5" stroke-dasharray="${pc-1.5} ${100-pc+1.5}" stroke-dashoffset="${off}"/>`;off-=pc;});
+  ring+=`<text x="21" y="23.5" text-anchor="middle" font-size="8" font-weight="700" fill="#16150f" font-family="Inter Tight,Arial">${tot}</text>`;
+  $("ringSvg").innerHTML=ring;
+  $("ringLeg").innerHTML=prov.map(([k,c],i)=>`<li><span class="dot" style="background:${c}"></span>${lbl[k]}<b>${cnt[i]}</b></li>`).join("");
+  // line chart with 1M / 3M / 6M toggle (simulated series)
+  const series={1:[0,0,40,40,120,120,200,200,320],3:[0,0,0,40,40,120,200,320,320],6:[0,0,0,0,0,40,120,200,320]};
+  function draw(r){const d=series[r],mx=360,W=300,H=100;const pts=d.map((v,i)=>[i/(d.length-1)*W,H-6-(v/mx)*(H-16)]);
+    const line=pts.map((p,i)=>(i?"L":"M")+p[0].toFixed(1)+" "+p[1].toFixed(1)).join(" ");
+    let g="";for(let y=1;y<4;y++)g+=`<line x1="0" x2="${W}" y1="${y*25}" y2="${y*25}" stroke="#efeee9" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+    $("lc").innerHTML=g+`<path d="${line} L${W} ${H} L0 ${H} Z" fill="#fdf1dc"/><path d="${line}" fill="none" stroke="#f5a524" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
+    $("lcCap").textContent=`Simulated payer, last ${r} month${r>1?"s":""}: ${d[d.length-1].toFixed(2)} mUSDC into s1`;
+    document.querySelectorAll("#rng button").forEach(b=>b.classList.toggle("on",b.dataset.r==String(r)));}
+  document.querySelectorAll("#rng button").forEach(b=>b.onclick=()=>draw(+b.dataset.r));draw(3);
+  // share list built from SONGS splits: s1..s9
+  const rows=[];let n=0;
+  SONGS.forEach(w=>w.splits.forEach(sp=>{n++;rows.push({id:"s"+n,work:w,who:sp[0],right:sp[1],pct:sp[3],color:sp[4],basis:sp[5]});}));
+  const holder=r=>r.id==="s1"?"buyer-pub":r.who;
+  const status=r=>r.basis==="disputed"?'<span class="st no">disputed, frozen</span>':(r.id==="s7"?'<span class="st no">contested part frozen</span>':'<span class="st ok">active</span>');
+  $("srows").innerHTML=rows.map(r=>`<tr data-id="${r.id}"><td class="mono"><span class="dot" style="background:${r.color};margin-right:6px"></span>${r.id}</td><td>${r.work.title}</td><td>${r.right}</td><td class="who">${holder(r)}.rr-demo.testnet</td><td><span class="tier">${r.basis==="disputed"?"contract":r.basis}</span></td><td class="bps" style="text-align:right">${(r.pct*100).toLocaleString()}</td><td>${status(r)}</td><td class="chev">&rsaquo;</td></tr>`).join("");
+  function open(id){const r=rows.find(x=>x.id===id);if(!r)return;
+    document.querySelectorAll("#srows tr").forEach(t=>t.classList.toggle("sel",t.dataset.id===id));
+    $("drT").textContent=`${r.id}: ${r.work.title}, ${r.who}, ${r.pct}% ${r.right}`;
+    $("drS").textContent=`ISRC ${r.work.isrc}, holder ${holder(r)}.rr-demo.testnet`;
+    $("drVault").textContent=`${r.id}.royltee-demo.testnet`;
+    const chips=[["Right",r.right],["Territory","World"],["Basis",r.basis==="disputed"?"contract":r.basis],["Points",(r.pct*100)+" bps"],["Tier",r.work.tier],["Provenance",lbl[r.work.prov]]];
+    $("drChips").innerHTML=chips.map(c=>`<span class="chip2"><b>${c[0]}</b>${c[1]}</span>`).join("");
+    const s1=r.id==="s1";
+    $("drKv").innerHTML=`<div><span class="eyebrow">Earned</span><b>${s1?"320.00":"0.00"}</b></div><div><span class="eyebrow">Paid out</span><b>${s1?"320.00":"0.00"}</b></div><div><span class="eyebrow">Claimable</span><b>0.00</b></div>`;
+    let iss=[];
+    if(s1)iss=[["payment_in","Q2 statement, simulated payer","",'+200.00'],["payment_in","Q3 statement, simulated payer","",'+120.00'],["claim","seller claim after sale rejected",'<span class="sev lo">Low</span>',"0.00"]];
+    if(r.id==="s7")iss=[["dispute #1","registered shares sum to 130%, contested 30% frozen",'<span class="sev hi">High</span>',"held 60.00"]];
+    if(r.basis==="disputed")iss=[["dispute #1","duplicate claim on the master",'<span class="sev hi">High</span>',"frozen"]];
+    if(r.work.id===2&&r.who==="ai-co")iss=[["agent payment","repeated statement line rejected",'<span class="sev md">Medium</span>',"0.00"]];
+    if(!iss.length)iss=[["none","no payouts or issues in example data","",""]];
+    $("drIss").innerHTML=iss.map(i=>`<tr><td class="mono" style="font-size:11px">${i[0]}</td><td>${i[1]}</td><td>${i[2]}</td><td class="mono" style="text-align:right">${i[3]}</td></tr>`).join("");
+    const frozen=r.basis==="disputed"||r.id==="s7";
+    const acc=[[holder(r)+".rr-demo.testnet","holder",frozen?"held":"yes",frozen?"no, frozen":"yes, 1 yocto"],["registrar.rr-demo.testnet","registrar","no","only with a document hash"],["pay-agent.label.rr-demo.testnet","agent allowance","no","no, pays works only"]];
+    $("drAcc").innerHTML=acc.map(a=>`<tr><td class="mono" style="font-size:11px">${a[0]}</td><td>${a[1]}</td><td>${a[2]}</td><td>${a[3]}</td></tr>`).join("");
+    document.body.classList.add("dopen");}
+  function close(){document.body.classList.remove("dopen");document.querySelectorAll("#srows tr.sel").forEach(t=>t.classList.remove("sel"));}
+  $("srows").addEventListener("click",e=>{const tr=e.target.closest("tr");if(tr)open(tr.dataset.id);});
+  $("drX").onclick=close;$("scrim").onclick=close;addEventListener("keydown",e=>{if(e.key==="Escape")close();});
+  window.__openShare=open;
+  document.querySelectorAll("#tabs a").forEach(a=>a.addEventListener("click",()=>{document.querySelectorAll("#tabs a").forEach(x=>x.classList.toggle("on",x===a));}));
+})();
+</script>
+</body>
+</html>

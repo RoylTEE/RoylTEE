@@ -1,0 +1,18 @@
+---
+import Base from '../layouts/Base.astro';
+import { PROJECT_NAME } from '../consts';
+---
+<Base title={`Whitepaper (placeholder) . ${PROJECT_NAME}`}>
+  <section class="wp pad">
+    <div class="wp-in">
+      <span class="tag-ph">Placeholder page</span>
+      <h1>Design whitepaper</h1>
+      <p class="lead">The whitepaper goes here once it is approved. It covers the problem, design goals, the lifecycle, the NEAR and privacy design, the trust model, why NEAR, and the rollout from testnet to mainnet.</p>
+      <a class="btn no-chip outline" href="/">Back to home</a>
+    </div>
+  </section>
+</Base>
+<style>
+  .wp { padding-top: 8rem; padding-bottom: 10rem; }
+  .wp-in { max-width: 44rem; margin: 0 auto; display: grid; gap: 1.5rem; justify-items: start; }
+</style>

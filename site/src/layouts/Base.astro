@@ -1,0 +1,38 @@
+---
+import '@fontsource-variable/inter-tight';
+import '@fontsource-variable/jetbrains-mono';
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import { PROJECT_NAME, PITCH } from '../consts';
+interface Props { title?: string; description?: string }
+const { title = PROJECT_NAME, description = PITCH } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  </head>
+  <body>
+    <a class="announce" href="#notice">
+      <span class="tag-mono">Simulated</span>
+      <span>Testnet only. Payments use Mock USDC (testnet).<span class="announce-more"> Nothing on this site moves real money.</span></span>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"/></svg>
+    </a>
+    <Nav />
+    <main><slot /></main>
+    <Footer />
+  </body>
+</html>
+<style is:global>
+  .announce {
+    display: flex; justify-content: center; align-items: center; gap: .6rem; padding: .5rem 1rem;
+    background: var(--amber2); color: var(--ink); font-size: .9rem; text-align: center;
+  }
+  .announce:hover span:last-of-type { text-decoration: underline; text-underline-offset: 3px; }
+  @media (max-width: 767px) { .announce { font-size: .78rem; } .announce svg, .announce-more { display: none; } }
+</style>

@@ -1,0 +1,67 @@
+---
+import Logo from './Logo.astro';
+import { DASHBOARD_URL, WHITEPAPER_URL, SOURCE_URL, PROJECT_NAME } from '../consts';
+const cols = [
+  { h: 'Product', l: [['How it works', '/#how'], ['Agent allowances', '/#agents'], ['Lifecycle', '/#lifecycle'], ['Trust and privacy', '/#trust']] },
+  { h: 'Resources', l: [['Whitepaper (placeholder)', WHITEPAPER_URL], ['Testnet dashboard (placeholder)', DASHBOARD_URL], ['Source code (placeholder)', SOURCE_URL], ['Help', '/help'], ['Contact support', '/help#support']] },
+  { h: 'Network', l: [['NEAR testnet', '/#notice'], ['Mock USDC (testnet)', '/#notice']] },
+];
+---
+<section class="fx" aria-label="Closing call to action">
+  <div class="fx-card">
+    <img class="fx-art" src="/placeholder-hero.svg" alt="" aria-hidden="true" />
+    <div class="fx-shade"></div>
+    <div class="fx-body pad">
+      <p class="fx-big" data-split-lines>Every share.<br />One address.</p>
+      <a class="btn dark" href={DASHBOARD_URL}>Open testnet dashboard <span class="chip"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M9 4l4 4-4 4"/></svg></span></a>
+    </div>
+  </div>
+</section>
+<footer class="ft pad" id="notice">
+  <div class="container">
+    <div class="ft-top">
+      <div class="ft-brand">
+        <Logo />
+        <p class="muted">Built at NEAR HACKATHON.</p>
+      </div>
+      {cols.map((c) => (
+        <div class="ft-col">
+          <p class="ft-h">{c.h}</p>
+          <ul>{c.l.map(([t, h]) => <li><a href={h}>{t}</a></li>)}</ul>
+        </div>
+      ))}
+    </div>
+    <div class="ft-notice">
+      <span class="tag-sim">Simulated</span>
+      <p>Testnet only. {PROJECT_NAME} runs on NEAR testnet. Payments use Mock USDC (testnet), a mock token with no value. Every number, work and account shown on this site is example data. This is not an investment product and nothing here is legal advice. Despite the name, the build does not use a trusted execution environment.</p>
+    </div>
+    <div class="ft-bottom">
+      <span>Built at NEAR HACKATHON</span>
+      <span class="mono">network: testnet</span>
+    </div>
+  </div>
+</footer>
+<style>
+  .fx { padding: 0 .5rem; background: var(--bg); }
+  .fx-card { position: relative; overflow: hidden; border-radius: var(--r-md); min-height: 34rem; display: flex; align-items: flex-end; }
+  .fx-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .fx-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(247,246,242,0) 40%, rgba(247,246,242,.55)); }
+  .fx-body { position: relative; width: 100%; padding-top: 4rem; padding-bottom: 3rem; }
+  .fx-big { font-size: clamp(3rem, 9.4vw, 8.7rem); line-height: .85; font-weight: 500; letter-spacing: -.02em; margin-bottom: 2.5rem; color: var(--ink); }
+  .ft { padding-top: 5rem; padding-bottom: 2rem; background: var(--ink); color: var(--ink-text); margin-top: .5rem; border-radius: var(--r-md) var(--r-md) 0 0; }
+  .ft-brand { color: #fff; }
+  .ft-top { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 2rem; }
+  .ft-brand p { margin-top: 1rem; font-size: .9rem; max-width: 18rem; color: #a7a295; }
+  .ft-h { font-family: var(--mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--amber2); margin-bottom: 1rem; }
+  .ft-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; font-size: .9rem; color: var(--ink-text); }
+  .ft-col a { transition: color .2s; }
+  .ft-col a:hover { color: #fff; }
+  .ft-notice { display: flex; gap: 1rem; align-items: flex-start; margin-top: 4rem; padding: 1.25rem; border: 1px solid #3a362c; border-radius: var(--r-xs); color: #a7a295; font-size: .85rem; }
+  .ft-bottom { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid #3a362c; font-size: .8rem; color: #8d887c; }
+  @media (max-width: 767px) {
+    .ft-top { grid-template-columns: 1fr 1fr; }
+    .ft-brand { grid-column: 1 / -1; }
+    .ft-notice { flex-direction: column; }
+    .fx-card { min-height: 26rem; }
+  }
+</style>

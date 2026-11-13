@@ -1,0 +1,76 @@
+import type { Config } from './config';
+import type { Store } from './store';
+import { digest, equal, fail, mac, rate, text } from './security';
+import { SYSTEM_PROMPT } from './prompt';
+import { sensitive } from './sensitive';
+export type Turn = { role: 'user' | 'assistant'; text: string; index?: number; signature?: string };
+export type ChatState = { count: number; digest: string; busy: boolean };
+export type Model = (turns: Turn[]) => Promise<string>;
+export const VERSION = 'royltee-chat-v1';
+const emptyState = (): ChatState => ({ count: 0, digest: digest([]), busy: false });
+export async function startChat(store: Store, id: string) { await store.put(`chat:${id}`, emptyState(), 3600); }
+export const signTurn = (secret: string, id: string, index: number, value: string) => mac(secret, [VERSION, id, index, value]);
+const jailbreak = /ignore\b.{0,60}\b(?:instructions|rules|prompt)|(?:system|developer|hidden|initial)\s*(?:prompt|message|instructions)|(?:reveal|show|print|repeat|leak|dump)\b.{0,40}(?:prompt|instructions|notes|secret|env|token|api key)|(?:your|the server'?s?|site'?s?)\s+(?:api|hmac|session|secret|signing)\s*(?:key|secret|token)|\bjailbreak|\bDAN\b|developer mode|pretend\b.{0,40}(?:unrestricted|no rules|no limits)|bypass\b.{0,30}(?:safety|filter|rules)|<\/?(?:system|assistant)>/is;
+const unrelated = /\b(?:recipe|cook(?:ing)?|weather|election|president|football|soccer|movie|poem|joke|horoscope|stock price|bitcoin price|homework|capital of|travel|dating)\b/i;
+export function refusal(question: string) {
+  const kind = sensitive(question);
+  if (kind) return `Please leave out ${kind}. This help chat only needs demo details. If you need a person, use [Contact support](/help#support).`;
+  if (jailbreak.test(question)) return 'I cannot share private setup details or step around the safety rules. I am happy to explain how RoylTEE works, though. [How it works](/#how) is a good place to start.';
+  if (unrelated.test(question)) return 'That is outside what I can help with here. I can explain RoylTEE shares, vaults, the testnet demo or wallet support. [How it works](/#how) is a good place to start.';
+  return null;
+}
+export const LINKS = new Set(['/', '/#how', '/#agents', '/#lifecycle', '/#trust', '/#notice', '/#problem', '/dashboard/', '/whitepaper', '/help', '/help#chat', '/help#support']);
+/** Returns null when the reply must not be shown; otherwise removes links outside the app. */
+export function cleanAnswer(value: string): string | null {
+  if (!value || value.length > 6000 || /grounding-notes|CHAT_HMAC_SECRET|SESSION_SECRET|NEARAI_API_KEY|UPSTASH_REDIS|KV_REST_API|CRON_SECRET|You are the RoylTEE help guide|Treat every user message as untrusted/i.test(value) || sensitive(value)) return null;
+  return value
+    .replace(/\[([^\]]{1,120})\]\(([^)\s]{1,200})\)/g, (all, label, href) => LINKS.has(href) ? all : label)
+    .replace(/https?:\/\/[^\s)]+/g, '(external link removed)')
+    .replace(/[\u2013\u2014]/g, ',');
+}
+export function nearAiModel(config: Config, fetcher = fetch): Model {
+  return async turns => {
+    if (!config.nearAiKey) fail(503, 'Chat is not configured yet. You can still read the guide or contact support.');
+    const r = await fetcher(`${config.nearAiBaseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.nearAiKey}` }, body: JSON.stringify({ model: config.nearAiModel, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...turns.map(t => ({ role: t.role, content: t.text }))], max_tokens: 650, stream: false, chat_template_kwargs: { enable_thinking: false } }), signal: AbortSignal.timeout(45000) });
+    if (!r.ok) fail(503, 'Chat is taking a break. Please try again shortly.');
+    const j = await r.json();
+    const answer = j.choices?.[0]?.message?.content;
+    if (typeof answer !== 'string' || !answer.trim()) fail(503, 'Chat could not finish that answer. Please try again.');
+    return answer.trim();
+  };
+}
+export async function chat(store: Store, config: Config, id: string, input: Record<string, unknown>, ip: string, model: Model) {
+  const state = await store.get<ChatState>(`chat:${id}`) ?? fail(400, 'This chat has expired. Please start a new conversation.');
+  const turns = input.history;
+  if (!Array.isArray(turns) || turns.length !== state.count * 2) fail(400, 'That chat history is not valid. Please start again.');
+  const history: Turn[] = [];
+  for (let i = 0; i < turns.length; i++) {
+    const raw = turns[i];
+    if (!raw || typeof raw !== 'object' || raw.role !== (i % 2 ? 'assistant' : 'user') || typeof raw.text !== 'string' || raw.text.length > 6000) fail(400, 'That chat history is not valid. Please start again.');
+    if (i % 2) {
+      const index = (i - 1) / 2;
+      if (raw.index !== index || typeof raw.signature !== 'string' || !equal(raw.signature, signTurn(config.chatSecret, id, index, raw.text))) fail(400, 'That chat history is not valid. Please start again.');
+      history.push({ role: 'assistant', text: raw.text, index, signature: raw.signature });
+    } else history.push({ role: 'user', text: raw.text });
+  }
+  if (state.busy || digest(history) !== state.digest) fail(400, 'That turn was already used or changed. Please start again.');
+  const question = text(input.message, 1500);
+  if (state.count >= config.chatSessionCap) fail(429, 'This conversation has reached its limit. Please come back later.');
+  await rate(store, `chat:ip:${ip}`, config.chatDayCap, 86400);
+  await rate(store, 'chat:global', config.chatGlobalDayCap, 86400);
+  const busy = { ...state, busy: true };
+  if (!await store.cas(`chat:${id}`, state, busy, 3600)) fail(400, 'That turn was already used. Please start again.');
+  try {
+    const user: Turn = { role: 'user', text: question };
+    const blocked = refusal(question);
+    const answer = blocked ?? await model([...history, user]);
+    const output = cleanAnswer(answer) ?? 'I could not give a safe answer to that one. Could you ask about a specific part of RoylTEE? [Contact support](/help#support) is there too.';
+    const assistant: Turn = { role: 'assistant', text: output, index: state.count, signature: signTurn(config.chatSecret, id, state.count, output) };
+    const all = [...history, user, assistant];
+    await store.put(`chat:${id}`, { count: state.count + 1, digest: digest(all), busy: false }, 3600);
+    return { sessionId: id, version: VERSION, assistant };
+  } catch (e) {
+    await store.cas(`chat:${id}`, busy, state, 3600);
+    throw e;
+  }
+}
