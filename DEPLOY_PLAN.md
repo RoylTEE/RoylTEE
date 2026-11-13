@@ -1,6 +1,6 @@
 # Testnet deploy plan (block 5)
 
-Status: DRAFT. Nothing here has been run. Every step that creates an account, deploys, calls a change method, deletes a key or moves NEAR needs the owner's explicit yes first (BUILD_PROMPT block 5: "print the exact testnet deploy plan, STOP for yes"). Testnet only. No mainnet, no real money.
+Status: steps 1 to 5 and 7 to 13 were run on testnet on 2026-11-13 (UTC). Accounts, public keys, wasm hashes and transaction ids are in `deployments/testnet.json`. Step 6 (delete the full-access keys of the registry and mock USDC) is parked until the owner says go, so those keys are still present and in-place upgrades remain possible. Steps 15 and 16 (redeploy with the contract review fixes, and the split sheet demo) are drafts, NOT run. Every remaining step that creates an account, deploys, calls a change method, deletes a key or moves NEAR still needs the owner's explicit yes first (BUILD_PROMPT block 5). Testnet only. No mainnet, no real money.
 
 ## Key handling rules
 
@@ -24,8 +24,8 @@ Status: DRAFT. Nothing here has been run. Every step that creates an account, de
 | `ROOT` | `royltee-dev.testnet` | faucet account, parent and funder of every project account |
 | `FUND1` | `royltee-fund-1.testnet` | faucet account, only forwards its NEAR to `ROOT` |
 | `FUND2` | `royltee-fund-2.testnet` | faucet account, only forwards its NEAR to `ROOT` |
-| `REG` | `reg.royltee-dev.testnet` | registry contract, keys deleted after init |
-| `USDC` | `usdc.royltee-dev.testnet` | mock USDC (testnet), keys deleted after init |
+| `REG` | `reg.royltee-dev.testnet` | registry contract; key deletion (step 6) parked, full-access key still present |
+| `USDC` | `usdc.royltee-dev.testnet` | mock USDC (testnet); key deletion (step 6) parked, full-access key still present |
 | `REGISTRAR` | `registrar.royltee-dev.testnet` | registrar |
 | `WA` | `writer-a.royltee-dev.testnet` | member, writer |
 | `WB` | `writer-b.royltee-dev.testnet` | member, writer, dispute claimant |
@@ -247,16 +247,14 @@ Proves: T2 and T4 live (only the holder claims; unclaimed money moves with the s
 
 ### Step 12. Scripted agent with function-call keys only (5 transactions, plus agent calls)
 
+The agent account is `$AGENT`, which is `pay-agent.$BUYER` (`pay-agent.buyer-pub.royltee-dev.testnet`). Keep the full-access key until a call signed with the function-call key has succeeded.
+
 ```bash
 near account create-account fund-myself $AGENT '0.5 NEAR' autogenerate-new-keypair save-to-legacy-keychain sign-as $BUYER $NET $SIGN
-AGENT_FULL_PK=$(near account get-public-key from-legacy-keychain $AGENT $NET | tail -n 1)
 near account add-key $AGENT grant-function-call-access --allowance '0.25 NEAR' \
   --contract-account-id $REG --function-names 'pay_from_allowance, report' \
   autogenerate-new-keypair save-to-legacy-keychain $NET $SIGN
-near account delete-keys $AGENT public-keys $AGENT_FULL_PK $NET $SIGN
-near account list-keys $AGENT $NET now                 # one function-call key on REG, no full access
-AGENT_FC_PK=ed25519:...                                # set by hand from the list-keys output (public key only)
-AGENT_SIGN="sign-with-legacy-keychain --signer-public-key $AGENT_FC_PK send"
+AGENT_SIGN="sign-with-access-key-file <path to function-call key file> send"
 NOW_NS=$(($(date +%s) * 1000000000)); EXP=$((NOW_NS + 30*24*3600*1000000000))
 near contract call-function as-transaction $REG grant_role \
   json-args "{\"agent\":\"$AGENT\",\"methods\":[\"pay_from_allowance\",\"report\"],\"per_tx_limit\":\"100000\",\"daily_limit\":\"300000\",\"max_tx_per_day\":5,\"expires_at\":\"$EXP\"}" \
@@ -269,15 +267,20 @@ near contract call-function as-transaction $USDC ft_transfer_call \
   prepaid-gas '300 Tgas' attached-deposit '1 yoctoNEAR' sign-as $BUYER $NET $SIGN
 near contract call-function as-transaction $REG pay_from_allowance \
   json-args "{\"target\":{\"work\":{\"work_id\":1,\"right_type\":\"publishing\",\"territory\":\"WW\"}},\"amount\":\"100000\",\"statement_line_id\":\"agent-line-1\",\"period\":\"2026-Q3\",\"statement_hash\":\"$H_F\"}" \
-  prepaid-gas '300 Tgas' attached-deposit '0 NEAR' sign-as $AGENT $NET $AGENT_SIGN
+  prepaid-gas '100 Tgas' attached-deposit '0 NEAR' sign-as $AGENT $NET $AGENT_SIGN
+# After that function-call-signed call succeeds:
+AGENT_FULL_PK=$(near account get-public-key from-legacy-keychain $AGENT $NET | tail -n 1)
+echo "$AGENT_FULL_PK"                                                            # must start with ed25519:
+near account delete-keys $AGENT public-keys $AGENT_FULL_PK $NET $SIGN
+near account list-keys $AGENT $NET now                 # one function-call key on REG, no full access
 near contract call-function as-transaction $REG pay_from_allowance \
   json-args "{\"target\":{\"work\":{\"work_id\":1,\"right_type\":\"publishing\",\"territory\":\"WW\"}},\"amount\":\"100000\",\"statement_line_id\":\"agent-line-1\",\"period\":\"2026-Q3\",\"statement_hash\":\"$H_F\"}" \
-  prepaid-gas '300 Tgas' attached-deposit '0 NEAR' sign-as $AGENT $NET $AGENT_SIGN   # must fail: same line
+  prepaid-gas '100 Tgas' attached-deposit '0 NEAR' sign-as $AGENT $NET $AGENT_SIGN   # must fail: same line
 near contract call-function as-transaction $REG claim json-args '{"token_id":"s4"}' \
-  prepaid-gas '300 Tgas' attached-deposit '1 yoctoNEAR' sign-as $AGENT $NET $AGENT_SIGN   # must fail at protocol level
+  prepaid-gas '100 Tgas' attached-deposit '1 yoctoNEAR' sign-as $AGENT $NET $AGENT_SIGN   # must fail at protocol level
 ```
 
-Proves: T6, T7, T8, T9 live (agent key cannot reach owner methods or attach deposits, limits hold, a statement line pays once). The function-call key's allowance (0.25 NEAR) caps the agent's gas spend. Agent calls pass `--signer-public-key` (an option of `sign-with-legacy-keychain` in 0.31.1) so the CLI signs with the function-call key, not the deleted full-access key whose file may stay in the store. That the legacy keychain finds the function-call key file by that public key is UNVERIFIED.
+Proves: T6, T7, T8, T9 live (agent key cannot reach owner methods or attach deposits, limits hold, a statement line pays once). The function-call key's allowance (0.25 NEAR) caps the agent's gas spend. Agent calls use 100 Tgas because 300 Tgas costs more than that 0.25 NEAR allowance. They sign with `sign-with-access-key-file <path to function-call key file>` (the path stays on the machine and is never committed). Do not use `--signer-public-key`: in near-cli-rs 0.31.1 the CLI ignored that flag and signed with the full-access key while it still existed. Delete the agent's full-access key only after a function-call-signed call has succeeded, so the account cannot be stuck if the function-call key cannot sign.
 
 ### Step 13. Dispute (3 transactions)
 
@@ -300,8 +303,47 @@ Proves: T11, T24, T38 live (only the contested fraction is frozen; the registrar
 
 ### Step 14. Record (no transaction)
 
-Write `deployments/testnet.json` with: account ids, public keys only, local sha256 of each wasm, on-chain code hashes, deploy transaction ids, CLI version, protocol version, commit hash, UTC timestamps. Add the NEAR spent to SPEND_LOG.md. Commit locally.
+Write `deployments/testnet.json` with: account ids, public keys only, local sha256 of each wasm, on-chain code hashes, deploy and step transaction ids, CLI version, protocol version, commit hash, UTC timestamps. Add the NEAR spent to SPEND_LOG.md. Commit locally. This step was written on 2026-11-13 (UTC); see that file for the record.
+
+### Step 15. Redeploy the registry in place with the contract review fixes (DRAFT, not run, needs the owner's yes)
+
+Possible only while step 6 is parked (the registry's full-access key is still present). No migration and no init call: every review fix keeps the stored layout and keeps new data in its own storage slots (DESIGN.md section 19). Existing shares count as approved. Vaults are not touched (they cannot be); only vaults created after this step get the new vault code with `ft_on_transfer`.
+
+```bash
+bash scripts/build-wasm.sh                                    # prints sha256 of contracts/res/registry.wasm and vault.wasm
+near account view-account-summary $REG $NET now              # balance must cover the larger code (about 0.39 NEAR more storage, UNVERIFIED)
+near contract deploy $REG use-file contracts/res/registry.wasm without-init-call $NET $SIGN
+near account view-account-summary $REG $NET now              # SHA-256 equals the local build
+near contract call-function as-read-only $REG get_vault_code_hash json-args '{}' $NET now   # new vault hash
+near contract call-function as-read-only $REG get_accounting json-args '{}' $NET now        # unchanged by the deploy
+near contract call-function as-read-only $REG nft_tokens json-args '{"from_index":"0","limit":10}' $NET now  # s1 to s7 unchanged, "approval":"approved"
+near contract call-function as-read-only $REG get_share_approval json-args '{"token_id":"s1"}' $NET now     # "approved"
+```
+
+Proves: the deployed state reads back unchanged under the new code. The same upgrade is rehearsed in the sandbox from the exact testnet registry wasm by `u01_testnet_wasm_upgrades_in_place_without_migration` (`contracts/tests/tests/upgrade.rs`); run `npm test` and see it pass before this step. After this step (and after step 6 or 16), `npm run verify:testnet` fails until `deployments/testnet.json` is updated: the registry code hash, the key counts after step 6, and `token_owners` after step 16 (review 03a I5). Record the new registry and vault sha256 in `deployments/testnet.json` next to the old vault hash (the 7 existing vaults keep it). Note: share `s7` (voided by `uphold_existing` in step 13) stays in its group's list, because the old code did not prune it; it is inert (never paid) and counts toward that group's 32-entry cap only.
+
+### Step 16. Split sheet demo (DRAFT, not run, needs the owner's yes; about 7 transactions)
+
+```bash
+near contract call-function as-transaction $REG register_work \
+  json-args "{\"code_type\":\"isrc\",\"code\":\"ZZRYL2600004\",\"title_hash\":\"$H_D\",\"provenance\":\"human\",\"metadata_uri\":\"\"}" \
+  prepaid-gas '30 Tgas' attached-deposit '0.05 NEAR' sign-as $WA $NET $SIGN          # expected work 3 (read the result), registered by WA
+share 3 $WA 5000                                                                     # by WA: approved
+near contract call-function as-transaction $REG register_share \
+  json-args "{\"work_id\":3,\"right_type\":\"publishing\",\"territory\":\"WW\",\"percent_bps\":5000,\"basis\":\"copyright\",\"holder\":\"$WB\",\"evidence_hash\":\"$H_E\"}" \
+  prepaid-gas '300 Tgas' attached-deposit '0.5 NEAR' sign-as $WB $NET $SIGN          # by WB: "approval":"pending"; read TOKEN from share_registered
+near contract call-function as-transaction $USDC ft_transfer_call \
+  json-args "{\"receiver_id\":\"$REG\",\"amount\":\"1000000\",\"msg\":\"{\\\"pay_work\\\":{\\\"work_id\\\":3,\\\"right_type\\\":\\\"publishing\\\",\\\"territory\\\":\\\"WW\\\",\\\"period\\\":\\\"2026-Q4\\\",\\\"statement_hash\\\":\\\"$H_F\\\",\\\"statement_line_id\\\":\\\"line-4\\\"}}\"}" \
+  prepaid-gas '300 Tgas' attached-deposit '1 yoctoNEAR' sign-as $PAYER $NET $SIGN    # WA's half forwarded; WB's half escrowed, reason awaiting_approval
+near contract call-function as-read-only $REG get_ledger json-args "{\"token_id\":\"$TOKEN\"}" $NET now   # escrowed 500000
+near contract call-function as-transaction $REG approve_share \
+  json-args "{\"token_id\":\"$TOKEN\"}" \
+  prepaid-gas '100 Tgas' attached-deposit '1 yoctoNEAR' sign-as $WA $NET $SIGN       # share_approved, 500000 released to the vault
+near tokens $TOKEN.$REG view-ft-balance $USDC $NET now                          # 0.5 mock USDC
+```
+
+Proves: T39 live. A share registered by someone other than the work registrant is held until the registrant signs; the signature is an on-chain event. The reject path (`reject_share`, held money to the group's unallocated escrow) is shown by unit and sandbox tests only.
 
 ## Transaction count
 
-Steps 1 to 13: 3 faucet accounts, 2 transfers, 8 sub-accounts, 2 deploys with init, 2 key deletions, 3 token calls, 3 credentials, 9 catalog calls, 3 payer calls, 4 claim and sale calls, 9 agent calls, 3 dispute calls: 51 transactions. Steps 5 and 6 are permanent (no upgrade path, no keys).
+The planned count for steps 1 to 13 was 51 transactions, including the two key deletions in step 6. Step 6 was not run (keys on the registry and mock USDC are still present). The run recorded in `deployments/testnet.json` has 50 on-chain transactions, plus one agent claim that the protocol refused before a transaction was sent. Step 5 (registry deploy and init) is on chain. Step 6 stays reversible until the owner says go.

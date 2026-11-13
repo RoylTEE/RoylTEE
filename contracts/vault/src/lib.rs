@@ -9,12 +9,20 @@
 //! `withdraw` arguments are borsh: (token: String, receiver: String, amount: u128).
 //! It returns the `ft_transfer` promise, so the registry callback sees
 //! whether the transfer itself succeeded.
+//!
+//! `ft_on_transfer` keeps every token sent with `ft_transfer_call` (it
+//! returns "0" unused). Without it the token refunds the sender, and a
+//! balance read in between could see money that then leaves (review H1).
+//! It reads nothing, writes nothing and calls nothing.
 #![cfg_attr(target_arch = "wasm32", no_std)]
 
 /// NEAR account ids are at most 64 bytes.
 pub const MAX_ACCOUNT_LEN: usize = 64;
 /// Gas passed to the token's `ft_transfer` (10 Tgas).
 pub const GAS_FT_TRANSFER: u64 = 10_000_000_000_000;
+
+/// `ft_on_transfer` return value: JSON string "0", nothing refunded.
+pub const FT_ON_TRANSFER_UNUSED: &[u8] = b"\"0\"";
 
 /// Parent of a sub-account: everything after the first dot.
 pub fn parent_of(account: &[u8]) -> Option<&[u8]> {
@@ -148,6 +156,17 @@ mod contract {
         }
     }
 
+    /// NEP-141 receiver: keep everything (see the module comment).
+    #[no_mangle]
+    pub extern "C" fn ft_on_transfer() {
+        unsafe {
+            sys::value_return(
+                FT_ON_TRANSFER_UNUSED.len() as u64,
+                FT_ON_TRANSFER_UNUSED.as_ptr() as u64,
+            )
+        };
+    }
+
     #[panic_handler]
     fn panic(_: &core::panic::PanicInfo) -> ! {
         core::arch::wasm32::unreachable()
@@ -194,6 +213,12 @@ mod tests {
         let long = "a".repeat(65);
         assert!(decode_withdraw(&encode(&long, "alice.near", 1)).is_none());
         assert!(decode_withdraw(&[1, 2, 3]).is_none());
+    }
+
+    #[test]
+    fn ft_on_transfer_returns_json_zero() {
+        let v: &str = core::str::from_utf8(FT_ON_TRANSFER_UNUSED).unwrap();
+        assert_eq!(v, "\"0\"");
     }
 
     #[test]

@@ -129,6 +129,7 @@ impl Registry {
             .works
             .get(&work_id)
             .unwrap_or_else(|| env::panic_str("unknown work"));
+        let registrant = work.registered_by.clone();
         require!(
             !matches!(work.status, WorkStatus::Void { .. }),
             "work is void"
@@ -181,13 +182,12 @@ impl Registry {
                 group.reserved_bps == 0,
                 "shares in this group are still minting; retry after they finish"
             );
+            // The claimant names exactly the shares it contests: there is no
+            // default of every active share (review H2).
             let list = contests.unwrap_or_else(|| {
-                group
-                    .shares
-                    .iter()
-                    .filter(|t| self.share(t).status == ShareStatus::Active)
-                    .cloned()
-                    .collect()
+                env::panic_str(
+                    "name the contested shares in contests: the group would exceed 100 percent",
+                )
             });
             require!(!list.is_empty(), "nothing to contest");
             let mut sorted = list.clone();
@@ -195,6 +195,7 @@ impl Registry {
             sorted.dedup();
             require!(sorted.len() == list.len(), "contests lists a share twice");
             let mut contested_bps = 0u32;
+            let mut smallest = u32::MAX;
             for t in &list {
                 let s = self
                     .shares
@@ -208,11 +209,30 @@ impl Registry {
                     s.status == ShareStatus::Active && s.dispute.is_none(),
                     "contests names a share that is not active"
                 );
+                require!(
+                    self.is_approved(t),
+                    "contests names a share pending approval: the work registrant can reject it"
+                );
+                // Nobody disputes their own share to hold the group's one
+                // dispute slot (review H2, sham self-dispute).
+                let owner = self.owner_of(t);
+                require!(
+                    owner.as_ref() != Some(&holder) && owner.as_ref() != Some(&caller),
+                    "contests names a share held by the claimant or the caller"
+                );
                 contested_bps += u32::from(s.percent_bps);
+                smallest = smallest.min(u32::from(s.percent_bps));
             }
+            let excess = total - FULL_BPS;
             require!(
-                contested_bps >= total - FULL_BPS,
+                contested_bps >= excess,
                 "contested shares do not cover the excess over 100 percent"
+            );
+            // Minimal: dropping any named share would leave the excess
+            // uncovered, so no share is frozen that is not needed (review H2).
+            require!(
+                contested_bps - smallest < excess,
+                "contests names more shares than the excess needs"
             );
             Some(list)
         } else {
@@ -264,6 +284,15 @@ impl Registry {
             },
         );
         self.ledgers.insert(token_id.clone(), Ledger::default());
+        // On-chain split sheet (review M2): a share registered by anyone
+        // but the work registrant waits for the registrant's approval. A
+        // claimant goes to the registrar through its dispute instead.
+        let approval = if contested.is_none() && caller != registrant {
+            Approval::Pending
+        } else {
+            Approval::Approved
+        };
+        self.set_approval(&token_id, approval);
         if let Some(list) = contested {
             self.open_overallocation(&caller, &group_key, &token_id, list);
         }
@@ -286,6 +315,8 @@ impl Registry {
                 "vault": vault,
                 "evidence_hash": evidence_hash,
                 "status": ShareStatus::Pending,
+                "approval": approval.as_str(),
+                "registered_by": caller,
             }),
         );
 
@@ -308,12 +339,20 @@ impl Registry {
         payer: AccountId,
     ) -> PromiseOrValue<bool> {
         let vault = self.share(&token_id).vault.clone();
+        let pending = self.share(&token_id).status == ShareStatus::Pending;
         if env::promise_results_count() != 1 || env::promise_result_checked(0, 64).is_err() {
             // The NEAR sent with the failed batch came back to the registry.
-            self.fail_share(&token_id, "vault account creation failed");
+            if pending {
+                self.fail_share(&token_id, "vault account creation failed");
+            }
             Promise::new(payer)
                 .transfer(VAULT_NEAR.saturating_add(FT_STORAGE_DEPOSIT))
                 .detach();
+            return PromiseOrValue::Value(false);
+        }
+        if !pending {
+            // Released by release_stale_mint meanwhile (review M1).
+            Self::late_mint_callback(&token_id);
             return PromiseOrValue::Value(false);
         }
         Promise::new(self.usdc.clone())
@@ -333,13 +372,26 @@ impl Registry {
 
     #[private]
     pub fn on_vault_ready(&mut self, token_id: TokenId, payer: AccountId) -> bool {
+        let pending = self.share(&token_id).status == ShareStatus::Pending;
         if callback_result(512).is_none() {
-            self.fail_share(&token_id, "vault token registration failed");
+            if pending {
+                self.fail_share(&token_id, "vault token registration failed");
+            }
             Promise::new(payer).transfer(FT_STORAGE_DEPOSIT).detach();
+            return false;
+        }
+        if !pending {
+            Self::late_mint_callback(&token_id);
             return false;
         }
         let share = self.share(&token_id).clone();
         let holder = share.holder_at_mint.clone();
+        // The holder must still be an active member at mint (review L6).
+        // The vault exists and stays keyless; no NFT is minted.
+        if !self.is_active(&holder) {
+            self.fail_share(&token_id, "holder no longer has an active credential");
+            return false;
+        }
         let metadata = TokenMetadata {
             title: Some(format!(
                 "Rights share {} of work {}",
@@ -391,6 +443,29 @@ impl Registry {
         );
         true
     }
+
+    /// Fails a share whose mint callbacks never committed (review M1), so
+    /// its reserved bps stop blocking the group. Anyone may call it once
+    /// the share has been Pending for `STALE_MINT_NS`. A callback that
+    /// still arrives later finds the share Failed and mints nothing. The
+    /// NEAR attached at registration is not refunded here: it may already
+    /// be spent on the vault account.
+    pub fn release_stale_mint(&mut self, token_id: TokenId) {
+        let share = self.share(&token_id);
+        require!(share.status == ShareStatus::Pending, "share is not minting");
+        require!(
+            env::block_timestamp() >= share.created_at.0.saturating_add(STALE_MINT_NS),
+            "mint is not stale yet"
+        );
+        self.fail_share(
+            &token_id,
+            "mint callbacks did not complete: released as stale",
+        );
+        emit(
+            "mint_released_stale",
+            json!({ "token_id": token_id, "by": env::predecessor_account_id() }),
+        );
+    }
 }
 
 impl Registry {
@@ -403,6 +478,8 @@ impl Registry {
         if let Some(s) = self.shares.get_mut(token_id) {
             s.status = ShareStatus::Failed;
         }
+        self.prune_from_group(&share.group, token_id);
+        self.set_approval(token_id, Approval::Approved);
         if let Some(dispute_id) = claimant_of {
             self.cancel_dispute(dispute_id);
         }
@@ -410,6 +487,22 @@ impl Registry {
             "vault_failed",
             json!({ "token_id": token_id, "vault": share.vault, "reason": reason }),
         );
+    }
+
+    fn late_mint_callback(token_id: &TokenId) {
+        emit(
+            "anomaly",
+            json!({ "token_id": token_id, "kind": "late_mint_callback", "detail": "share is no longer minting: nothing minted" }),
+        );
+    }
+
+    /// Drops a Failed or Void share from its group's list so dead entries
+    /// never fill MAX_GROUP_ENTRIES (review H2). The share record, its NFT
+    /// and its history stay.
+    pub(crate) fn prune_from_group(&mut self, group: &GroupKey, token_id: &TokenId) {
+        if let Some(g) = self.groups.get_mut(group) {
+            g.shares.retain(|t| t != token_id);
+        }
     }
 
     /// Writes pending collection changes so storage_usage is accurate.

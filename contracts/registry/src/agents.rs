@@ -61,6 +61,10 @@ impl Registry {
             self.credentials.get(&agent).is_none(),
             "accounts with a credential cannot be agents"
         );
+        require!(
+            !self.payers.contains(&agent),
+            "payer accounts cannot be agents"
+        );
         require!(!methods.is_empty(), "methods must not be empty");
         require!(
             per_tx_limit.0 > 0 && per_tx_limit.0 <= daily_limit.0,
@@ -101,6 +105,10 @@ impl Registry {
         };
         self.roles.insert(agent.clone(), role);
         self.roles.flush();
+        // Reserve the window tail slot now, so the organisation pays its
+        // storage (review L2).
+        let tail = Self::read_tail(&agent).unwrap_or((0, 0, 0));
+        Self::write_tail(&agent, tail);
         let storage = env::storage_byte_cost()
             .saturating_mul(u128::from(env::storage_usage().saturating_sub(initial)));
         let attached = env::attached_deposit();
@@ -253,11 +261,12 @@ impl Registry {
             .cloned()
             .unwrap_or_else(|| env::panic_str("no such agent"));
         require!(amount <= role.per_tx_limit, "over per-transaction limit");
+        let (tail_spent, tail_count) = Self::tail_now(&agent, &role, now_hour);
         let hour = logic::roll_window(&mut role.spent, role.bucket_hour, now_hour);
         logic::roll_window(&mut role.counts, role.bucket_hour, now_hour);
         role.bucket_hour = hour;
-        let spent: u128 = role.spent.iter().sum();
-        let count: u32 = role.counts.iter().sum();
+        let spent: u128 = role.spent.iter().sum::<u128>() + tail_spent;
+        let count: u32 = role.counts.iter().sum::<u32>() + tail_count;
         require!(
             spent.saturating_add(amount) <= role.daily_limit,
             "over rolling 24 hour limit"
@@ -307,6 +316,14 @@ impl Registry {
         role.allowance -= amount;
         role.line_credits -= 1;
         self.roles.insert(agent.clone(), role);
+        Self::write_tail(
+            &agent,
+            (
+                hour.saturating_sub(ROLLING_HOURS as u64),
+                tail_spent,
+                tail_count,
+            ),
+        );
         self.statement_lines.insert(key);
         self.allowance_total -= amount;
         emit(
@@ -342,6 +359,7 @@ impl Registry {
     pub fn get_role(&self, agent: AccountId) -> Option<RoleView> {
         let r = self.roles.get(&agent)?;
         let now_hour = env::block_timestamp() / NS_PER_HOUR;
+        let (tail_spent, tail_count) = Self::tail_now(&agent, r, now_hour);
         let mut spent = r.spent;
         let mut counts = r.counts;
         logic::roll_window(&mut spent, r.bucket_hour, now_hour);
@@ -358,8 +376,8 @@ impl Registry {
             expired: env::block_timestamp() >= r.expires_at,
             allowance: U128(r.allowance),
             line_credits: r.line_credits,
-            spent_last_24h: U128(spent.iter().sum()),
-            tx_last_24h: counts.iter().sum(),
+            spent_last_24h: U128(spent.iter().sum::<u128>() + tail_spent),
+            tx_last_24h: counts.iter().sum::<u32>() + tail_count,
         })
     }
 
@@ -391,6 +409,38 @@ impl Registry {
             "organisation credential is not active"
         );
         role.org.clone()
+    }
+
+    /// The window tail (spent, count) for `now_hour` (review L2). Kept in
+    /// its own storage slot `l2t:<agent>`, so AgentRole is unchanged.
+    fn tail_now(agent: &AccountId, role: &AgentRole, now_hour: u64) -> (u128, u32) {
+        let stored = Self::read_tail(agent);
+        let spent = logic::window_tail(
+            &role.spent,
+            role.bucket_hour,
+            now_hour,
+            stored.map(|(h, s, _)| (h, s)),
+        );
+        let count = logic::window_tail(
+            &role.counts,
+            role.bucket_hour,
+            now_hour,
+            stored.map(|(h, _, c)| (h, c)),
+        );
+        (spent, count)
+    }
+
+    fn tail_key(agent: &AccountId) -> Vec<u8> {
+        [b"l2t:".as_slice(), agent.as_bytes()].concat()
+    }
+
+    fn read_tail(agent: &AccountId) -> Option<(u64, u128, u32)> {
+        env::storage_read(&Self::tail_key(agent)).and_then(|v| near_sdk::borsh::from_slice(&v).ok())
+    }
+
+    fn write_tail(agent: &AccountId, tail: (u64, u128, u32)) {
+        let v = near_sdk::borsh::to_vec(&tail).unwrap_or_else(|_| env::panic_str("borsh"));
+        env::storage_write(&Self::tail_key(agent), &v);
     }
 
     fn credit_lines(&mut self, agent: &AccountId, deposit: NearToken) {

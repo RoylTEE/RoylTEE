@@ -123,6 +123,32 @@ pub fn is_territory(s: &str) -> bool {
     s.len() == 2 && s.bytes().all(|b| b.is_ascii_uppercase())
 }
 
+/// The bucket of hour `now_hour - N`, which `roll_window` is about to
+/// clear or already cleared. Counting it as well makes the window cover
+/// at least N full hours (N to N + 1 hours) instead of N - 1 (review L2).
+/// `stored` is the tail saved at the last roll, as (hour, value).
+pub fn window_tail<T: Copy + Default, const N: usize>(
+    buckets: &[T; N],
+    bucket_hour: u64,
+    now_hour: u64,
+    stored: Option<(u64, T)>,
+) -> T {
+    let now = now_hour.max(bucket_hour);
+    let gap = now - bucket_hour;
+    let Some(tail_hour) = now.checked_sub(N as u64) else {
+        return T::default();
+    };
+    if gap == 0 {
+        stored
+            .filter(|(h, _)| *h == tail_hour)
+            .map_or(T::default(), |(_, v)| v)
+    } else if gap <= N as u64 {
+        buckets[(now % N as u64) as usize]
+    } else {
+        T::default()
+    }
+}
+
 /// Advances a rolling window of hourly buckets to `now_hour`, clearing the
 /// buckets of hours that fell out of the window. Returns the new bucket hour.
 pub fn roll_window<T: Copy + Default, const N: usize>(
@@ -257,6 +283,19 @@ mod tests {
         );
         assert!(split_partial(10, &[(1, 5000), (2, 5001)]).is_none());
         assert!(split_partial(10, &[]).is_none());
+    }
+
+    #[test]
+    fn window_tail_is_the_bucket_24_hours_back() {
+        let mut b = [0u32; 24];
+        b[10] = 7; // hour 10, bucket hour 10
+        assert_eq!(window_tail(&b, 10, 10, None), 0);
+        assert_eq!(window_tail(&b, 10, 33, None), 0, "hour 9 is the tail");
+        assert_eq!(window_tail(&b, 10, 34, None), 7, "hour 10 is the tail");
+        assert_eq!(window_tail(&b, 10, 35, None), 0);
+        assert_eq!(window_tail(&b, 34, 34, Some((10, 7))), 7);
+        assert_eq!(window_tail(&b, 35, 35, Some((10, 7))), 0);
+        assert_eq!(window_tail(&b, 0, 5, None), 0);
     }
 
     #[test]

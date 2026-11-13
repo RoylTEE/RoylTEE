@@ -106,7 +106,7 @@ Legend. Deposit: `1y` exactly 1 yoctoNEAR; `>=1` any nonzero deposit that also c
 
 **Solvency invariant (T31).** `ft_balance_of(registry) >= allowance_total + unallocated_total + escrow_total + undelivered_total + forwards_in_flight_total`. Checked at the end of every sandbox test (`assert_solvent`). Unit tests check each counter moves with its balance.
 
-**Zero full-access keys plan (T1, T13).** Vaults are created without any key (`CreateAccount`, `Transfer`, `DeployContract`, no `AddKey`), proven by `view_access_key_list` in sandbox tests 1, 4, 8, 14 and others. The registry and mock USDC accounts get their full-access keys deleted after deploy and init (DEPLOY_PLAN.md), after which their code cannot change; proof is an empty `list-keys` view plus the published code hashes. Live proof on testnet is pending block 5 (gap).
+**Zero full-access keys plan (T1, T13).** Vaults are created without any key (`CreateAccount`, `Transfer`, `DeployContract`, no `AddKey`), proven by `view_access_key_list` in sandbox tests 1, 4, 8, 14 and others. Planned: the registry and mock USDC accounts get their full-access keys deleted after deploy and init (DEPLOY_PLAN.md step 6), after which their code cannot change; proof would be an empty `list-keys` view plus the published code hashes. Current testnet state: step 6 is parked, both full-access keys are still present, so the registry can still be redeployed (gap, THREAT_MODEL T13).
 
 ## THREAT_MODEL rows to tests
 
@@ -150,3 +150,8 @@ Legend. Deposit: `1y` exactly 1 yoctoNEAR; `>=1` any nonzero deposit that also c
 | T36 | unit `stale_payout_lock_released_only_after_timeout_and_late_callback_is_safe`, `late_failed_claim_after_stale_release_changes_no_balance`, `late_resolve_after_stale_release_keeps_current_owner` | covered in unit tests |
 | T37 | t09, t10, t11 | residual risk accepted |
 | T38 | t14b; unit `over_allocation_rules`, `failed_claimant_mint_cancels_dispute_and_escrow_goes_to_undelivered` | covered |
+
+## Contract review fixes (2026-11-13, branch `fix/contract-review`)
+
+An external review of the contracts (H1 to H3, M1, M2, L1 to L9) and Security Suite F-04 and F-12 were worked on this branch; see THREAT_MODEL.md (rows marked "review", new T39) and DESIGN.md section 19. Fixed in code: H1 (holder or registrar only sync; new vaults export `ft_on_transfer`), H2 (explicit minimal contests, pruning), H3 (registrar cannot hold a credential), M2 (on-chain split sheet approval), L2, L4 (F-04), L5, L6, L8, L9, M1 for stuck mints plus 10 Tgas forward callback gas. Not fixed in code: a lost `on_forward` (T19); vaults created before the fix keep the old code (T21); registrar trust (T12, M2 above). The vault is now 7478 bytes.
+

@@ -42,14 +42,15 @@ async fn a02_resolve_releasing_escrow_to_16_shares_fits() -> anyhow::Result<()> 
     for _ in 0..15 {
         shares.push(e.mint(w, e.writer_a.id(), 666).await?);
     }
-    // 15 x 666 = 9990; a 100 bps claimant contests all of them.
+    // 15 x 666 = 9990. A 10000 bps claimant needs all 15 to cover the
+    // 9990 excess, so the minimal contested set is every share (review H2).
     let r = ok(e
-        .writer_a
+        .writer_b
         .call(e.reg.id(), "register_share")
         .args_json(json!({
             "work_id": w, "right_type": "publishing", "territory": "WW",
-            "percent_bps": 100, "basis": "copyright", "holder": e.buyer.id(),
-            "evidence_hash": hash('e'),
+            "percent_bps": 10_000, "basis": "copyright", "holder": e.buyer.id(),
+            "evidence_hash": hash('e'), "contests": shares,
         }))
         .deposit(near_workspaces::types::NearToken::from_millinear(500))
         .max_gas()
@@ -63,6 +64,7 @@ async fn a02_resolve_releasing_escrow_to_16_shares_fits() -> anyhow::Result<()> 
         .map(|t| json!({ "token_id": t, "bps": 660 }))
         .collect();
     new_bps.push(json!({ "token_id": claimant, "bps": 90 }));
+    // The contested total was 9990, so new bps must sum to 9990.
     let r = e
         .registrar
         .call(e.reg.id(), "resolve")

@@ -102,6 +102,10 @@ impl Registry {
                 && self.share(&token_id).dispute.is_none(),
             "share is not active or is in dispute"
         );
+        require!(
+            self.is_approved(&token_id),
+            "share is not approved by the work registrant"
+        );
         let initial = env::storage_usage();
         if let Some(s) = self.shares.get_mut(&token_id) {
             s.payer_attestation = Some(Attestation {
@@ -140,6 +144,10 @@ impl Registry {
         require!(
             share.status == ShareStatus::Active && share.dispute.is_none(),
             "share is not active or is in dispute"
+        );
+        require!(
+            self.is_approved(&token_id),
+            "share is not approved by the work registrant"
         );
         let owner = self.owner_of(&token_id);
         require!(
@@ -188,6 +196,7 @@ impl Registry {
                 self.shares
                     .get(*t)
                     .is_some_and(|s| s.status == ShareStatus::Active)
+                    && self.is_approved(t)
             })
             .filter_map(|t| self.owner_of(t))
             .filter(|o| Some(o) != own.as_ref())
@@ -198,7 +207,13 @@ impl Registry {
     }
 
     pub(crate) fn evidence_tier(&self, share: &Share) -> &'static str {
-        if share.payer_attestation.is_some() {
+        // Counts only while the attesting account still has the payer
+        // role (review L5).
+        if share
+            .payer_attestation
+            .as_ref()
+            .is_some_and(|a| self.payers.contains(&a.payer))
+        {
             return "payer_confirmed";
         }
         let others = self.counterpart_owners(share);

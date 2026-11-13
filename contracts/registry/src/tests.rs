@@ -695,7 +695,7 @@ fn sync_records_plain_transfers_and_discards_stale_reads() {
     let mut c = setup();
     let w = work(&mut c, "USRC12600001");
     let t = mint(&mut c, w, "alice.near", 10_000);
-    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    call(&acc("alice.near"), NearToken::from_yoctonear(0));
     let _ = c.sync(t.clone());
     let epoch = ledger(&c, &t).epoch;
     callback(ok(b"\"250000\""));
@@ -720,7 +720,7 @@ fn sync_refused_during_forward() {
     let msg =
         json!({ "pay_share": { "token_id": t, "period": "2026-Q3", "statement_hash": h('f') } });
     let _ = c.ft_on_transfer(acc("payer.near"), U128(50_000), msg.to_string());
-    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    call(&acc("alice.near"), NearToken::from_yoctonear(0));
     let _ = c.sync(t);
 }
 
@@ -1056,7 +1056,7 @@ fn agent_pays_registered_shares_only_and_once_per_line() {
     assert!(try_pay(
         &mut c,
         PayTarget::Share { token_id: t2 },
-        1,
+        MIN_GROUP_PAYMENT,
         "L-2",
         0
     ));
@@ -1083,8 +1083,10 @@ fn per_tx_daily_and_count_limits_with_rolling_window() {
         !try_pay(&mut c, target(w), 10_000, "f", t0 + 3 * HOUR),
         "daily or count"
     );
-    // 24 hours after the first payment its hour drops out of the window.
-    assert!(try_pay(&mut c, target(w), 100_000, "g", t0 + 24 * HOUR));
+    // The window covers 24 to 25 hours (review L2): 24 hours after the
+    // first payment its hour is still counted, 25 hours after it is not.
+    assert!(!try_pay(&mut c, target(w), 100_000, "g", t0 + 24 * HOUR));
+    assert!(try_pay(&mut c, target(w), 100_000, "g", t0 + 25 * HOUR));
     let r = c.get_role(agent()).unwrap();
     assert_eq!((r.spent_last_24h.0, r.tx_last_24h), (250_000, 3));
     assert_eq!(r.allowance.0, 650_000);
@@ -1396,7 +1398,7 @@ fn late_failed_claim_after_stale_release_changes_no_balance() {
     let l = ledger(&c, &t);
     assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
     // sync reads the real vault balance and makes it claimable again.
-    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    call(&acc("bob.near"), NearToken::from_yoctonear(0));
     let _ = c.sync(t.clone());
     let epoch = c.ledgers.get(&t).unwrap().epoch;
     callback(ok(b"\"700000\""));
@@ -1473,15 +1475,15 @@ fn over_allocation_opens_dispute_and_freezes_only_the_contested_fraction() {
     let msg =
         json!({ "pay_share": { "token_id": b, "period": "2026-Q3", "statement_hash": h('f') } });
     assert!(matches!(
-        c.ft_on_transfer(acc("payer.near"), U128(1000), msg.to_string()),
+        c.ft_on_transfer(acc("payer.near"), U128(10_000), msg.to_string()),
         PromiseOrValue::Value(U128(0))
     ));
-    assert_eq!(ledger(&c, &b).escrowed.0, 501_000);
+    assert_eq!(ledger(&c, &b).escrowed.0, 510_000);
     let msg =
         json!({ "pay_share": { "token_id": cl, "period": "2026-Q3", "statement_hash": h('f') } });
     assert!(matches!(
-        c.ft_on_transfer(acc("payer.near"), U128(1000), msg.to_string()),
-        PromiseOrValue::Value(U128(1000))
+        c.ft_on_transfer(acc("payer.near"), U128(10_000), msg.to_string()),
+        PromiseOrValue::Value(U128(10_000))
     ));
 
     // Frozen shares cannot move or sync; old money stays claimable.
@@ -1501,7 +1503,7 @@ fn over_allocation_opens_dispute_and_freezes_only_the_contested_fraction() {
         None,
         None
     )));
-    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    call(&acc("carol.near"), NearToken::from_yoctonear(0));
     assert!(panics(|| drop(c.sync(b.clone()))));
     yocto(&acc("carol.near"));
     let _ = c.claim(b.clone());
@@ -1661,11 +1663,18 @@ fn over_allocation_rules() {
         panics(|| reg(&mut c, 5000, Some(vec![a.clone(), a.clone()]))),
         "duplicate entry"
     );
-    // Default contests: every active share.
-    let cl = mint_with(&mut c, w, "alice.near", 5000, None);
+    // No default: the claimant must name the contested shares (review H2).
+    assert!(panics(|| reg(&mut c, 5000, None)), "contests required");
+    // Not minimal: a alone covers the 4000 excess, b is not needed.
+    assert!(
+        panics(|| reg(&mut c, 5000, Some(vec![a.clone(), b.clone()]))),
+        "minimal set only"
+    );
+    let cl = mint_with(&mut c, w, "alice.near", 5000, Some(vec![a.clone()]));
     let id = c.get_share(cl).unwrap().dispute.unwrap();
     assert!(matches!(c.get_dispute(id).unwrap().kind,
-        DisputeKind::Overallocation { ref contested, .. } if contested.len() == 2));
+        DisputeKind::Overallocation { ref contested, .. } if contested == &vec![a.clone()]));
+    assert!(c.get_share(b.clone()).unwrap().dispute.is_none());
     assert!(
         panics(|| reg(&mut c, 100, None)),
         "group has an open dispute"
@@ -1686,7 +1695,7 @@ fn failed_claimant_mint_cancels_dispute_and_escrow_goes_to_undelivered() {
         Basis::Copyright,
         acc("alice.near"),
         h('e'),
-        None,
+        Some(vec![a.clone()]),
     );
     let cl = format!("s{}", c.next_share);
     let id = c.get_share(cl.clone()).unwrap().dispute.unwrap();
@@ -1811,8 +1820,8 @@ fn void_work_waits_for_its_share_dispute() {
         s => panic!("{s:?}"),
     };
     let _ = w1;
-    let _a = mint(&mut c, w2, "bob.near", 10_000);
-    let cl = mint_with(&mut c, w2, "carol.near", 1000, None);
+    let a = mint(&mut c, w2, "bob.near", 10_000);
+    let cl = mint_with(&mut c, w2, "carol.near", 1000, Some(vec![a]));
     let share_dispute = c.get_share(cl).unwrap().dispute.unwrap();
     yocto(&registrar());
     assert!(panics(|| c.resolve(id, Outcome::VoidDuplicate, h('7'))));
@@ -1865,7 +1874,7 @@ fn confirm_share_reaches_counterparty_tier_and_drops_on_sale() {
 fn void_share_keeps_claim_and_sync() {
     let (mut c, _w, _a, _b, cl, id) = contested_setup();
     resolve(&mut c, id, Outcome::UpholdExisting);
-    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    call(&acc("alice.near"), NearToken::from_yoctonear(0));
     let _ = c.sync(cl.clone());
     let epoch = c.ledgers.get(&cl).unwrap().epoch;
     callback(ok(b"\"9000\""));
@@ -1878,9 +1887,9 @@ fn void_share_keeps_claim_and_sync() {
 // ---------- audit fixes ----------
 
 #[test]
-fn group_entry_list_is_capped_including_failed_shares() {
-    // Failed and Void shares stay in the group's list. Without a cap on the
-    // whole list, every payment and void loop would grow with them.
+fn failed_shares_leave_the_group_list() {
+    // Failed shares are pruned from the group's list (review H2), so the
+    // list stays bounded by live shares and never closes the group.
     let mut c = setup();
     let w = work(&mut c, "USRC12600001");
     for _ in 0..MAX_GROUP_ENTRIES {
@@ -1898,18 +1907,10 @@ fn group_entry_list_is_capped_including_failed_shares() {
         let t = format!("s{}", c.next_share);
         callback(PromiseResult::Failed);
         let _ = c.on_vault_created(t, acc("alice.near"));
+        assert!(group_of(&c, w).shares.is_empty());
     }
-    call(&acc("alice.near"), NearToken::from_near(1));
-    assert!(panics(|| drop(c.register_share(
-        w,
-        RightType::Publishing,
-        "WW".into(),
-        100,
-        Basis::Copyright,
-        acc("bob.near"),
-        h('e'),
-        None
-    ))));
+    let t = mint(&mut c, w, "bob.near", 100);
+    assert_eq!(group_of(&c, w).shares, vec![t]);
 }
 
 #[test]
@@ -1933,4 +1934,37 @@ fn only_the_registry_account_itself_can_initialise() {
         )
     });
     assert!(r.is_err(), "init from another account must fail");
+}
+
+#[path = "review_fixes.rs"]
+mod review_fixes;
+
+/// Review 03d L7: the site's grant deposit is 0.01 NEAR for role storage plus
+/// 0.001 NEAR per statement line. Check that 0.01 NEAR covers the role's
+/// storage on its own and that 0.01 + 5 x 0.001 NEAR buys at least 5 lines.
+#[test]
+fn r03d_l7_grant_deposit_of_site_covers_role_storage() {
+    let mut c = setup();
+    call(&acc("alice.near"), NearToken::from_millinear(10));
+    c.grant_role(
+        agent(),
+        vec![AgentMethod::PayFromAllowance, AgentMethod::Report],
+        U128(1),
+        U128(1),
+        1,
+        U64(FAR),
+    );
+    let bare = c.get_role(agent()).unwrap().line_credits;
+    call(&acc("alice.near"), NearToken::from_millinear(15));
+    c.grant_role(
+        acc("pay2.alice.near"),
+        vec![AgentMethod::PayFromAllowance, AgentMethod::Report],
+        U128(1),
+        U128(1),
+        1,
+        U64(FAR),
+    );
+    let r = c.get_role(acc("pay2.alice.near")).unwrap();
+    assert!(r.line_credits >= 5, "{}", r.line_credits);
+    println!("role storage leaves {bare} spare lines at 0.01 NEAR");
 }

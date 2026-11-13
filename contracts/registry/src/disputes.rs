@@ -56,6 +56,9 @@ impl Registry {
                 let bps = u32::from(self.share(claimant).percent_bps);
                 self.unfreeze(claimant);
                 self.set_void(claimant, dispute_id);
+                // The voided claimant leaves the group list, so repeated
+                // claims cannot close the group (review H2).
+                self.prune_from_group(group, claimant);
                 if let Some(g) = self.groups.get_mut(group) {
                     g.claimant_bps -= bps;
                     g.open_dispute = None;
@@ -108,6 +111,7 @@ impl Registry {
                     }
                     if e.bps == 0 {
                         self.set_void(&e.token_id, dispute_id);
+                        self.prune_from_group(group, &e.token_id);
                     }
                     self.forward(&e.token_id, credit);
                     released.push(
@@ -198,6 +202,11 @@ impl Registry {
             if let Some(s) = self.shares.get_mut(t) {
                 s.dispute = Some(id);
             }
+            // A sync read that started before the freeze must not land
+            // after it (review L4, Security Suite F-04).
+            if let Some(l) = self.ledgers.get_mut(t) {
+                l.epoch += 1;
+            }
         }
         for t in &contested {
             let snapshot = self.ledgers.get(t).map_or(0, |l| l.known_balance);
@@ -277,7 +286,7 @@ impl Registry {
         self.escrow_total += amount;
     }
 
-    fn take_escrow(&mut self, token_id: &TokenId) -> u128 {
+    pub(crate) fn take_escrow(&mut self, token_id: &TokenId) -> u128 {
         let amount = self
             .ledgers
             .get_mut(token_id)
@@ -329,14 +338,23 @@ impl Registry {
                 group.reserved_bps == 0,
                 "shares of this work are still minting"
             );
+            let mut held = 0u128;
             for t in &group.shares {
                 if self.share(t).status == ShareStatus::Active {
                     self.set_void(t, dispute_id);
+                    // A share still waiting for approval: its held money
+                    // joins the group's unallocated escrow (review M2).
+                    if self.approval(t) == Approval::Pending {
+                        held += self.take_escrow(t);
+                        self.set_approval(t, Approval::Rejected);
+                    }
                 }
             }
             if let Some(g) = self.groups.get_mut(key) {
                 g.active_bps = 0;
+                g.unallocated = U128(g.unallocated.0 + held);
             }
+            self.unallocated_total += held;
         }
         if let Some(w) = self.works.get_mut(&work_id) {
             w.status = WorkStatus::Void { dispute_id };

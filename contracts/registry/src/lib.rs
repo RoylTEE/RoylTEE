@@ -18,6 +18,7 @@ use near_sdk::{
 };
 
 mod agents;
+mod approval;
 mod disputes;
 mod holder;
 pub mod logic;
@@ -27,6 +28,7 @@ mod nft;
 mod registration;
 pub mod types;
 
+use approval::Approval;
 use types::*;
 
 /// Custom event standard. Name-neutral on purpose (DESIGN.md section 13).
@@ -64,6 +66,9 @@ pub const MAX_EFFECTIVE_FUTURE_NS: u64 = 30 * 24 * 3600 * 1_000_000_000;
 /// A lock older than this many blocks may be cleared by anyone (T19).
 /// About 20 minutes at one block per second. Long enough under congestion: UNVERIFIED.
 pub const STALE_LOCK_BLOCKS: u64 = 1_200;
+/// A share Pending this long (its mint callbacks never committed) may be
+/// failed by anyone (review M1). Same 20 minutes as STALE_LOCK_BLOCKS.
+pub const STALE_MINT_NS: u64 = 20 * 60 * 1_000_000_000;
 /// Storage prepaid per statement line id (a 32-byte hash in a set, with margin).
 pub const LINE_STORAGE_BYTES: StorageUsage = 100;
 pub const MAX_TX_PER_DAY: u32 = 1_000;
@@ -76,7 +81,8 @@ pub const GAS_MEMBER_CB: Gas = Gas::from_tgas(5);
 pub const GAS_WITHDRAW: Gas = Gas::from_tgas(20);
 pub const GAS_CLAIM_CB: Gas = Gas::from_tgas(10);
 pub const GAS_FT_TRANSFER: Gas = Gas::from_tgas(8);
-pub const GAS_FORWARD_CB: Gas = Gas::from_tgas(5);
+/// Measured use about 2.2 Tgas (2.151 in sandbox test r03); raised from 5 for margin.
+pub const GAS_FORWARD_CB: Gas = Gas::from_tgas(10);
 pub const GAS_FT_BALANCE: Gas = Gas::from_tgas(5);
 pub const GAS_SYNC_CB: Gas = Gas::from_tgas(5);
 pub const GAS_NFT_ON_TRANSFER_MIN: Gas = Gas::from_tgas(25);

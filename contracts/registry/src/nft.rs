@@ -70,7 +70,10 @@ impl Registry {
             approval_id,
             effective_from,
         );
-        self.ledger_mut(&token_id).transfer_pending = Some(Self::lock_here(receiver_id.clone(), 0));
+        let ledger = self.ledger_mut(&token_id);
+        ledger.transfer_pending = Some(Self::lock_here(receiver_id.clone(), 0));
+        // A sync read that started before the call must not land during it.
+        ledger.epoch += 1;
         self.move_token(&sender, &receiver_id, &token_id, memo, eff, true);
         Promise::new(receiver_id.clone())
             .function_call_weight(
@@ -183,6 +186,10 @@ impl Registry {
         require!(
             self.share(&token_id).dispute.is_none(),
             "share is frozen by a dispute"
+        );
+        require!(
+            self.is_approved(&token_id),
+            "share is not approved by the work registrant"
         );
         let ledger = self
             .ledgers
@@ -314,6 +321,10 @@ impl Registry {
             "share is not transferable"
         );
         require!(share.dispute.is_none(), "share is frozen by a dispute");
+        require!(
+            self.is_approved(token_id),
+            "share is not approved by the work registrant"
+        );
         let ledger = self
             .ledgers
             .get(token_id)
@@ -393,6 +404,7 @@ impl Registry {
             "payer_attestation": share.payer_attestation,
             "note": share.note,
             "status": share.status,
+            "approval": self.approval(&share.token_id).as_str(),
             "vault": share.vault,
             "earned": v.earned,
             "paid_out": v.total_paid_out,

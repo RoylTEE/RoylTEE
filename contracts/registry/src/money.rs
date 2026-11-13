@@ -169,8 +169,15 @@ impl Registry {
 
     /// Reads the vault's real token balance and records it, so plain
     /// `ft_transfer` payments straight into a vault count as earned.
-    /// Anyone may call it. Refused while any lock or forward is open (T21).
+    /// Only the current holder or the registrar may call it, so nobody can
+    /// time a read against someone else's vault (review H1). Refused while
+    /// any lock or forward is open (T21).
     pub fn sync(&mut self, token_id: TokenId) -> Promise {
+        let caller = env::predecessor_account_id();
+        require!(
+            caller == self.registrar || self.owner_of(&token_id).as_ref() == Some(&caller),
+            "only the holder or the registrar can sync"
+        );
         let share = self.share(&token_id);
         let vault = share.vault.clone();
         require!(
@@ -182,6 +189,12 @@ impl Registry {
         require!(
             share.dispute.is_none(),
             "share is in dispute: sync after resolve"
+        );
+        // Plain deposits into a share that is not approved stay held
+        // (review M2), as during a dispute (T24).
+        require!(
+            self.is_approved(&token_id),
+            "share is not approved by the work registrant"
         );
         let ledger = self.ledger_mut(&token_id);
         require!(ledger.payout_in_flight.is_none(), "payout in flight");
@@ -202,11 +215,17 @@ impl Registry {
             )
     }
 
-    /// Discards the reading if the ledger changed since the read began.
-    /// Never panics. Returns the earned total after the sync.
+    /// Discards the reading if the ledger changed since the read began, or
+    /// if the share entered a dispute or a transfer_call meanwhile (review
+    /// L4). Never panics. Returns the earned total after the sync.
     #[private]
     pub fn on_sync(&mut self, token_id: TokenId, epoch: U64) -> Option<U128> {
         let observed = callback_result(64).and_then(|v| serde_json::from_slice::<U128>(&v).ok());
+        let held = self
+            .shares
+            .get(&token_id)
+            .is_none_or(|s| s.dispute.is_some())
+            || !self.is_approved(&token_id);
         let ledger = self.ledgers.get_mut(&token_id)?;
         let Some(observed) = observed else {
             emit(
@@ -215,8 +234,10 @@ impl Registry {
             );
             return None;
         };
-        if ledger.epoch != epoch.0
+        if held
+            || ledger.epoch != epoch.0
             || ledger.payout_in_flight.is_some()
+            || ledger.transfer_pending.is_some()
             || ledger.inbound_pending > 0
         {
             emit(
@@ -267,6 +288,10 @@ impl Registry {
             share.status == ShareStatus::Active && share.dispute.is_none(),
             "share is not active or is in dispute"
         );
+        require!(
+            self.is_approved(&token_id),
+            "share is not approved by the work registrant"
+        );
         require!(amount.0 > 0, "amount must be positive");
         require!(Self::has_gas_for_forwards(1), "not enough gas to forward");
         let g = self
@@ -290,6 +315,88 @@ impl Registry {
                 "by": env::predecessor_account_id(),
             }),
         );
+    }
+
+    /// Sends unallocated escrow of a voided work back out, for example to
+    /// the payer, once a duplicate-code dispute voided the work and no share
+    /// of it can ever be paid again (review L9). Registrar only, 1
+    /// yoctoNEAR, with a document hash. The escrow is debited before the
+    /// transfer and restored if the transfer fails.
+    #[payable]
+    pub fn refund_unallocated(
+        &mut self,
+        group: GroupKey,
+        receiver: AccountId,
+        amount: U128,
+        doc_hash: Hash32,
+    ) -> Promise {
+        near_sdk::assert_one_yocto();
+        self.assert_registrar();
+        require!(
+            logic::is_hash32(&doc_hash),
+            "doc_hash must be 64 lowercase hex characters"
+        );
+        require!(
+            matches!(
+                self.works.get(&group.work_id).map(|w| &w.status),
+                Some(WorkStatus::Void { .. })
+            ),
+            "work is not void: use release_unallocated"
+        );
+        require!(amount.0 > 0, "amount must be positive");
+        require!(
+            receiver != self.registrar,
+            "the registrar cannot send escrow to itself"
+        );
+        require!(Self::has_gas_for_forwards(1), "not enough gas to transfer");
+        let g = self
+            .groups
+            .get_mut(&group)
+            .unwrap_or_else(|| env::panic_str("unknown group"));
+        require!(
+            amount.0 <= g.unallocated.0,
+            "amount exceeds unallocated escrow"
+        );
+        g.unallocated = U128(g.unallocated.0 - amount.0);
+        self.unallocated_total -= amount.0;
+        self.forwards_in_flight_total += amount.0;
+        Promise::new(self.usdc.clone())
+            .function_call(
+                "ft_transfer".to_string(),
+                json_bytes(json!({ "receiver_id": receiver, "amount": amount })),
+                NearToken::from_yoctonear(1),
+                GAS_FT_TRANSFER,
+            )
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FORWARD_CB)
+                    .on_unallocated_refunded(group, receiver, amount, doc_hash),
+            )
+    }
+
+    /// Settles a refund_unallocated. On failure the amount returns to the
+    /// group's unallocated escrow. Never panics.
+    #[private]
+    pub fn on_unallocated_refunded(
+        &mut self,
+        group: GroupKey,
+        receiver: AccountId,
+        amount: U128,
+        doc_hash: Hash32,
+    ) -> bool {
+        let ok = callback_result(64).is_some();
+        self.forwards_in_flight_total = self.forwards_in_flight_total.saturating_sub(amount.0);
+        if !ok {
+            if let Some(g) = self.groups.get_mut(&group) {
+                g.unallocated = U128(g.unallocated.0 + amount.0);
+            }
+            self.unallocated_total += amount.0;
+        }
+        emit(
+            "unallocated_refunded",
+            json!({ "group": group, "receiver": receiver, "amount": amount, "doc_hash": doc_hash, "ok": ok }),
+        );
+        ok
     }
 
     /// NEP-141 receiver. Only the configured token is accepted (T18).
@@ -406,13 +513,17 @@ impl Registry {
             .ok_or("no shares registered for this group")?;
         // Pending shares are not paid yet; their bps count as unassigned.
         // A dispute claimant is not paid; contested shares are paid into
-        // escrow (T11).
+        // escrow (T11), and so are shares still waiting for the work
+        // registrant's approval (review M2).
         let paid: Vec<(TokenId, u64, Bps, bool)> = group
             .shares
             .iter()
             .map(|t| (t, self.share(t)))
             .filter(|(_, s)| s.status == ShareStatus::Active && !self.is_claimant(s))
-            .map(|(t, s)| (t.clone(), s.number, s.percent_bps, s.dispute.is_some()))
+            .map(|(t, s)| {
+                let held = s.dispute.is_some() || !self.is_approved(t);
+                (t.clone(), s.number, s.percent_bps, held)
+            })
             .collect();
         if paid.is_empty() {
             return Err("no active shares in this group");
@@ -428,7 +539,13 @@ impl Registry {
         for ((token_id, _, _, frozen), credit) in paid.iter().zip(credits) {
             if *frozen {
                 self.escrow(token_id, credit);
-                escrowed.push(json!({ "token_id": token_id, "amount": U128(credit), "dispute_id": self.share(token_id).dispute }));
+                let dispute_id = self.share(token_id).dispute;
+                let reason = if dispute_id.is_some() {
+                    "dispute"
+                } else {
+                    "awaiting_approval"
+                };
+                escrowed.push(json!({ "token_id": token_id, "amount": U128(credit), "dispute_id": dispute_id, "reason": reason }));
             } else {
                 self.forward(token_id, credit);
                 lines.push(json!({ "token_id": token_id, "amount": U128(credit) }));
@@ -470,8 +587,10 @@ impl Registry {
         line: Option<&String>,
     ) -> Result<(), &'static str> {
         Self::check_statement(&p.period, &p.statement_hash, line)?;
-        if amount == 0 {
-            return Err("zero amount");
+        // Same floor as a group payment, so share payments cannot be used
+        // to spam dust events and forwards (review L8).
+        if amount < MIN_GROUP_PAYMENT {
+            return Err("below minimum share payment");
         }
         let share = self.shares.get(&p.token_id).ok_or("unknown share")?;
         if share.status != ShareStatus::Active {
@@ -487,8 +606,10 @@ impl Registry {
         if self.is_claimant(share) {
             return Err("share is a dispute claimant: not paid until resolve");
         }
-        let frozen = share.dispute;
-        if frozen.is_some() {
+        let dispute_id = share.dispute;
+        let awaiting = !self.is_approved(&p.token_id);
+        let frozen = dispute_id.is_some() || awaiting;
+        if frozen {
             self.escrow(&p.token_id, amount);
         } else {
             if !Self::has_gas_for_forwards(1) {
@@ -507,8 +628,8 @@ impl Registry {
                 "period": p.period,
                 "statement_hash": p.statement_hash,
                 "statement_line_id": line,
-                "credits": if frozen.is_none() { json!([{ "token_id": p.token_id, "amount": U128(amount) }]) } else { json!([]) },
-                "escrowed": if let Some(id) = frozen { json!([{ "token_id": p.token_id, "amount": U128(amount), "dispute_id": id }]) } else { json!([]) },
+                "credits": if frozen { json!([]) } else { json!([{ "token_id": p.token_id, "amount": U128(amount) }]) },
+                "escrowed": if frozen { json!([{ "token_id": p.token_id, "amount": U128(amount), "dispute_id": dispute_id, "reason": if awaiting { "awaiting_approval" } else { "dispute" } }]) } else { json!([]) },
             }),
         );
         Ok(())
