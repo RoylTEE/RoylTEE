@@ -305,7 +305,7 @@ Proves: T11, T24, T38 live (only the contested fraction is frozen; the registrar
 
 Write `deployments/testnet.json` with: account ids, public keys only, local sha256 of each wasm, on-chain code hashes, deploy and step transaction ids, CLI version, protocol version, commit hash, UTC timestamps. Add the NEAR spent to SPEND_LOG.md. Commit locally. This step was written on 2026-11-13 (UTC); see that file for the record.
 
-### Step 15. Redeploy the registry in place with the contract review fixes (DRAFT, not run, needs the owner's yes)
+### Step 15. Redeploy the registry in place with the contract review fixes (run on 2026-11-13 at 18:54 UTC, decision 100)
 
 Possible only while step 6 is parked (the registry's full-access key is still present). No migration and no init call: every review fix keeps the stored layout and keeps new data in its own storage slots (DESIGN.md section 19). Existing shares count as approved. Vaults are not touched (they cannot be); only vaults created after this step get the new vault code with `ft_on_transfer`.
 
@@ -328,13 +328,14 @@ Proves: the deployed state reads back unchanged under the new code. The same upg
 ```bash
 near contract call-function as-transaction $REG register_work \
   json-args "{\"code_type\":\"isrc\",\"code\":\"ZZRYL2600004\",\"title_hash\":\"$H_D\",\"provenance\":\"human\",\"metadata_uri\":\"\"}" \
-  prepaid-gas '30 Tgas' attached-deposit '0.05 NEAR' sign-as $WA $NET $SIGN          # expected work 3 (read the result), registered by WA
-share 3 $WA 5000                                                                     # by WA: approved
+  prepaid-gas '30 Tgas' attached-deposit '0.05 NEAR' sign-as $WA $NET $SIGN          # registered by WA; read work_id from the work_registered event
+WORK=<work_id from that event>                                                       # not 3: works 3, 4 and 5 are taken by demo writes W4, W7, W12 (decision 102)
+share $WORK $WA 5000                                                                    # by WA: approved
 near contract call-function as-transaction $REG register_share \
-  json-args "{\"work_id\":3,\"right_type\":\"publishing\",\"territory\":\"WW\",\"percent_bps\":5000,\"basis\":\"copyright\",\"holder\":\"$WB\",\"evidence_hash\":\"$H_E\"}" \
+  json-args "{\"work_id\":$WORK,\"right_type\":\"publishing\",\"territory\":\"WW\",\"percent_bps\":5000,\"basis\":\"copyright\",\"holder\":\"$WB\",\"evidence_hash\":\"$H_E\"}" \
   prepaid-gas '300 Tgas' attached-deposit '0.5 NEAR' sign-as $WB $NET $SIGN          # by WB: "approval":"pending"; read TOKEN from share_registered
 near contract call-function as-transaction $USDC ft_transfer_call \
-  json-args "{\"receiver_id\":\"$REG\",\"amount\":\"1000000\",\"msg\":\"{\\\"pay_work\\\":{\\\"work_id\\\":3,\\\"right_type\\\":\\\"publishing\\\",\\\"territory\\\":\\\"WW\\\",\\\"period\\\":\\\"2026-Q4\\\",\\\"statement_hash\\\":\\\"$H_F\\\",\\\"statement_line_id\\\":\\\"line-4\\\"}}\"}" \
+  json-args "{\"receiver_id\":\"$REG\",\"amount\":\"1000000\",\"msg\":\"{\\\"pay_work\\\":{\\\"work_id\\\":$WORK,\\\"right_type\\\":\\\"publishing\\\",\\\"territory\\\":\\\"WW\\\",\\\"period\\\":\\\"2026-Q4\\\",\\\"statement_hash\\\":\\\"$H_F\\\",\\\"statement_line_id\\\":\\\"line-4\\\"}}\"}" \
   prepaid-gas '300 Tgas' attached-deposit '1 yoctoNEAR' sign-as $PAYER $NET $SIGN    # WA's half forwarded; WB's half escrowed, reason awaiting_approval
 near contract call-function as-read-only $REG get_ledger json-args "{\"token_id\":\"$TOKEN\"}" $NET now   # escrowed 500000
 near contract call-function as-transaction $REG approve_share \
