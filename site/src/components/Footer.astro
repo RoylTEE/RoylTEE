@@ -1,67 +1,50 @@
 ---
 import Logo from './Logo.astro';
 import { DASHBOARD_URL, WHITEPAPER_URL, SOURCE_URL, PROJECT_NAME } from '../consts';
+import { REGISTRY, accountUrl } from '../data/testnet';
 const cols = [
-  { h: 'Product', l: [['How it works', '/#how'], ['Agent allowances', '/#agents'], ['Lifecycle', '/#lifecycle'], ['Trust and privacy', '/#trust']] },
-  { h: 'Resources', l: [['Whitepaper (placeholder)', WHITEPAPER_URL], ['Testnet dashboard (placeholder)', DASHBOARD_URL], ['Source code (placeholder)', SOURCE_URL], ['Help', '/help'], ['Contact support', '/help#support']] },
-  { h: 'Network', l: [['NEAR testnet', '/#notice'], ['Mock USDC (testnet)', '/#notice']] },
+  { h: 'Product', l: [['How it works', '/#how'], ['Catalog sale on testnet', '/#lifecycle'], ['Agent allowances', '/#agents'], ['Trust and privacy', '/#trust']] },
+  { h: 'Registry', l: [['Catalog', DASHBOARD_URL], ['Your shares', '/member'], ['Agents', '/agents'], ['Disputes', '/disputes']] },
+  { h: 'Support', l: [['Help chat', '/help#chat'], ['Contact support', '/help#support'], ['Whitepaper (placeholder)', WHITEPAPER_URL], ['Source code (placeholder)', SOURCE_URL]] },
 ];
 ---
-<section class="fx" aria-label="Closing call to action">
-  <div class="fx-card">
-    <img class="fx-art" src="/placeholder-hero.svg" alt="" aria-hidden="true" />
-    <div class="fx-shade"></div>
-    <div class="fx-body pad">
-      <p class="fx-big" data-split-lines>Every share.<br />One address.</p>
-      <a class="btn dark" href={DASHBOARD_URL}>Open testnet dashboard <span class="chip"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 8h10M9 4l4 4-4 4"/></svg></span></a>
-    </div>
-  </div>
-</section>
-<footer class="ft pad" id="notice">
+<footer class="site-foot" id="notice">
   <div class="container">
-    <div class="ft-top">
-      <div class="ft-brand">
+    <div class="foot-top">
+      <div class="foot-brand">
         <Logo />
-        <p class="muted">Built at NEAR HACKATHON.</p>
+        <p>A registry of music rights shares. Each share is an NFT that controls its own payout account.</p>
+        <a class="acct-link" href={accountUrl(REGISTRY)} rel="noopener" target="_blank">{REGISTRY}</a>
       </div>
       {cols.map((c) => (
-        <div class="ft-col">
-          <p class="ft-h">{c.h}</p>
+        <div class="foot-col">
+          <p class="eyebrow">{c.h}</p>
           <ul>{c.l.map(([t, h]) => <li><a href={h}>{t}</a></li>)}</ul>
         </div>
       ))}
     </div>
-    <div class="ft-notice">
-      <span class="tag-sim">Simulated</span>
-      <p>Testnet only. {PROJECT_NAME} runs on NEAR testnet. Payments use Mock USDC (testnet), a mock token with no value. Every number, work and account shown on this site is example data. This is not an investment product and nothing here is legal advice. Despite the name, the contracts use no trusted execution environment. The help chat can report a provider TEE flag from NEAR AI Cloud; attestation is not verified by this app.</p>
+    <div class="foot-notice">
+      <span class="badge sim">Simulated</span>
+      <p>{PROJECT_NAME} runs on NEAR testnet only. Payments use Mock USDC (testnet), a mock token with no value. Identity checks, payers and payer statements are Simulated. This is not an investment product, and nothing here is legal advice.</p>
     </div>
-    <div class="ft-bottom">
-      <span>Built at NEAR HACKATHON</span>
-      <span class="mono">network: testnet</span>
-    </div>
+    <div class="foot-bottom"><span>Built at NEAR HACKATHON</span><span class="mono foot-net">network: testnet</span></div>
   </div>
 </footer>
 <style>
-  .fx { padding: 0 .5rem; background: var(--bg); }
-  .fx-card { position: relative; overflow: hidden; border-radius: var(--r-md); min-height: 34rem; display: flex; align-items: flex-end; }
-  .fx-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .fx-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(247,246,242,0) 40%, rgba(247,246,242,.55)); }
-  .fx-body { position: relative; width: 100%; padding-top: 4rem; padding-bottom: 3rem; }
-  .fx-big { font-size: clamp(3rem, 9.4vw, 8.7rem); line-height: .85; font-weight: 500; letter-spacing: -.02em; margin-bottom: 2.5rem; color: var(--ink); }
-  .ft { padding-top: 5rem; padding-bottom: 2rem; background: var(--ink); color: var(--ink-text); margin-top: .5rem; border-radius: var(--r-md) var(--r-md) 0 0; }
-  .ft-brand { color: #fff; }
-  .ft-top { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 2rem; }
-  .ft-brand p { margin-top: 1rem; font-size: .9rem; max-width: 18rem; color: #a7a295; }
-  .ft-h { font-family: var(--mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--amber2); margin-bottom: 1rem; }
-  .ft-col ul { list-style: none; margin: 0; padding: 0; display: grid; gap: .55rem; font-size: .9rem; color: var(--ink-text); }
-  .ft-col a { transition: color .2s; }
-  .ft-col a:hover { color: #fff; }
-  .ft-notice { display: flex; gap: 1rem; align-items: flex-start; margin-top: 4rem; padding: 1.25rem; border: 1px solid #3a362c; border-radius: var(--r-xs); color: #a7a295; font-size: .85rem; }
-  .ft-bottom { display: flex; justify-content: space-between; margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid #3a362c; font-size: .8rem; color: #8d887c; }
+  .site-foot { margin-top: var(--s9); border-top: 1px solid var(--edge); background: var(--surface); padding: var(--s8) 0 var(--s5); }
+  .foot-top { display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); gap: var(--s6); }
+  .foot-brand { display: grid; gap: var(--s3); align-content: start; }
+  .foot-brand p { font-size: var(--fs-14); color: var(--muted); max-width: 20rem; }
+  .foot-col ul { list-style: none; margin: var(--s3) 0 0; padding: 0; display: grid; }
+  .foot-col a { display: inline-flex; align-items: center; min-height: 2.25rem; font-size: var(--fs-14); color: var(--muted); text-decoration: none; }
+  .foot-col a:hover { color: var(--text); text-decoration: underline; text-underline-offset: 3px; }
+  .foot-notice { display: flex; gap: var(--s3); align-items: flex-start; margin-top: var(--s7); padding: var(--s4); border: 1px solid var(--rule); border-radius: var(--r-ctl); font-size: var(--fs-14); color: var(--muted); }
+  .foot-bottom { display: flex; justify-content: space-between; gap: var(--s4); margin-top: var(--s5); font-size: var(--fs-12); color: var(--dim); }
   @media (max-width: 767px) {
-    .ft-top { grid-template-columns: 1fr 1fr; }
-    .ft-brand { grid-column: 1 / -1; }
-    .ft-notice { flex-direction: column; }
-    .fx-card { min-height: 26rem; }
+    .foot-top { grid-template-columns: 1fr 1fr; }
+    .foot-brand { grid-column: 1 / -1; }
+    .foot-col a { min-height: 2.75rem; }
+    .foot-notice { flex-direction: column; }
   }
+  .foot-net { font-size: var(--fs-12); }
 </style>

@@ -1,201 +1,59 @@
 ---
 import Logo from './Logo.astro';
-import { DASHBOARD_URL, WHITEPAPER_URL, SOURCE_URL } from '../consts';
-const menus = [
-  {
-    key: 'product', label: 'Product',
-    intro: { title: 'The share registry', text: 'Each rights share is a token that controls its own payout vault. The vault has no keys.', href: '/#how', cta: 'See how it works' },
-    links: [
-      { t: 'Share vaults', d: 'One payout address per share', href: '/#how' },
-      { t: 'Payments', d: 'Pay a work once, split by basis points', href: '/#how' },
-      { t: 'Agent allowances', d: 'Capped spending for software payers', href: '/#agents' },
-      { t: 'Catalog sale', d: 'The payout follows the token', href: '/#lifecycle' },
-    ],
-  },
-  {
-    key: 'trust', label: 'Trust',
-    intro: { title: 'Trust and privacy', text: 'What the registrar can and cannot do, and what stays off chain.', href: '/#trust', cta: 'Read the trust model' },
-    links: [
-      { t: 'Zero key vaults', d: 'Only the registry contract moves money', href: '/#trust' },
-      { t: 'Registrar limits', d: 'Every power needs a document hash', href: '/#trust' },
-      { t: 'Disputes', d: 'Contested money is held, not guessed', href: '/#trust' },
-      { t: 'Privacy', d: 'Statements stay off chain', href: '/#trust' },
-    ],
-  },
-  {
-    key: 'resources', label: 'Resources',
-    intro: { title: 'Design whitepaper', text: 'The problem, the mechanism and why it works. Placeholder link.', href: WHITEPAPER_URL, cta: 'Open the whitepaper' },
-    links: [
-      { t: 'Whitepaper', d: 'Placeholder', href: WHITEPAPER_URL },
-      { t: 'Testnet dashboard', d: 'Placeholder link', href: DASHBOARD_URL },
-      { t: 'Source code', d: 'Placeholder link', href: SOURCE_URL },
-    ],
-  },
+import { DASHBOARD_URL } from '../consts';
+interface Props { current?: string }
+const { current = '' } = Astro.props;
+/* Navigation by job: learn how it works, look up the registry, act on your own shares, get help. */
+const links = [
+  { key: 'how', t: 'How it works', href: '/#how' },
+  { key: 'registry', t: 'Registry', href: DASHBOARD_URL },
+  { key: 'member', t: 'Your shares', href: '/member' },
+  { key: 'help', t: 'Help', href: '/help' },
 ];
 ---
-<header class="nav-wrap" data-nav>
-  <div class="nav pad-none">
-    <a href="/" class="nav-logo" aria-label="Home"><Logo /></a>
-    <nav class="nav-menu" aria-label="Main">
-      {menus.map((m) => (
-        <div class="dd" data-dd>
-          <button class="dd-toggle" aria-expanded="false" aria-controls={`dd-${m.key}`}>
-            {m.label}
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2 3.5l3 3 3-3"/></svg>
-          </button>
-          <div class="dd-panel" id={`dd-${m.key}`}>
-            <div class="dd-inner">
-              <div class="dd-cols">
-                <div class="dd-col">
-                  <p class="dd-colh">{m.label}</p>
-                  <ul class="dd-links">
-                    {m.links.map((l) => (
-                      <li><a href={l.href}><span class="dd-ico"></span><span><span class="dd-t">{l.t}</span><span class="dd-d">{l.d}</span></span></a></li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-              <a class="dd-feature" href={m.intro.href}>
-                <span class="dd-thumb frame gridbg"><span class="tag-mono">Preview</span></span>
-                <span class="dd-intro-t">{m.intro.title}</span>
-                <span class="dd-intro-d">{m.intro.text}</span>
-                <span class="link-arrow"><span class="link-line">{m.intro.cta}</span><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8h10M9 4l4 4-4 4"/></svg></span>
-              </a></div>
-          </div>
-        </div>
-      ))}
-      <a class="nav-link" href={WHITEPAPER_URL}>Whitepaper</a>
+<header class="site-head">
+  <div class="container head-row">
+    <a href="/" class="head-logo" aria-label="Home"><Logo /></a>
+    <nav class="head-nav" aria-label="Main">
+      {links.map((l) => <a href={l.href} aria-current={current === l.key ? 'page' : undefined}>{l.t}</a>)}
     </nav>
-    <div class="nav-cta">
-      <a class="btn no-chip nav-btn" href={DASHBOARD_URL}>Open testnet dashboard</a>
-      <button class="burger" aria-label="Open menu" aria-expanded="false" data-burger><span></span><span></span></button>
+    <div class="head-end">
+      <span class="badge ok net">NEAR testnet</span>
+      <a class="btn primary head-cta" href={DASHBOARD_URL}>Open the registry</a>
+      <button class="menu-btn" type="button" aria-expanded="false" aria-controls="mobile-menu" data-menu-btn>
+        <span class="sr">Menu</span><span class="bars" aria-hidden="true"></span>
+      </button>
     </div>
   </div>
-  <div class="mnav" data-mnav hidden>
-    <div class="mnav-track" data-mtrack>
-      <div class="mnav-panel" data-mmain>
-        {menus.map((m) => (
-          <button class="mnav-link" data-sub={m.key}>{m.label}<span>&rsaquo;</span></button>
-        ))}
-        <a class="mnav-link" href={WHITEPAPER_URL}>Whitepaper</a>
-        <a class="btn no-chip dark" href={DASHBOARD_URL}>Open testnet dashboard</a>
-      </div>
-      <div class="mnav-panel">
-        <button class="mnav-link is-back" data-back><span>&lsaquo;</span> Back</button>
-        {menus.map((m) => (
-          <div class="mnav-sub" data-subpanel={m.key} hidden>
-            <p class="eyebrow">{m.label}</p>
-            {m.links.map((l) => (<a class="mnav-link" href={l.href}>{l.t}</a>))}
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
+  <nav class="mobile-menu" id="mobile-menu" aria-label="Main" hidden data-menu>
+    {links.map((l) => <a href={l.href} aria-current={current === l.key ? 'page' : undefined}>{l.t}</a>)}
+    <a class="btn primary" href={DASHBOARD_URL}>Open the registry</a>
+  </nav>
 </header>
-
 <style>
-  .nav-wrap { position: sticky; top: 0; z-index: 50; padding: .75rem; transition: padding .35s var(--ease-ui); }
-  .nav {
-    display: grid; grid-template-columns: .375fr 1fr .375fr; align-items: center; gap: 1rem;
-    max-width: 90rem; margin: 0 auto; padding: .75rem .75rem .75rem 1.25rem; border-radius: var(--r-nav);
-    transition: background-color .35s, box-shadow .35s;
-  }
-  .nav-wrap.is-scrolled { padding: 1.25rem 1.75rem; }
-  .nav-wrap.is-scrolled .nav { background: var(--panel2); box-shadow: var(--shadow-soft); }
-  .nav-menu { display: flex; justify-content: center; align-items: center; }
-  .dd-toggle, .nav-link {
-    display: flex; align-items: center; gap: .5rem; padding: .75rem 1rem; background: none; border: 0;
-    color: var(--text); font: inherit; font-size: 1rem; letter-spacing: -.02em; cursor: pointer; transition: color .2s;
-  }
-  .dd-toggle:hover, .nav-link:hover, .dd.open .dd-toggle { color: var(--amber-ink); }
-  .dd-toggle svg { transition: transform .3s ease; }
-  .dd.open .dd-toggle svg { transform: rotate(180deg); }
-  .dd-panel {
-    position: absolute; left: 0; right: 0; top: calc(100% - .5rem); padding: .5rem .75rem 0;
-    opacity: 0; visibility: hidden; transform: translateY(-6px); transition: opacity .25s ease, transform .3s ease, visibility .3s;
-  }
-  .nav-wrap.is-scrolled .dd-panel { padding-left: 1.75rem; padding-right: 1.75rem; }
-  .dd.open .dd-panel { opacity: 1; visibility: visible; transform: none; }
-  .dd-inner { max-width: 90rem; margin: 0 auto; display: flex; background: var(--panel); border-radius: var(--r-nav); box-shadow: var(--shadow-soft), 0 0 0 1px var(--line); }
-  .dd-cols { flex: 1; padding: 1.5rem 0 1.5rem 1.5rem; display: grid; grid-template-columns: 1fr; }
-  .dd-col { border-left: 1px solid var(--line); padding: 0 4.5rem 0 1.5rem; }
-  .dd-colh { font-family: var(--mono); font-size: .7rem; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); margin-bottom: 1rem; }
-  .dd-links { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: .85rem 2rem; }
-  .dd-links a { display: flex; gap: .75rem; align-items: flex-start; padding: .25rem 0; }
-  .dd-ico { width: 8px; height: 8px; margin-top: .45rem; border: 1px solid var(--line3); transform: rotate(45deg); flex: none; transition: background-color .2s, border-color .2s; }
-  .dd-links a:hover .dd-ico { background: var(--amber); border-color: var(--amber); }
-  .dd-links a:hover .dd-t { color: var(--amber-ink); }
-  .dd-t { display: block; font-weight: 500; transition: color .2s; }
-  .dd-d { display: block; color: var(--dim); font-size: .875rem; }
-  .dd-feature { width: 20rem; flex: none; padding: 1.5rem; display: flex; flex-direction: column; gap: .6rem; border-left: 1px solid var(--line); }
-  .dd-thumb { display: block; height: 8.5rem; margin-bottom: .4rem; }
-  .dd-intro-t { font-size: 1.125rem; font-weight: 500; line-height: 1.3; }
-  .dd-intro-d { color: var(--muted); font-size: .875rem; }
-  .dd-feature .link-arrow { font-size: .875rem; margin-top: .25rem; }
-  .nav-cta { display: flex; justify-content: flex-end; align-items: center; gap: .75rem; }
-  .nav-btn { white-space: nowrap; background: var(--bg2); }
-  .nav-wrap.is-scrolled .nav-btn { background: var(--ink); color: #fff; }
-  .nav-wrap.is-scrolled .nav-btn:hover { background: var(--amber); color: #2a1a00; }
-  .burger { display: none; width: 44px; height: 44px; border: 0; border-radius: 10px; background: transparent; cursor: pointer; position: relative; }
-  .burger span { position: absolute; left: 10px; right: 10px; height: 2px; background: var(--text); transition: transform .3s ease, top .3s ease; }
-  .burger span:first-child { top: 17px; } .burger span:last-child { top: 26px; }
-  .burger[aria-expanded="true"] span:first-child { top: 21px; transform: rotate(45deg); }
-  .burger[aria-expanded="true"] span:last-child { top: 21px; transform: rotate(-45deg); }
-  .mnav { overflow: hidden; margin-top: .5rem; background: var(--panel); border-radius: var(--r-md); box-shadow: var(--shadow-soft), 0 0 0 1px var(--line); }
-  .mnav-track { display: flex; width: 200%; }
-  .mnav-panel { width: 50%; padding: 1rem; display: flex; flex-direction: column; gap: .25rem; }
-  .mnav-panel .btn { margin-top: 1rem; justify-content: center; }
-  .mnav-link { display: flex; justify-content: space-between; align-items: center; padding: .9rem .5rem; font: inherit; font-size: 1.1rem; color: var(--text); background: none; border: 0; border-bottom: 1px solid var(--line); text-align: left; cursor: pointer; }
-  .mnav-link.is-back { justify-content: flex-start; gap: .5rem; color: var(--muted); }
-  .mnav-sub .eyebrow { margin: .75rem .5rem .25rem; }
+  .site-head { position: sticky; top: 0; z-index: 40; background: rgba(247,246,242,.96); border-bottom: 1px solid var(--rule); }
+  .head-row { display: flex; align-items: center; gap: var(--s6); min-height: 4rem; }
+  .head-logo { text-decoration: none; display: inline-flex; min-height: 2.75rem; align-items: center; }
+  .head-nav { display: flex; gap: var(--s1); }
+  .head-nav a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 .8rem; border-radius: var(--r-ctl); text-decoration: none; font-size: var(--fs-14); font-weight: 500; color: var(--muted); }
+  .head-nav a:hover { color: var(--text); background: var(--paper-2); }
+  .head-nav a[aria-current="page"] { color: var(--text); box-shadow: inset 0 -2px 0 var(--ink); border-radius: 0; }
+  .head-end { margin-left: auto; display: flex; align-items: center; gap: var(--s3); }
+  .menu-btn { display: none; width: 2.75rem; height: 2.75rem; border: 1px solid var(--edge); border-radius: var(--r-ctl); background: var(--surface); cursor: pointer; position: relative; }
+  .bars, .bars::before, .bars::after { position: absolute; left: .8rem; right: .8rem; height: 2px; background: var(--ink); content: ''; }
+  .bars { top: 50%; margin-top: -1px; } .bars::before { left: 0; right: 0; top: -6px; } .bars::after { left: 0; right: 0; top: 6px; }
+  .menu-btn[aria-expanded="true"] .bars { background: transparent; }
+  .menu-btn[aria-expanded="true"] .bars::before { top: 0; transform: rotate(45deg); }
+  .menu-btn[aria-expanded="true"] .bars::after { top: 0; transform: rotate(-45deg); }
+  .mobile-menu { display: grid; padding: var(--s2) var(--gutter) var(--s4); border-top: 1px solid var(--rule); background: var(--surface); box-shadow: var(--shadow-2); }
+  .mobile-menu[hidden] { display: none; }
+  .mobile-menu a:not(.btn) { display: flex; align-items: center; min-height: 3rem; border-bottom: 1px solid var(--rule); text-decoration: none; font-size: var(--fs-16); font-weight: 500; }
+  .mobile-menu a[aria-current="page"] { box-shadow: inset 3px 0 0 var(--amber); padding-left: .75rem; }
+  .mobile-menu .btn { margin-top: var(--s4); }
   @media (max-width: 991px) {
-    .nav { grid-template-columns: 1fr auto; padding-left: 1rem; background: var(--panel2); box-shadow: var(--shadow-soft); }
-    .nav-menu { display: none; }
-    .burger { display: block; }
-    .nav-btn { border: 1.5px solid var(--ink); background: var(--bg2); }
+    .head-nav, .head-cta { display: none; }
+    .menu-btn { display: block; }
   }
-  @media (max-width: 479px) { .nav-btn { display: none; } }
+  @media (max-width: 479px) { .net { display: none; } }
 </style>
-
-<script>
-  import { gsap } from 'gsap';
-  const wrap = document.querySelector<HTMLElement>('[data-nav]')!;
-  const onScroll = () => wrap.classList.toggle('is-scrolled', window.scrollY > 24);
-  onScroll();
-  window.addEventListener('scroll', onScroll, { passive: true });
-
-  // Desktop mega menu: opens on hover with a short close delay, and on click or keyboard.
-  document.querySelectorAll<HTMLElement>('[data-dd]').forEach((dd) => {
-    const btn = dd.querySelector<HTMLButtonElement>('.dd-toggle')!;
-    let t: number | undefined;
-    const set = (open: boolean) => {
-      document.querySelectorAll('[data-dd].open').forEach((o) => { if (o !== dd) { o.classList.remove('open'); o.querySelector('.dd-toggle')?.setAttribute('aria-expanded', 'false'); } });
-      dd.classList.toggle('open', open); btn.setAttribute('aria-expanded', String(open));
-    };
-    dd.addEventListener('mouseenter', () => { clearTimeout(t); set(true); });
-    dd.addEventListener('mouseleave', () => { t = window.setTimeout(() => set(false), 200); });
-    btn.addEventListener('click', () => set(!dd.classList.contains('open')));
-    dd.addEventListener('keydown', (e) => { if (e.key === 'Escape') { set(false); btn.focus(); } });
-  });
-
-  // Mobile menu: a two panel track. Opening a submenu slides the track left.
-  const burger = document.querySelector<HTMLButtonElement>('[data-burger]')!;
-  const mnav = document.querySelector<HTMLElement>('[data-mnav]')!;
-  const track = document.querySelector<HTMLElement>('[data-mtrack]')!;
-  const main = document.querySelector<HTMLElement>('[data-mmain]')!;
-  const tl = gsap.timeline({ paused: true })
-    .to(track, { xPercent: -50, duration: 0.4, ease: 'power1.inOut' }, 0)
-    .to(main, { opacity: 0, duration: 0.25, ease: 'power1.out' }, 0);
-  burger.addEventListener('click', () => {
-    const open = burger.getAttribute('aria-expanded') !== 'true';
-    burger.setAttribute('aria-expanded', String(open));
-    mnav.hidden = !open;
-    if (!open) tl.progress(0).pause();
-  });
-  document.querySelectorAll<HTMLButtonElement>('[data-sub]').forEach((b) => b.addEventListener('click', () => {
-    document.querySelectorAll<HTMLElement>('[data-subpanel]').forEach((p) => { p.hidden = p.dataset.subpanel !== b.dataset.sub; });
-    tl.play();
-  }));
-  document.querySelector('[data-back]')!.addEventListener('click', () => tl.reverse());
-  mnav.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => { burger.click(); }));
-</script>
+<script>import '../scripts/nav.ts';</script>
