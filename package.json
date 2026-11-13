@@ -1,0 +1,12 @@
+{
+  "name": "rights-share-registry",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build:wasm": "bash scripts/build-wasm.sh",
+    "test": "npm run build:wasm && cargo test --workspace",
+    "test:unit": "cargo test --workspace --exclude sandbox_tests",
+    "test:sandbox": "npm run build:wasm && cargo test -p sandbox_tests -- --nocapture",
+    "lint": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && RUSTFLAGS='--cfg near' cargo clippy -p vault -p registry -p mock_usdc -p test_receiver --target wasm32-unknown-unknown --target-dir target/wasm -- -D warnings"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "projectName": "RoylTEE",
+  "nftSymbol": "RRS",
+  "mockTokenName": "Mock USDC (testnet)",
+  "mockTokenSymbol": "mUSDC",
+  "mockTokenDecimals": 6,
+  "eventStandard": "share_registry",
+  "eventVersion": "1.0.0",
+  "isPlaceholder": true
+}
