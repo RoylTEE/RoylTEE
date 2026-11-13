@@ -115,3 +115,74 @@ async fn a03_stranger_cannot_initialise_a_fresh_deploy() -> anyhow::Result<()> {
     check(c.call("new").args_json(args).transact().await?);
     Ok(())
 }
+
+/// Audit F1: a direct work payment to the largest group (16 shares) fits
+/// in the 300 Tgas that most wallets and the deploy plan attach to one
+/// transaction. Before the fix each forward reserved 8 + 10 Tgas, so 16
+/// forwards needed 298 Tgas inside `ft_on_transfer` and the payment was
+/// refused. Also measures the gas each forward really burns against the
+/// per forward reservations.
+#[tokio::test]
+async fn a04_full_group_of_16_is_paid_with_300_tgas() -> anyhow::Result<()> {
+    let e = setup().await?;
+    let w = e.register_work("USRC12600001").await?;
+    let mut shares = Vec::new();
+    for _ in 0..16 {
+        shares.push(e.mint(w, e.writer_a.id(), 625).await?);
+    }
+    let r = e
+        .pay_work_with_gas(w, 1_600_007, near_workspaces::types::Gas::from_tgas(300))
+        .await?;
+    let usdc = e.usdc.id().to_string();
+    let reg = e.reg.id().to_string();
+    let transfer_gas: Vec<u64> = r
+        .receipt_outcomes()
+        .iter()
+        .filter(|o| {
+            o.executor_id.as_str() == usdc
+                && o.logs.iter().any(|l| {
+                    l.contains("ft_transfer") && l.contains(&format!("\"old_owner_id\":\"{reg}\""))
+                })
+        })
+        .map(|o| o.gas_burnt.as_gas())
+        .collect();
+    let forward_cb_gas: Vec<u64> = r
+        .receipt_outcomes()
+        .iter()
+        .filter(|o| o.executor_id.as_str() == reg && o.logs.is_empty())
+        .map(|o| o.gas_burnt.as_gas())
+        .collect();
+    let max = |v: &Vec<u64>| v.iter().copied().max().unwrap_or(0) as f64 / 1e12;
+    println!(
+        "16-share payment at 300 Tgas: gas burnt {} Tgas, success {}, ft_transfer max {:.3} Tgas over {}, on_forward max {:.3} Tgas over {}",
+        r.total_gas_burnt.as_tgas(),
+        r.is_success(),
+        max(&transfer_gas),
+        transfer_gas.len(),
+        max(&forward_cb_gas),
+        forward_cb_gas.len()
+    );
+    let r = ok(r);
+    assert!(
+        !r.logs().iter().any(|l| l.contains("payment_refused")),
+        "must not be refused at 300 Tgas"
+    );
+    assert!(!r.logs().iter().any(|l| l.contains("forward_failed")));
+    let mut sum = 0;
+    for s in &shares {
+        sum += e.balance(&e.vault(s)).await?;
+    }
+    assert_eq!(sum, 1_600_007);
+    assert_eq!(transfer_gas.len(), 16);
+    assert_eq!(forward_cb_gas.len(), 16);
+    // Reservations per forward: GAS_FT_TRANSFER and GAS_FORWARD_CB (lib.rs).
+    assert!(
+        max(&transfer_gas) < 6.0,
+        "ft_transfer within its reservation"
+    );
+    assert!(
+        max(&forward_cb_gas) < 6.0,
+        "on_forward within its reservation"
+    );
+    e.assert_solvent().await
+}

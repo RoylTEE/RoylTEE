@@ -273,14 +273,39 @@ impl Env {
     }
 
     async fn ft_call(&self, amount: u128, msg: Value) -> anyhow::Result<ExecutionFinalResult> {
+        self.ft_call_with_gas(amount, msg, Gas::from_tgas(1_000))
+            .await
+    }
+
+    async fn ft_call_with_gas(
+        &self,
+        amount: u128,
+        msg: Value,
+        gas: Gas,
+    ) -> anyhow::Result<ExecutionFinalResult> {
         Ok(self
             .payer
             .call(self.usdc.id(), "ft_transfer_call")
             .args_json(json!({ "receiver_id": self.reg.id(), "amount": amount.to_string(), "msg": msg.to_string() }))
             .deposit(ONE_YOCTO)
-            .max_gas()
+            .gas(gas)
             .transact()
             .await?)
+    }
+
+    /// A work payment with a fixed amount of gas, for example the 300 Tgas
+    /// that most wallets and the deploy plan attach (audit F1).
+    pub async fn pay_work_with_gas(
+        &self,
+        work_id: u64,
+        amount: u128,
+        gas: Gas,
+    ) -> anyhow::Result<ExecutionFinalResult> {
+        let msg = json!({ "pay_work": {
+            "work_id": work_id, "right_type": "publishing", "territory": "WW",
+            "period": "2026-Q3", "statement_hash": hash('f'), "statement_line_id": "line-300",
+        }});
+        self.ft_call_with_gas(amount, msg, gas).await
     }
 
     pub async fn claim(

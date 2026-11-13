@@ -734,21 +734,25 @@ fn r03a_l5_approve_before_any_payment_sends_nothing() {
     assert!(get_logs().join("\n").contains("\"released\":\"0\""));
 }
 
-/// Review 03a L4: each forward reserves GAS_FT_TRANSFER + GAS_FORWARD_CB
-/// (8 + 10 Tgas) plus 10 Tgas once. With 100 Tgas prepaid (the agent
-/// calls in the deploy plan) at most 5 forwards fit before any gas is
-/// used, so 4 in practice; with 300 Tgas, the 16-share maximum fits.
+/// Review 03a L4 and audit F1: each forward reserves GAS_FT_TRANSFER +
+/// GAS_FORWARD_CB (5 + 10 Tgas) plus GAS_FORWARD_BASE (10 Tgas) once.
+/// With 100 Tgas prepaid (the agent calls in the deploy plan) 6 forwards
+/// would need exactly 100 Tgas, so at most 5 fit once any gas is used
+/// (sandbox t13b also pays 5). The 16-share maximum fits in what
+/// a 300 Tgas payment leaves after PAYMENT_OVERHEAD_GAS.
 #[test]
 fn r03a_l4_forward_gas_reservation_per_share() {
     let per = GAS_FT_TRANSFER.as_gas() + GAS_FORWARD_CB.as_gas();
-    assert_eq!(per, Gas::from_tgas(18).as_gas());
+    assert_eq!(per, Gas::from_tgas(15).as_gas());
     testing_env!(ctx(&acc("x.near"), NearToken::from_yoctonear(0))
         .prepaid_gas(Gas::from_tgas(100))
         .build());
-    assert!(Registry::has_gas_for_forwards(4));
+    assert!(Registry::has_gas_for_forwards(5));
     assert!(!Registry::has_gas_for_forwards(6));
     testing_env!(ctx(&acc("x.near"), NearToken::from_yoctonear(0))
-        .prepaid_gas(Gas::from_tgas(300))
+        .prepaid_gas(Gas::from_gas(
+            PAYMENT_TX_GAS.as_gas() - PAYMENT_OVERHEAD_GAS.as_gas()
+        ))
         .build());
     assert!(Registry::has_gas_for_forwards(MAX_SHARES_PER_GROUP));
 }

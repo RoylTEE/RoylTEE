@@ -80,9 +80,31 @@ pub const GAS_VAULT_READY_CB: Gas = Gas::from_tgas(20);
 pub const GAS_MEMBER_CB: Gas = Gas::from_tgas(5);
 pub const GAS_WITHDRAW: Gas = Gas::from_tgas(20);
 pub const GAS_CLAIM_CB: Gas = Gas::from_tgas(10);
-pub const GAS_FT_TRANSFER: Gas = Gas::from_tgas(8);
-/// Measured use about 2.2 Tgas (2.151 in sandbox test r03); raised from 5 for margin.
+/// Gas for one registry `ft_transfer` to the token. Measured use about
+/// 1.7 Tgas (1.736 in sandbox test a04); lowered from 8 so the largest
+/// group fits in one 300 Tgas payment (audit F1). If it runs out, the
+/// forward fails, the amount is kept as `undelivered` and `retry_forward`
+/// can send it again.
+pub const GAS_FT_TRANSFER: Gas = Gas::from_tgas(5);
+/// Measured use about 2.2 Tgas (2.151 in sandbox tests r03 and a04); raised from 5 for margin.
+/// Kept at 10 because a lost `on_forward` is not recoverable (THREAT_MODEL T19).
 pub const GAS_FORWARD_CB: Gas = Gas::from_tgas(10);
+/// Gas reserved once per payment on top of the per-forward reservations.
+pub const GAS_FORWARD_BASE: Gas = Gas::from_tgas(10);
+/// Gas most wallets and the deploy plan attach to one transaction.
+pub const PAYMENT_TX_GAS: Gas = Gas::from_tgas(300);
+/// Gas a payment spends outside the forwards: the token's own
+/// `ft_transfer_call` work and its 5 Tgas `ft_resolve_transfer`, plus the
+/// registry's checks and split. A whole refused 16-share payment at 300 Tgas
+/// burnt 10 Tgas in sandbox test a04, so 40 leaves margin.
+pub const PAYMENT_OVERHEAD_GAS: Gas = Gas::from_tgas(40);
+// Audit F1: the largest group must fit in one 300 Tgas payment.
+const _: () = assert!(
+    MAX_SHARES_PER_GROUP as u64 * (GAS_FT_TRANSFER.as_gas() + GAS_FORWARD_CB.as_gas())
+        + GAS_FORWARD_BASE.as_gas()
+        + PAYMENT_OVERHEAD_GAS.as_gas()
+        <= PAYMENT_TX_GAS.as_gas()
+);
 pub const GAS_FT_BALANCE: Gas = Gas::from_tgas(5);
 pub const GAS_SYNC_CB: Gas = Gas::from_tgas(5);
 pub const GAS_NFT_ON_TRANSFER_MIN: Gas = Gas::from_tgas(25);

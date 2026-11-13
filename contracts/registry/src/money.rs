@@ -480,7 +480,7 @@ impl Registry {
 
     pub(crate) fn has_gas_for_forwards(n: usize) -> bool {
         let need = (GAS_FT_TRANSFER.as_gas() + GAS_FORWARD_CB.as_gas()) * n as u64
-            + Gas::from_tgas(10).as_gas();
+            + GAS_FORWARD_BASE.as_gas();
         env::prepaid_gas()
             .as_gas()
             .saturating_sub(env::used_gas().as_gas())

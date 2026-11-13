@@ -514,7 +514,8 @@ async fn t13_allowance_work_payment_splits_exactly() -> anyhow::Result<()> {
 
 /// Review 03a L4: the largest group an agent can pay with 100 Tgas, the
 /// gas the deploy plan attaches to agent calls (a 0.25 NEAR function-call
-/// allowance does not cover 300 Tgas). Each forward reserves 18 Tgas.
+/// allowance does not cover 300 Tgas). Each forward reserves 15 Tgas
+/// (5 for the token transfer, 10 for the callback; audit F1).
 /// A group one share larger is refused before any debit.
 #[tokio::test]
 async fn t13b_agent_group_size_at_100_tgas() -> anyhow::Result<()> {
@@ -537,7 +538,7 @@ async fn t13b_agent_group_size_at_100_tgas() -> anyhow::Result<()> {
         }
     };
     let mut largest = 0;
-    for n in 1..=6u16 {
+    for n in 1..=8u16 {
         let w = e.register_work(&format!("USRC1260010{n}")).await?;
         for i in 0..n {
             let bps = if i == 0 {
@@ -567,7 +568,7 @@ async fn t13b_agent_group_size_at_100_tgas() -> anyhow::Result<()> {
         }
     }
     println!("largest group an agent pays at 100 Tgas: {largest}");
-    assert_eq!(largest, 4);
+    assert_eq!(largest, 5);
     e.assert_solvent().await
 }
 
