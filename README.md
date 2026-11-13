@@ -52,11 +52,11 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 | 5 | Optional: `npm run lint` | `cargo fmt --check`, then `cargo clippy -D warnings` for the host and wasm targets; ends with `Finished` and exit code 0. |
 | 6 | Open the explorer links under [Live testnet deployment](#live-testnet-deployment) | The same accounts, the catalog sale transfer of `s2`, the refused outsider claim, the agent payment and the dispute, on NEAR testnet. |
 | 7 | Site (in `site/`): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest: `Test Files  18 passed (18)` and `Tests  219 passed (219)`; `astro check`: `0 errors`; a build in `site/.vercel/output`. |
-| 8 | Site, local: `npm run dev` (in `site/`), then open http://127.0.0.1:4321 | The landing page, `/dashboard/`, `/help`, `/whitepaper`. `/admin` answers 401 when not signed in. Without server secrets the help chat and support API answer 503 ("not configured yet"). `site/README.md` explains how to run the API locally with in-memory storage. |
+| 8 | Site, local: `npm run dev` (in `site/`), then open http://127.0.0.1:4321 | The pages listed under [Website and help chat](#website-and-help-chat). `/admin` answers 401 when not signed in. Without server secrets the help chat and support API answer 503 ("not configured yet"). `site/README.md` explains how to run the API locally with in-memory storage. |
 
 Hosted site: https://royltee.vercel.app (UNVERIFIED: which commit it runs, its live security headers, whether chat and support are configured, and whether a wallet sign-in works there have not been checked yet. **Pre-submission item:** check it in a private window and record the result here.)
 
-The contract numbers above (steps 2 to 5) come from running these commands on 2026-11-13 (UTC) on branch code that is NOT yet deployed (see [Live testnet deployment](#live-testnet-deployment)). Steps 7 and 8 were run on the merged tree (contract, server and UI branches) on 2026-11-13 (UTC): 219 site tests in 18 files.
+The contract numbers above (steps 2 to 5) come from running these commands on 2026-11-13 (UTC) on branch code that is NOT yet deployed (see [Live testnet deployment](#live-testnet-deployment)). Steps 7 and 8 were run on the merged tree (contract, server and UI branches) on 2026-11-13 (UTC): 219 site tests in 18 files; on the local dev server every page answered 200, `/admin` answered 401, and the chat and ticket API answered 503 without server secrets.
 
 ## The problem
 
@@ -263,8 +263,34 @@ See: `"keys":[]` in the result.
 
 The site is an Astro app in `site/`, hosted at https://royltee.vercel.app (hosted state UNVERIFIED, see the note under Steps). This section describes the site on the merged tree (contract, server and UI branches).
 
-- Pages: `/` (landing), `/dashboard/` (dashboard), `/help` (help chat and wallet support tickets), `/whitepaper` (placeholder), `/admin` (support admin, server-checked).
-- The landing page and dashboard show **Simulated** example data. They do not read the testnet contracts yet; the live chain state is what `npm run verify:testnet` and the explorer links above show.
+- Live reads: most pages read NEAR testnet from your browser with read-only RPC view calls (`call_function`, `view_account` and `view_access_key_list` in `site/src/scripts/chain.ts`, sent to `test.rpc.fastnear.com` with `rpc.testnet.near.org` as the fallback). A view call cannot change anything on chain.
+- Recorded demo: the demo steps, mints, transfers and registrar events (transaction ids and times) are copied into `site/src/data/testnet.ts` from `deployments/testnet.json` and this README. Pages that show them link each row to its transaction on the explorer.
+- Signing: only `/member` (Your shares) sends transactions, and only after you connect a testnet wallet and approve each call in it. `/help` and `/admin` ask the wallet to sign a message to sign in, never a transaction. Sending transactions from the site has not been run on testnet yet: UNVERIFIED.
+
+| Page | What it shows | Testnet reads |
+|---|---|---|
+| `/` | Landing page: the pitch, the recorded demo steps with explorer links, Real and Simulated, and a curl check that needs no wallet | None (recorded demo) |
+| `/dashboard/` | Overview: the registry statement since mint and what needs attention | Live |
+| `/activity` | The recorded on-chain demo, newest first | None (recorded demo) |
+| `/catalog/` | Every registered work and how its rights are split | Live |
+| `/catalog/lookup` | Find a work by ISRC or ISWC, a share by id, or everything an account holds, and who gets paid now | Live |
+| `/catalog/splits` | One split sheet per work, with a check that each right adds up to 100 percent | Live |
+| `/shares/` | Ledger: every share NFT with its holder, role, percent, state and what it can claim | Live |
+| `/shares/accounts` | Each share's payout account (vault): access keys, NEAR kept for storage and Mock USDC balance | Live |
+| `/shares/claims` | Money waiting in share accounts for their holders | Live |
+| `/share?id=s1` | One share: holder, the account it controls, the standard NFT data a wallet reads, and its recorded moves | Live, plus recorded moves |
+| `/disputes` | Disputes and the money held in escrow | Live, plus a link to the recorded resolve step |
+| `/registrar` | Registrar powers, the recorded registrar events, and member credential status | Live credentials and keys, recorded events |
+| `/agents` | What a payment agent may do, and its keys | Live |
+| `/member` | Your shares: look up any account without a wallet; with a connected wallet, claim, transfer, approve split sheets, draft shares and manage an organisation's agents | Live; transactions only from your wallet (UNVERIFIED on testnet) |
+| `/verify` | The code hash on each contract, the share accounts with no keys, and the keys still on the contract accounts | Live |
+| `/docs` | The accounts, the contract methods the pages read, and how to check the demo without a wallet | None |
+| `/help` | Help chat and wallet support tickets | None |
+| `/admin` | Support admin: the server checks the admin wallet on every request and answers 401 when not signed in | None |
+| `/whitepaper` | Placeholder until the whitepaper is approved | None |
+
+- Marked Simulated on the pages: payer steps in the recorded demo (badge "Simulated payer"), the identity checks behind member credentials, dispute documents and arbitration (hashes of dummy documents), and the document hashes in registrar events (placeholder test values). Live values are the real testnet state of these demo accounts.
+- Split sheet approval (`approve_share`) is in the branch code but not in the deployed registry. The site checks live whether the method exists and says so when it does not.
 - Help chat: uses NEAR AI Cloud. A reply shows the label "Inference ran in a TEE (reported by NEAR AI Cloud)" only when NEAR AI Cloud reports `signature_kind: provider_tee` for that completion. The app reads the TEE flag the provider reports; it does not verify the attestation itself. The contracts use no TEE. (The name RoylTEE does not mean the contracts run in a TEE.)
 - Support tickets: wallet sign-in with a NEP-413 signed message checked on the server against a full-access key of the testnet account. Live wallet sign-in on the hosted site is UNVERIFIED.
 - Details, limits, environment variable names and security headers: [site/README.md](site/README.md). No secrets are in the repo; values live in the host's settings.
@@ -282,7 +308,8 @@ Screenshots: none yet. **Pre-submission item:** add the landing page, the help c
 | Locks (`payout_in_flight`, `transfer_pending`), credentials, disputes and escrow | Provenance evidence (the field is real, the evidence is not checked) |
 | Events and per-token history | Arbitration and dispute documents (hashes of dummy documents) |
 | | TEE attestation of payer statements (not built; roadmap) |
-| | Site landing page and dashboard data |
+| Site pages' live values (read-only view calls to NEAR testnet) | Payer steps in the site's recorded demo (badge "Simulated payer") |
+| | Document hashes in the site's registrar events (placeholder test values) |
 
 Mock USDC (testnet) is used instead of Circle USDC because a Circle USDC address on NEAR testnet is UNVERIFIED.
 
@@ -339,7 +366,12 @@ scripts/build-wasm.sh    builds every contract into contracts/res/ and prints sh
 scripts/verify-testnet.mjs  read-only check of the live deployment against deployments/testnet.json
 deployments/testnet.json accounts, public keys, code hashes, transaction ids (no secrets)
 config/project.json      project name, NFT symbol, mock token name
-site/                    Astro website, help chat and support tickets
+site/src/pages           the pages listed under Website and help chat, plus the API route (api/[...route].ts)
+site/src/scripts         browser code: read-only testnet view calls (chain.ts), wallet sign in and transactions (wallet.ts)
+site/src/server          server side: help chat, tickets, sign in, admin checks, rate limits, security headers
+site/src/data/testnet.ts accounts and the recorded demo, copied from deployments/testnet.json
+site/tests               Vitest tests for the site (219 in 18 files)
+.github/workflows/ci.yml CI: wasm build, fmt, clippy, Rust tests, site typecheck, tests and build, gitleaks
 docs/reviews/            status of each external review finding (fixed, documented, deferred or false)
 README.md  THREAT_MODEL.md  DESIGN.md  AUDIT.md  DEPLOY_PLAN.md  DECISIONS_LOG.md  SPEND_LOG.md  LICENSE
 ```
