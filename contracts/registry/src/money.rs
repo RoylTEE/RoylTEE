@@ -62,11 +62,13 @@ impl Registry {
             )
     }
 
-    /// Clears `payout_in_flight` if it is still this claim's lock. If the
-    /// vault's transfer failed, restores the debit. If the lock was already
-    /// cleared by `release_stale_lock`, a late failure still restores the
-    /// debit (the money never left the vault) but leaves any newer lock
-    /// alone. Never panics. Returns true if the holder was paid.
+    /// Settles a claim. If `payout_in_flight` is still this claim's lock
+    /// (same `since_block` and amount), clears it and, if the vault's
+    /// transfer failed, restores the debit. If the lock was already cleared
+    /// by `release_stale_lock`, it changes no balance (T36): a late failure
+    /// means the money is still in the vault and `sync` finds it again; a
+    /// rollback here could count it twice after such a sync. Never panics.
+    /// Returns true if the holder was paid.
     #[private]
     pub fn on_claim(
         &mut self,
@@ -76,19 +78,28 @@ impl Registry {
         lock_block: U64,
     ) -> bool {
         let ok = callback_result(64).is_some();
+        let mut late = false;
         if let Some(l) = self.ledgers.get_mut(&token_id) {
             let mine = l
                 .payout_in_flight
                 .as_ref()
                 .is_some_and(|k| k.since_block == lock_block && k.amount == amount);
+            l.epoch += 1;
             if mine {
                 l.payout_in_flight = None;
+                if !ok {
+                    l.known_balance += amount.0;
+                    l.total_paid_out = l.total_paid_out.saturating_sub(amount.0);
+                }
+            } else {
+                late = true;
             }
-            l.epoch += 1;
-            if !ok {
-                l.known_balance += amount.0;
-                l.total_paid_out = l.total_paid_out.saturating_sub(amount.0);
-            }
+        }
+        if late {
+            emit(
+                "anomaly",
+                json!({ "token_id": token_id, "kind": "late_claim_callback", "ok": ok, "amount": amount, "detail": "sync to reconcile the vault balance" }),
+            );
         }
         emit(
             "claim_settled",

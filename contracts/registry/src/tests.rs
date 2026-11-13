@@ -1377,3 +1377,32 @@ fn late_resolve_after_stale_release_keeps_current_owner() {
     ));
     assert_eq!(c.owner_of(&t), Some(acc("carol.near")));
 }
+
+#[test]
+fn late_failed_claim_after_stale_release_changes_no_balance() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = mint(&mut c, w, "bob.near", 10_000);
+    pay_share(&mut c, &t, 700_000);
+    at(&acc("bob.near"), NearToken::from_yoctonear(1), 0, 5);
+    let _ = c.claim(t.clone());
+    at(
+        &acc("anyone.near"),
+        NearToken::from_yoctonear(0),
+        0,
+        5 + STALE_LOCK_BLOCKS,
+    );
+    c.release_stale_lock(t.clone());
+    callback(PromiseResult::Failed);
+    assert!(!c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(5)));
+    assert!(get_logs().join("\n").contains("late_claim_callback"));
+    let l = ledger(&c, &t);
+    assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
+    // sync reads the real vault balance and makes it claimable again.
+    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    let _ = c.sync(t.clone());
+    let epoch = c.ledgers.get(&t).unwrap().epoch;
+    callback(ok(b"\"700000\""));
+    assert!(c.on_sync(t.clone(), U64(epoch)).is_some());
+    assert_eq!(ledger(&c, &t).claimable.0, 700_000);
+}
