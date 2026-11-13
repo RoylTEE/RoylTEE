@@ -15,9 +15,10 @@ Sources: the repository README, DESIGN.md, THREAT_MODEL.md, DEPLOY_PLAN.md, DECI
 
 - Registry contract: reg.royltee-dev.testnet. NFT name RoylTEE, symbol ROYLT, spec nft-1.0.0. Registrar: registrar.royltee-dev.testnet. Token: usdc.royltee-dev.testnet.
 - Mock token: usdc.royltee-dev.testnet. Name "Mock USDC (testnet)", symbol mUSDC, 6 decimals. Only the simulated payer account (payer.royltee-dev.testnet) can mint it.
-- As of 2026-11-13 (UTC) the contracts are deployed and initialised, and part of the demo is on chain: three verified members (writer-a, writer-b and buyer-pub under royltee-dev.testnet), three fictional works (ISRC codes starting ZZRYL), and six shares s1 to s6, each with its own vault holding zero keys.
-- Also live: a Simulated payer work payment split 0.5 and 0.5 mUSDC into s1 and s2, a plain transfer into s3 picked up by sync, a claim by writer-a on s1, and the catalog sale: writer-b transferred s2 to buyer-pub, who then claimed the 0.5 mUSDC that moved with it. A claim on s1 by an account without the share failed on chain.
-- Not on chain yet: the scripted agent and the dispute scene. They are later deploy steps.
+- As of 2026-11-13 (UTC) the contracts are deployed and initialised, and the whole demo is on chain: three verified members (writer-a, writer-b and buyer-pub under royltee-dev.testnet), three fictional works (ISRC codes starting ZZRYL), and seven shares s1 to s7, each with its own vault holding zero keys. Share s7 is void after the dispute.
+- On chain: a Simulated payer work payment split 0.5 and 0.5 mUSDC into s1 and s2, a plain transfer into s3 picked up by sync, a claim by writer-a on s1, and the catalog sale: writer-b transferred s2 to buyer-pub, who then claimed the 0.5 mUSDC that moved with it. A claim on s1 by an account without the share failed on chain.
+- Also on chain: the scripted payment agent paid work 1 from its allowance, its second submit of the same statement line was refused, and its claim attempt with a deposit was stopped by the protocol. The dispute scene is on chain too: a 20 percent share on work 2 opened dispute 0, the 0.7 mUSDC for s5 was held in escrow, and the registrar resolved it (uphold existing) with a document hash, releasing the escrow to s5.
+- The deployed registry is the build from before the contract review fixes. The on-chain split sheet (approve or reject a share) is tested in the code but not deployed yet; a registry update is planned.
 - The registry and token accounts still hold one full access key each, so the code can still be fixed in place. Deleting those keys (the zero keys proof for the registry) is planned once the code is final. Until then, do not claim the registry is keyless.
 - Vault accounts are created by the registry with no keys at all, ever.
 
@@ -55,7 +56,13 @@ Sources: the repository README, DESIGN.md, THREAT_MODEL.md, DEPLOY_PLAN.md, DECI
 
 ## What is Simulated
 
-KYB and identity, the fiat rail and payer statements, payer attestations, provenance evidence (human, AI assisted, fully AI is a declared field), arbitration documents, license legal terms, the agent (scripted, not a model), and USDC (a mock token). The dashboard page is a mockup with example data and is not yet wired to testnet. The claim view on that page is a mockup too. It does not show a live claimable balance, and live vault balances are not shown in the app today. Claims happen on chain by the current holder.
+KYB and identity, the fiat rail and payer statements, payer attestations, provenance evidence (human, AI assisted, fully AI is a declared field), arbitration documents, license legal terms, the agent (scripted, not a model), and USDC (a mock token).
+
+## The registry pages
+
+- The registry pages read live NEAR testnet values with view calls: Catalog (statement since mint, works and rights, every share with an inspector), Share (holder, share account, live access key list, NEAR balance against its storage minimum, statement, history), Agents (the live role and key of the payment agent), Disputes (live dispute list and escrow) and Your shares.
+- Your shares: look up any account read only, or connect a testnet wallet. A connected holder can claim, a work registrant can approve or reject a pending share, and a member can draft a split sheet with a review step before signing. Sending these from the site has not been run on testnet yet, so it is UNVERIFIED.
+- Statements on these pages use Opening balance, activity and Closing balance since mint. A view by statement period needs an event indexer, which is roadmap.
 
 ## Not built
 
@@ -75,18 +82,21 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 
 - Is this real money? No. Testnet only, Mock USDC (testnet).
 - Can I buy a share? No. It is a permissioned registry among verified members, not a public sale.
-- Do I need a wallet to read the site? No. A wallet is only needed to open support tickets.
+- Do I need a wallet to read the site? No. A wallet is needed to open support tickets, and to claim or sign split sheets on the Your shares page.
 - Where is the code? The source link on the site is a placeholder until the repository is public.
 
 ## In app links
 
 - [Home](/)
 - [How it works](/#how)
-- [Agent allowances](/#agents)
+- [Holder powers and agent limits](/#agents)
 - [Lifecycle and catalog sale](/#lifecycle)
 - [Trust and privacy](/#trust)
 - [Testnet notice](/#notice)
-- [Testnet dashboard mockup](/dashboard/)
+- [Registry catalog](/dashboard/)
+- [Your shares](/member)
+- [Agents](/agents)
+- [Disputes](/disputes)
 - [Whitepaper placeholder](/whitepaper)
 - [Help chat](/help#chat)
 - [Contact support](/help#support)

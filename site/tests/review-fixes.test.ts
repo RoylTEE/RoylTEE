@@ -270,6 +270,8 @@ describe('F-07 F-08 F-15 static review', () => {
     expect(src('pages/admin.astro')).toMatch(/!config\.sessionSecret/);
     const dash = src('content/dashboard.html') + readFileSync(new URL('../public/dashboard.js', import.meta.url), 'utf8');
     expect(dash).not.toMatch(/innerHTML|fonts\.googleapis|fonts\.gstatic/);
+    const registry = ['catalog', 'sharecard', 'share', 'member', 'agents', 'disputes', 'ui', 'chain', 'nav'].map(f => src(`scripts/${f}.ts`)).join('\n');
+    expect(registry).not.toMatch(/innerHTML|outerHTML|insertAdjacentHTML|document\.write|fonts\.googleapis|fonts\.gstatic|eval\(/);
   });
 
   it('documents the optional admin public key pin and open ticket expiry', () => {

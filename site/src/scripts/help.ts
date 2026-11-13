@@ -1,6 +1,6 @@
 import { api, el, signIn, signOut } from './wallet';
 type Turn = { role: 'user' | 'assistant'; text: string; index?: number; signature?: string; tee?: boolean };
-const allowed = new Set(['/', '/#how', '/#agents', '/#lifecycle', '/#trust', '/#notice', '/#problem', '/dashboard/', '/whitepaper', '/help', '/help#chat', '/help#support']);
+const allowed = new Set(['/', '/#how', '/#agents', '/#lifecycle', '/#trust', '/#notice', '/#problem', '/dashboard/', '/member', '/agents', '/disputes', '/whitepaper', '/help', '/help#chat', '/help#support']);
 function render(text: string) {
   const p = el('p'); let last = 0;
   for (const m of text.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {
@@ -44,7 +44,7 @@ function signedIn(account: string | null) {
 }
 function ticketRow(t: { subject: string; message: string; status: string; reply: string | null }) {
   return el('li', { className: `ticket ${t.status}` },
-    el('div', { className: 'ticket-head' }, el('strong', { textContent: t.subject }), el('span', { className: 'tag-mono', textContent: t.status })),
+    el('div', { className: 'ticket-head' }, el('strong', { textContent: t.subject }), el('span', { className: `badge ${t.status === 'closed' ? 'plain' : t.status === 'answered' ? 'ok' : 'warn'}`, textContent: t.status })),
     el('p', { textContent: t.message }), ...(t.reply ? [el('p', { className: 'reply', textContent: `Reply: ${t.reply}` })] : []));
 }
 function renderTickets(tickets: { subject: string; message: string; status: string; reply: string | null }[], append: boolean) {
@@ -56,7 +56,7 @@ function renderTickets(tickets: { subject: string; message: string; status: stri
     list.append(...tickets.map(ticketRow));
   }
   if (ticketCursor) {
-    const more = el('li', { className: 'row' }, el('button', { type: 'button', className: 'btn no-chip outline', textContent: 'Load more tickets' }));
+    const more = el('li', { className: 'row' }, el('button', { type: 'button', className: 'btn sm', textContent: 'Load more tickets' }));
     more.setAttribute('data-more', '');
     more.querySelector('button')!.onclick = () => { void load(true); };
     list.append(more);
