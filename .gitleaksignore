@@ -1,0 +1,5 @@
+# Public ed25519 keys (44 character base58) quoted in deploy notes in deployments/testnet.json. Public keys only, not secrets.
+ace5138b25032c3cc594d86d5f66c2806f71202c:deployments/testnet.json:generic-api-key:1399
+ace5138b25032c3cc594d86d5f66c2806f71202c:deployments/testnet.json:generic-api-key:1421
+ace5138b25032c3cc594d86d5f66c2806f71202c:deployments/testnet.json:generic-api-key:1531
+ace5138b25032c3cc594d86d5f66c2806f71202c:deployments/testnet.json:generic-api-key:1553
