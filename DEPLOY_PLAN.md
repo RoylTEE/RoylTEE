@@ -320,7 +320,7 @@ near contract call-function as-read-only $REG nft_tokens json-args '{"from_index
 near contract call-function as-read-only $REG get_share_approval json-args '{"token_id":"s1"}' $NET now     # "approved"
 ```
 
-Proves: the deployed state reads back unchanged under the new code. Record the new registry and vault sha256 in `deployments/testnet.json` next to the old vault hash (the 7 existing vaults keep it). Note: share `s7` (voided by `uphold_existing` in step 13) stays in its group's list, because the old code did not prune it; it is inert (never paid) and counts toward that group's 32-entry cap only.
+Proves: the deployed state reads back unchanged under the new code. The same upgrade is rehearsed in the sandbox from the exact testnet registry wasm by `u01_testnet_wasm_upgrades_in_place_without_migration` (`contracts/tests/tests/upgrade.rs`); run `npm test` and see it pass before this step. After this step (and after step 6 or 16), `npm run verify:testnet` fails until `deployments/testnet.json` is updated: the registry code hash, the key counts after step 6, and `token_owners` after step 16 (review 03a I5). Record the new registry and vault sha256 in `deployments/testnet.json` next to the old vault hash (the 7 existing vaults keep it). Note: share `s7` (voided by `uphold_existing` in step 13) stays in its group's list, because the old code did not prune it; it is inert (never paid) and counts toward that group's 32-entry cap only.
 
 ### Step 16. Split sheet demo (DRAFT, not run, needs the owner's yes; about 7 transactions)
 
