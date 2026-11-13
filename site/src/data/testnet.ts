@@ -76,3 +76,19 @@ export const MINTS: Record<string, { tx: string; at: string }> = {
 export const TRANSFERS: { token: string; from: string; to: string; tx: string; at: string; what: string }[] = [
   { token: 's2', from: 'writer-b.royltee-dev.testnet', to: 'buyer-pub.royltee-dev.testnet', tx: 'HZ9pD2kLbqbjmKqC68ao6KBTUpQmQstyd2Tro8hWwYPy', at: '2026-11-13T05:59:22Z', what: 'Catalog sale' },
 ];
+
+/**
+ * Registrar events in the record, copied from the EVENT_JSON logs (standard share_registry) of each transaction.
+ * The doc hashes in this demo are placeholder test values, not hashes of real documents.
+ */
+export type RegistrarEventKind = 'credential_granted' | 'credential_suspended' | 'credential_reinstated' | 'payer_role_granted' | 'payer_role_revoked' | 'registrar_transfer' | 'dispute_resolved';
+export const REGISTRAR_EVENT_KINDS: [RegistrarEventKind, string][] = [
+  ['credential_granted', 'Credentials granted'], ['credential_suspended', 'Credentials suspended'], ['credential_reinstated', 'Credentials reinstated'],
+  ['payer_role_granted', 'Payer roles granted'], ['payer_role_revoked', 'Payer roles revoked'], ['registrar_transfer', 'Registrar transfers'], ['dispute_resolved', 'Disputes resolved'],
+];
+export const REGISTRAR_EVENTS: { kind: RegistrarEventKind; subject: string; detail: string; docHash: string; tx: string; at: string }[] = [
+  { kind: 'credential_granted', subject: 'writer-b.royltee-dev.testnet', detail: 'Member credential', docHash: 'c'.repeat(64), tx: 'Bv7cDUgGrGxgqaXr5FJnGpauqw1DcLpJmUuTMnrydFa6', at: '2026-11-13T05:48:03Z' },
+  { kind: 'credential_granted', subject: 'buyer-pub.royltee-dev.testnet', detail: 'Member credential', docHash: 'c'.repeat(64), tx: '8QffMekUyzGzF6UvPX256tUBBBcXsjhy5M6GTHibUjkB', at: '2026-11-13T05:48:09Z' },
+  { kind: 'credential_granted', subject: 'writer-a.royltee-dev.testnet', detail: 'Member credential', docHash: 'c'.repeat(64), tx: '3dqBCz6QkbdbDqkZFSqvmfzHjuZHRkVt45A5kbAvg6Vq', at: '2026-11-13T05:48:37Z' },
+  { kind: 'dispute_resolved', subject: 'Dispute 0', detail: 'Uphold existing: s7 void, 0.7 mUSDC released to s5', docHash: 'c'.repeat(64), tx: '7wvLcnuB5L6w3rh3tBL2Jgg7yTMErD9QduC1XLSAYUVi', at: '2026-11-13T07:42:54Z' },
+];

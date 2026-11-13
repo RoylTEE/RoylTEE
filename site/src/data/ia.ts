@@ -33,7 +33,11 @@ export const AREAS: Area[] = [
   { key: 'verify', label: 'Verify', group: 'Registry', purpose: 'Code hashes, keyless vaults, keys left', href: '/verify', tabs: [] },
   { key: 'agents', label: 'Agents', group: 'Oversight', purpose: 'Roles, limits and keys', href: '/agents', tabs: [] },
   { key: 'disputes', label: 'Disputes', group: 'Oversight', purpose: 'Frozen money and outcomes', href: '/disputes', tabs: [] },
-  { key: 'registrar', label: 'Registrar log', group: 'Oversight', purpose: 'Members, powers and recorded actions', href: '/registrar', tabs: [] },
+  { key: 'registrar', label: 'Registrar log', group: 'Oversight', purpose: 'Members, powers and recorded actions', href: '/registrar', tabs: [
+    { key: 'log', label: 'Log', href: '/registrar#log' },
+    { key: 'members', label: 'Members', href: '/registrar#members' },
+    { key: 'role', label: 'Role and powers', href: '/registrar#role' },
+  ] },
   { key: 'member', label: 'Your shares', group: 'You', purpose: 'Claim, transfer, agents, approve, draft', href: '/member', tabs: [
     { key: 'holdings', label: 'Holdings', href: '/member#holdings' },
     { key: 'transfer', label: 'Transfer', href: '/member#transfer' },

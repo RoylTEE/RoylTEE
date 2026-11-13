@@ -1,29 +1,56 @@
 ---
 import App from '../layouts/App.astro';
-import ActivityTable from '../components/ActivityTable.astro';
 import PowerTable from '../components/PowerTable.astro';
-import { REGISTRAR, accountUrl } from '../data/testnet';
+import { REGISTRAR, REGISTRAR_EVENTS, REGISTRAR_EVENT_KINDS, accountUrl, txUrl } from '../data/testnet';
 const cannot = ['Hold a credential', 'Claim from any share account', "Move an active member's share", 'Sign for a share account (they have no keys)'];
+const count = (k: string) => REGISTRAR_EVENTS.filter((e) => e.kind === k).length;
+const one: Record<string, string> = { credential_granted: 'Credential granted', credential_suspended: 'Credential suspended', credential_reinstated: 'Credential reinstated', payer_role_granted: 'Payer role granted', payer_role_revoked: 'Payer role revoked', registrar_transfer: 'Registrar transfer', dispute_resolved: 'Dispute resolved' };
+const none = REGISTRAR_EVENT_KINDS.filter(([k]) => !count(k)).map(([, l]) => l);
+const events = [...REGISTRAR_EVENTS].sort((a, b) => b.at.localeCompare(a.at));
+const short = (a: string) => a.replace(/\.royltee-dev\.testnet$/, '');
 ---
-<App area="registrar" title="Registrar log" intro="The registrar is a trusted role in this demo. Every registrar action is an event with a document hash.">
-  <div class="gov-grid">
-    <section class="panel" aria-labelledby="rg-h">
-      <div class="panel-head"><h2 id="rg-h">Role and keys</h2><span class="end" data-reg-badge></span></div>
-      <div class="panel-body" data-registrar>
-        <dl class="kv"><dt>Registrar account</dt><dd><a class="acct-link" href={accountUrl(REGISTRAR)} target="_blank" rel="noopener">{REGISTRAR}</a></dd></dl>
-        <p class="loading">Reading testnet</p>
-      </div>
-    </section>
-    <section class="panel" aria-labelledby="mem-h">
-      <div class="panel-head"><h2 id="mem-h">Verified members</h2><span class="caption">Credential status, read live. Identity checks behind them are Simulated.</span></div>
-      <div class="table-wrap" data-members><p class="loading panel-body">Reading testnet</p></div>
-    </section>
-  </div>
-  <section class="panel" aria-labelledby="log-h">
-    <div class="panel-head"><h2 id="log-h">Recorded registrar actions</h2><span class="caption">From the recorded demo. Credential grants at setup are in the registrar account history on the explorer.</span></div>
-    <ActivityTable id="reg-acts" only="registrar" />
+<App area="registrar" tab="log" title="Registrar log" intro="The registrar is a trusted role in this demo. Every registrar action is an event with a document hash.">
+  <section class="panel" id="log" data-tab-panel aria-labelledby="log-h">
+    <div class="panel-head"><h2 id="log-h">Registrar log</h2><span class="caption">Read from the recorded events, newest first</span></div>
+    <div class="table-wrap">
+      <table class="ledger rows-sm">
+        <thead><tr><th>When</th><th>Event</th><th>Subject</th><th>Doc hash</th><th>Transaction</th></tr></thead>
+        <tbody>
+          {events.map((e) => (
+            <tr>
+              <td class="m nowrap">{e.at.slice(0, 10)} {e.at.slice(11, 16)} UTC</td>
+              <td class="p"><strong>{one[e.kind]}</strong><span class="small muted only-wide"><br />{e.detail}</span></td>
+              <td class="p-wrap">{e.subject.includes('.') ? <a class="acct-link" href={accountUrl(e.subject)} target="_blank" rel="noopener">{short(e.subject)}</a> : e.subject}</td>
+              <td class="m hash" title={e.docHash}>{e.docHash.slice(0, 8)}...{e.docHash.slice(-4)} <span class="badge sim">Placeholder</span></td>
+              <td class="p-end"><a class="acct-link" href={txUrl(e.tx)} target="_blank" rel="noopener">{e.tx.slice(0, 8)}</a></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+    <div class="panel-body stack">
+      <dl class="kv tally">{REGISTRAR_EVENT_KINDS.map(([k, l]) => <><dt>{l}</dt><dd class="mono">{count(k)}</dd></>)}</dl>
+      <p class="small">Not in the record: {none.join(', ').toLowerCase()}. None of these happened in the recorded demo.</p>
+    </div>
+    <p class="panel-foot">Each row is an EVENT_JSON log (standard share_registry) in the linked transaction. The doc hashes in this demo are placeholder test values, not hashes of real documents (Simulated). Later registrar actions appear in the <a class="link" href={accountUrl(REGISTRAR)} target="_blank" rel="noopener">registrar account history</a> on the explorer.</p>
   </section>
-  <section class="panel" aria-labelledby="pw-h">
+
+  <section class="panel" id="members" data-tab-panel aria-labelledby="mem-h">
+    <div class="panel-head"><h2 id="mem-h">Members</h2><span class="caption">Credential status, read live. Identity checks behind them are Simulated.</span></div>
+    <div class="table-wrap" data-members><p class="loading panel-body">Reading testnet</p></div>
+    <form class="panel-body lookup-form" data-member-check>
+      <label for="mc">Check any account: get_credential and is_active_member</label>
+      <div class="lookup-row"><input id="mc" name="account" autocomplete="off" spellcheck="false" placeholder="outsider.royltee-dev.testnet" /><button class="btn" type="submit">Check</button></div>
+      <div data-member-result aria-live="polite"></div>
+    </form>
+  </section>
+
+  <section class="panel" id="role" data-tab-panel aria-labelledby="rg-h">
+    <div class="panel-head"><h2 id="rg-h">Role and keys</h2><span class="end" data-reg-badge></span></div>
+    <div class="panel-body" data-registrar>
+      <dl class="kv"><dt>Registrar account</dt><dd><a class="acct-link" href={accountUrl(REGISTRAR)} target="_blank" rel="noopener">{REGISTRAR}</a></dd></dl>
+      <p class="loading">Reading testnet</p>
+    </div>
     <div class="panel-head"><h2 id="pw-h">What the registrar can and cannot do</h2></div>
     <PowerTable who="registrar" />
     <div class="panel-body">
@@ -35,10 +62,14 @@ const cannot = ['Hold a credential', 'Claim from any share account', "Move an ac
 </App>
 <script>import '../scripts/registrar.ts';</script>
 <style is:global>
-  .gov-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: var(--s5); align-items: start; }
   .method-list { display: flex; flex-wrap: wrap; gap: var(--s2); }
   .method { font-family: var(--mono); font-size: var(--fs-14); padding: .2rem .5rem; border-radius: var(--r-ctl); border: 1px solid var(--ok-line); background: var(--ok-bg); color: var(--ok); }
   .method.no { border-color: var(--bad-line); background: var(--bad-bg); color: var(--bad); font-family: var(--sans); }
+  .hash { font-family: var(--mono); font-size: var(--fs-12); }
+  .tally { grid-template-columns: repeat(auto-fit, minmax(10rem, max-content) minmax(2rem, max-content)); }
+  .lookup-form { display: grid; gap: var(--s2); border-top: 1px solid var(--edge); }
+  .lookup-form label { font-weight: 600; font-size: var(--fs-14); }
+  .lookup-row { display: flex; gap: var(--s2); flex-wrap: wrap; }
+  .lookup-row input { flex: 1 1 16rem; min-width: 0; min-height: 2.75rem; padding: 0 var(--s3); border: 1px solid var(--edge); border-radius: var(--r-ctl); font: inherit; font-family: var(--mono); font-size: var(--fs-14); background: var(--paper, #fff); color: var(--text); }
   @media (max-width: 767px) { table.rows-sm td.m.wrap { white-space: normal; } }
-  @media (max-width: 1199px) { .gov-grid { grid-template-columns: 1fr; } }
 </style>

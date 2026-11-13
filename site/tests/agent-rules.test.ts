@@ -47,3 +47,20 @@ describe('organisation agent controls mirror agents.rs', () => {
     expect(csp).toMatch(/WALLET_ROUTES = \['\/admin', '\/help', '\/member'\]/);
   });
 });
+
+import { REGISTRAR_EVENTS, REGISTRAR_EVENT_KINDS, SCENES } from '../src/data/testnet';
+describe('registrar log', () => {
+  it('every recorded registrar event has a doc hash, a transaction and a known kind', () => {
+    const kinds = REGISTRAR_EVENT_KINDS.map(([k]) => k);
+    for (const e of REGISTRAR_EVENTS) { expect(e.docHash).toMatch(/^[0-9a-f]{64}$/); expect(e.tx).toMatch(/^[1-9A-HJ-NP-Za-km-z]{43,44}$/); expect(kinds).toContain(e.kind); }
+    const resolve = SCENES.find((s) => s.step === 'Resolve')!;
+    expect(REGISTRAR_EVENTS.find((e) => e.kind === 'dispute_resolved')!.tx).toBe(resolve.txs[0]);
+  });
+  it('labels placeholder hashes, lists kinds with no events, and has a Members check', () => {
+    const page = readFileSync(new URL('../src/pages/registrar.astro', import.meta.url), 'utf8');
+    expect(page).toMatch(/placeholder test values, not hashes of real documents \(Simulated\)/);
+    expect(page).toMatch(/Not in the record/);
+    const ui = readFileSync(new URL('../src/scripts/registrar.ts', import.meta.url), 'utf8');
+    expect(ui).toMatch(/'get_credential'/); expect(ui).toMatch(/'is_active_member'/);
+  });
+});
