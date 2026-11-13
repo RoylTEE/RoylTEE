@@ -344,6 +344,10 @@ impl Registry {
             "work is not void: use release_unallocated"
         );
         require!(amount.0 > 0, "amount must be positive");
+        require!(
+            receiver != self.registrar,
+            "the registrar cannot send escrow to itself"
+        );
         require!(Self::has_gas_for_forwards(1), "not enough gas to transfer");
         let g = self
             .groups

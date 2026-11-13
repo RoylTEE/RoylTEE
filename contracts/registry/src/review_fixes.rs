@@ -447,6 +447,10 @@ fn m2_registrar_recovers_plain_deposits_of_a_rejected_vault() {
         drop(c.recover_rejected_vault(t.clone(), acc("payer.near"), U128(10), h('4')))
     });
     yocto(&registrar());
+    assert_panics("cannot send vault money to itself", || {
+        drop(c.recover_rejected_vault(t.clone(), registrar(), U128(10), h('4')))
+    });
+    yocto(&registrar());
     let _ = c.recover_rejected_vault(t.clone(), acc("payer.near"), U128(10), h('4'));
     callback(ok(b""));
     assert!(c.on_rejected_vault_recovered(t.clone(), acc("payer.near"), U128(10), h('4')));
@@ -567,6 +571,10 @@ fn l9_registrar_refunds_unallocated_of_a_void_work() {
     yocto(&acc("alice.near"));
     assert_panics("registrar only", || {
         drop(c.refund_unallocated(key.clone(), acc("payer.near"), U128(1), h('5')))
+    });
+    yocto(&registrar());
+    assert_panics("cannot send escrow to itself", || {
+        drop(c.refund_unallocated(key.clone(), registrar(), U128(1), h('5')))
     });
     yocto(&registrar());
     assert_panics("exceeds unallocated", || {

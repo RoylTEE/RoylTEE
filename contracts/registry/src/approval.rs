@@ -119,6 +119,10 @@ impl Registry {
             self.approval(&token_id) == Approval::Rejected,
             "only a rejected share's vault can be recovered"
         );
+        require!(
+            receiver != self.registrar,
+            "the registrar cannot send vault money to itself"
+        );
         require!(amount.0 > 0, "amount must be positive");
         let l = self
             .ledgers
