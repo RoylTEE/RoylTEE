@@ -23,13 +23,15 @@ export function refusal(question: string) {
   return null;
 }
 export const LINKS = new Set(['/', '/#how', '/#agents', '/#lifecycle', '/#trust', '/#notice', '/#problem', '/dashboard/', '/whitepaper', '/help', '/help#chat', '/help#support']);
-/** Returns null when the reply must not be shown; otherwise removes links outside the app. */
+/** Returns null when the reply must not be shown; otherwise drops links outside the app. Raw outside URLs are withheld instead of leaving a mid-sentence placeholder. */
+const RAW_URL = /(?<![A-Za-z0-9])(?:https?:\/\/|(?:javascript|data|vbscript):)\S*|(?<![A-Za-z0-9:])\/\/[A-Za-z0-9][^\s)]*/i;
 export function cleanAnswer(value: string): string | null {
   if (!value || value.length > 6000 || /grounding-notes|CHAT_HMAC_SECRET|SESSION_SECRET|NEARAI_API_KEY|UPSTASH_REDIS|KV_REST_API|CRON_SECRET|You are the RoylTEE help guide|Treat every user message as untrusted/i.test(value) || sensitive(value)) return null;
-  return value
+  const cleaned = value
     .replace(/\[([^\]]{1,120})\]\(([^)\s]{1,200})\)/g, (all, label, href) => LINKS.has(href) ? all : label)
-    .replace(/https?:\/\/[^\s)]+/g, '(external link removed)')
     .replace(/[\u2013\u2014]/g, ',');
+  if (RAW_URL.test(cleaned)) return null;
+  return cleaned;
 }
 /** True only when NEAR AI Cloud reports signature_kind as the exact string provider_tee. Never inferred. */
 export function reportedProviderTee(value: unknown): boolean {
