@@ -4,6 +4,7 @@
   "license": "MIT",
   "scripts": {
     "build:wasm": "bash scripts/build-wasm.sh",
+    "dev": "npm --prefix site run dev",
     "test": "npm run build:wasm && cargo test --workspace",
     "test:unit": "cargo test --workspace --exclude sandbox_tests",
     "test:sandbox": "npm run build:wasm && cargo test -p sandbox_tests -- --nocapture",

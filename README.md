@@ -52,11 +52,13 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 | 5 | Optional: `npm run lint` | `cargo fmt --check`, then `cargo clippy -D warnings` for the host and wasm targets; ends with `Finished` and exit code 0. |
 | 6 | Open the explorer links under [Live testnet deployment](#live-testnet-deployment) | The same accounts, the catalog sale transfer of `s2`, the refused outsider claim, the agent payment and the dispute, on NEAR testnet. |
 | 7 | Site (in `site/`): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest: `Test Files  18 passed (18)` and `Tests  219 passed (219)`; `astro check`: `0 errors`; a build in `site/.vercel/output`. |
-| 8 | Site, local: `npm run dev` (in `site/`), then open http://127.0.0.1:4321 | The pages listed under [Website and help chat](#website-and-help-chat). `/admin` answers 401 when not signed in. Without server secrets the help chat and support API answer 503 ("not configured yet"). `site/README.md` explains how to run the API locally with in-memory storage. |
+| 8 | Site, local: `npm run dev` (at the repo root or in `site/`, after the `npm ci` of step 7), then open http://127.0.0.1:4321 | The pages listed under [Website and help chat](#website-and-help-chat). `/admin` answers 401 when not signed in. Without server secrets the help chat and support API answer 503 ("not configured yet"). `site/README.md` explains how to run the API locally with in-memory storage. |
 
 Hosted site: https://royltee.vercel.app (UNVERIFIED: which commit it runs, its live security headers, whether chat and support are configured, and whether a wallet sign-in works there have not been checked yet. **Pre-submission item:** check it in a private window and record the result here.)
 
 The contract numbers above (steps 2 to 5) come from running these commands on 2026-11-13 (UTC) on branch code that is NOT yet deployed (see [Live testnet deployment](#live-testnet-deployment)). Steps 7 and 8 were run on the merged tree (contract, server and UI branches) on 2026-11-13 (UTC): 219 site tests in 18 files; on the local dev server every page answered 200, `/admin` answered 401, and the chat and ticket API answered 503 without server secrets.
+
+Demo scripts: there are no separate `seed-demo`, `simulated-payer` or `scripted-agent` scripts. The on-chain demo (seed accounts and works, the Simulated payer's payments, the scripted agent's calls) was run as the `near` CLI commands written out step by step in [DEPLOY_PLAN.md](DEPLOY_PLAN.md), steps 1 to 13, and every resulting transaction id is in `deployments/testnet.json`. The key check (zero keys on every vault, the registry and mock USDC keys equal to the record, the agent's single scoped function call key) is `npm run verify:testnet` (`scripts/verify-testnet.mjs`), not a separate `verify-keys` script.
 
 ## The problem
 
@@ -345,7 +347,7 @@ Residual risks of the branch code, from the review passes. None of them lets any
 
 ## Libraries, templates and AI-written code
 
-Disclosed as the hackathon rules ask (Q-005). No pre-hackathon code: the first commit is from 2026-11-12 18:48 UTC (`git log --reverse`). That this is inside the hackathon window is UNVERIFIED in this repo (the window start date is not recorded here).
+Disclosed as the hackathon rules ask (Q-005). No pre-hackathon code: the first commit is from 2026-11-12 18:48 UTC (`git log --reverse`). That is inside the hackathon window: the rules (HACKATHON.md, Q-001, https://nearhackathon.com/HACKATHON.md) count code from the announcement on 2026-10-19.
 
 - Contracts (Rust): `near-sdk` 5.30.1, `near-contract-standards` 5.30.1 (NEP-171, NEP-177, NEP-181, NEP-141, NEP-145 helpers), `near-sys` 0.4.1 (the vault is written against raw host functions, no SDK).
 - Contract tests: `near-workspaces` 0.24.0 (downloads the NEAR sandbox node), `tokio`, `anyhow`, `serde_json`. Exact versions in `Cargo.lock`.
@@ -362,7 +364,7 @@ contracts/vault          Rust, raw host functions: the keyless vault (withdraw, 
 contracts/mock-usdc      Rust: Mock USDC (testnet), NEP-141, 6 decimals
 contracts/test-receiver  Rust: member contract used by the sandbox bounce test
 contracts/tests          near-workspaces sandbox tests; fixtures/ holds the registry wasm deployed on testnet (upgrade test)
-scripts/build-wasm.sh    builds every contract into contracts/res/ and prints sha256
+scripts/build-wasm.sh    builds every contract into contracts/res/ with local paths remapped, checks no local path is left, prints sha256
 scripts/verify-testnet.mjs  read-only check of the live deployment against deployments/testnet.json
 deployments/testnet.json accounts, public keys, code hashes, transaction ids (no secrets)
 config/project.json      project name, NFT symbol, mock token name

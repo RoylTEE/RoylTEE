@@ -1,6 +1,6 @@
 # Review 03b status
 
-Branch: `fix/review-03b` (off `ui/pass`). Local only, not pushed, not merged. Report: review 03b of the site and server diff (`86e071b..613c116`).
+Branch: `fix/review-03b` (off `ui/pass`). Merged into the submission branch. Report: review 03b of the site and server diff (`86e071b..613c116`).
 
 | Item | Verdict | Status |
 |---|---|---|

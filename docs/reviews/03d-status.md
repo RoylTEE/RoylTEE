@@ -1,6 +1,6 @@
 # Review 03d status
 
-Branch: `fix/review-03b` (site), `fix/review-03a` (contract test for L7). Local only, not pushed, not merged. The full 03d report file was not available here; this maps the reviewer's summary.
+Branch: `fix/review-03b` (site), `fix/review-03a` (contract test for L7). Merged into the submission branch. The full 03d report file was not available here; this maps the reviewer's summary.
 
 | Item | Verdict | Status |
 |---|---|---|

@@ -1,6 +1,6 @@
 # Review 03c status
 
-Branch: `fix/review-03b` for site changes, `fix/review-03a` for README parts. Local only, not pushed, not merged.
+Branch: `fix/review-03b` for site changes, `fix/review-03a` for README parts. Merged into the submission branch.
 
 | Item | Verdict | Status |
 |---|---|---|
