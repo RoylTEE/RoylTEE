@@ -14,7 +14,7 @@ impl Registry {
     pub fn set_share_note(&mut self, token_id: TokenId, note: String) {
         require!(
             !env::attached_deposit().is_zero(),
-            "attach at least 1 yoctoNEAR"
+            "attach a deposit of at least 1 yoctoNEAR"
         );
         let caller = env::predecessor_account_id();
         require!(
@@ -89,7 +89,7 @@ impl Registry {
     pub fn attest_share(&mut self, token_id: TokenId, statement_hash: Hash32) {
         require!(
             !env::attached_deposit().is_zero(),
-            "attach at least 1 yoctoNEAR"
+            "attach a deposit of at least 1 yoctoNEAR"
         );
         let payer = env::predecessor_account_id();
         require!(self.payers.contains(&payer), "payer role only");
