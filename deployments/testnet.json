@@ -1,0 +1,1659 @@
+{
+  "network": "testnet",
+  "record": {
+    "written_at_utc": "2026-11-13T07:59:39Z",
+    "git_branch": "master",
+    "git_head_when_written": "680b639ab26e70cb483cdf6f19b12138c8b6feb5",
+    "cli": {
+      "name": "near-cli-rs",
+      "version": "0.31.1"
+    },
+    "protocol": {
+      "protocol_version": 88,
+      "node_version": "2.14.1",
+      "node_build": "2.14.1",
+      "node_commit": "0ad2bdb2630e85bbacecab2a3b77072c78b46bc6",
+      "chain_id": "testnet",
+      "source": "https://rpc.testnet.near.org/status",
+      "observed_at_utc": "2026-11-13T07:59:39Z"
+    },
+    "notes": [
+      "Testnet only. No mainnet deploys or transactions.",
+      "Public keys only. No private keys or seed phrases are recorded.",
+      "Step 6 (delete full-access keys of the registry and mock USDC) is parked until the owner says go. Those full-access keys are still present, so in-place upgrades remain possible.",
+      "contracts/res/*.wasm is gitignored, so the exact git commit that produced the deployed wasm is UNVERIFIED. The local sha256 of the built wasm files used for this record matches the on-chain SHA-256 checksums.",
+      "The first pay_from_allowance in step 12 (7DJThzgCgnZYf9uNhPgH5ZsuJKx8mJqHkiLcqszdRSTu) was signed with the agent's full-access key before that key was deleted. The report, the refused duplicate pay, and the client-side refused claim used the function-call key.",
+      "The agent's claim on s4 with a deposit was refused by the protocol rule (deposit not allowed with a function-call access key) and produced no transaction.",
+      "An extra 0.5 NEAR transfer from royltee-dev.testnet to outsider.royltee-dev.testnet ran during step 11, before the refused outsider claim. It is recorded under step 11."
+    ]
+  },
+  "wasm": {
+    "registry": {
+      "local_path": "contracts/res/registry.wasm",
+      "size_bytes": 674606,
+      "local_sha256": "e7439e120c7c00e3b71a658b1083dfd28bfd67708d820ef84a10157c87de10f8",
+      "on_chain_sha256": "e7439e120c7c00e3b71a658b1083dfd28bfd67708d820ef84a10157c87de10f8",
+      "on_chain_code_hash_base58": "GZkyojcHYDip7pZsDYvkgkjEtgGakPZZcX28cgSyAVhq",
+      "sha256_matches_on_chain": true,
+      "in_git": false
+    },
+    "mock_usdc": {
+      "local_path": "contracts/res/mock_usdc.wasm",
+      "size_bytes": 181587,
+      "local_sha256": "2e5c896b2ead7d1bd12a2944971d6a393902084cf47616c54d18e7a577efc0bb",
+      "on_chain_sha256": "2e5c896b2ead7d1bd12a2944971d6a393902084cf47616c54d18e7a577efc0bb",
+      "on_chain_code_hash_base58": "47ybTZxhaJ9ZW3FC9jwaDdLfwgkJ59cCrnkSn5oop67t",
+      "sha256_matches_on_chain": true,
+      "in_git": false
+    },
+    "vault": {
+      "local_path": "contracts/res/vault.wasm",
+      "size_bytes": 7420,
+      "local_sha256": "973b2cbdbe904de710dcc7bf54a7b4164156f8c81d2932191e6968514aaaa727",
+      "on_chain_sha256": "973b2cbdbe904de710dcc7bf54a7b4164156f8c81d2932191e6968514aaaa727",
+      "on_chain_code_hash_base58": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU",
+      "sha256_matches_on_chain": true,
+      "in_git": false
+    }
+  },
+  "balances_observed": {
+    "observed_at_utc": "2026-11-13T07:59:39Z",
+    "block_height_range": [
+      277481803,
+      277482071
+    ],
+    "source": "near account view-account-summary and RPC view_account, finality final",
+    "accounts": {
+      "royltee-dev.testnet": {
+        "balance_yocto": "8943035447187500000000000",
+        "balance_near": "8.9430354471875"
+      },
+      "royltee-fund-1.testnet": {
+        "balance_yocto": "99955363487500000000000",
+        "balance_near": "0.0999553634875"
+      },
+      "royltee-fund-2.testnet": {
+        "balance_yocto": "99955363487500000000000",
+        "balance_near": "0.0999553634875"
+      },
+      "reg.royltee-dev.testnet": {
+        "balance_yocto": "8221662694519273799999998",
+        "balance_near": "8.221662694519273799999998"
+      },
+      "usdc.royltee-dev.testnet": {
+        "balance_yocto": "2513486807902146000000013",
+        "balance_near": "2.513486807902146000000013"
+      },
+      "registrar.royltee-dev.testnet": {
+        "balance_yocto": "986350948137074199999999",
+        "balance_near": "0.986350948137074199999999"
+      },
+      "writer-a.royltee-dev.testnet": {
+        "balance_yocto": "3236132083328670799999999",
+        "balance_near": "3.236132083328670799999999"
+      },
+      "writer-b.royltee-dev.testnet": {
+        "balance_yocto": "1372247840334463599999999",
+        "balance_near": "1.372247840334463599999999"
+      },
+      "buyer-pub.royltee-dev.testnet": {
+        "balance_yocto": "1391116015880764599999998",
+        "balance_near": "1.391116015880764599999998"
+      },
+      "pay-agent.buyer-pub.royltee-dev.testnet": {
+        "balance_yocto": "498056910189627800000000",
+        "balance_near": "0.4980569101896278"
+      },
+      "payer.royltee-dev.testnet": {
+        "balance_yocto": "993484760420760399999996",
+        "balance_near": "0.993484760420760399999996"
+      },
+      "outsider.royltee-dev.testnet": {
+        "balance_yocto": "799100726232201000000000",
+        "balance_near": "0.799100726232201"
+      },
+      "s1.reg.royltee-dev.testnet": {
+        "balance_yocto": "99999999999999999999999",
+        "balance_near": "0.099999999999999999999999"
+      },
+      "s2.reg.royltee-dev.testnet": {
+        "balance_yocto": "99999999999999999999999",
+        "balance_near": "0.099999999999999999999999"
+      },
+      "s3.reg.royltee-dev.testnet": {
+        "balance_yocto": "100000000000000000000000",
+        "balance_near": "0.1"
+      },
+      "s4.reg.royltee-dev.testnet": {
+        "balance_yocto": "100000000000000000000000",
+        "balance_near": "0.1"
+      },
+      "s5.reg.royltee-dev.testnet": {
+        "balance_yocto": "100000000000000000000000",
+        "balance_near": "0.1"
+      },
+      "s6.reg.royltee-dev.testnet": {
+        "balance_yocto": "100000000000000000000000",
+        "balance_near": "0.1"
+      },
+      "s7.reg.royltee-dev.testnet": {
+        "balance_yocto": "100000000000000000000000",
+        "balance_near": "0.1"
+      }
+    }
+  },
+  "accounts": {
+    "royltee-dev.testnet": {
+      "variable": "ROOT",
+      "account_id": "royltee-dev.testnet",
+      "role": "faucet parent and funder",
+      "balance_yocto": "8943035447187500000000000",
+      "balance_near": "8.9430354471875",
+      "storage_usage_bytes": 182,
+      "code_hash_base58": null,
+      "keys": [
+        {
+          "public_key": "ed25519:Ct3vT5rfpzPf98YFQ51Ym3LjXa8tqry96jZGDmN3oCyM",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1
+    },
+    "royltee-fund-1.testnet": {
+      "variable": "FUND1",
+      "account_id": "royltee-fund-1.testnet",
+      "role": "faucet account, forwarded NEAR to ROOT",
+      "balance_yocto": "99955363487500000000000",
+      "balance_near": "0.0999553634875",
+      "storage_usage_bytes": 182,
+      "code_hash_base58": null,
+      "keys": [
+        {
+          "public_key": "ed25519:4wXJiVB3sP1vsoY6CHFWr5jbbQX9LM7s9cG9tmwHE7cR",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1
+    },
+    "royltee-fund-2.testnet": {
+      "variable": "FUND2",
+      "account_id": "royltee-fund-2.testnet",
+      "role": "faucet account, forwarded NEAR to ROOT",
+      "balance_yocto": "99955363487500000000000",
+      "balance_near": "0.0999553634875",
+      "storage_usage_bytes": 182,
+      "code_hash_base58": null,
+      "keys": [
+        {
+          "public_key": "ed25519:AP7VKizJsgb1Vj4g561wjUgYZAwhzEefGdUMvQjR4psT",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1
+    },
+    "reg.royltee-dev.testnet": {
+      "variable": "REG",
+      "account_id": "reg.royltee-dev.testnet",
+      "role": "registry contract; full-access key kept (step 6 parked)",
+      "balance_yocto": "8221662694519273799999998",
+      "balance_near": "8.221662694519273799999998",
+      "storage_usage_bytes": 685507,
+      "code_hash_base58": "GZkyojcHYDip7pZsDYvkgkjEtgGakPZZcX28cgSyAVhq",
+      "keys": [
+        {
+          "public_key": "ed25519:7T5XuUzh1wUs3kqRw9bc8AUW8bETUZwrJZtXw7U5MTvn",
+          "permission": "full_access",
+          "note": "deliberately kept; step 6 parked"
+        }
+      ],
+      "key_count": 1
+    },
+    "usdc.royltee-dev.testnet": {
+      "variable": "USDC",
+      "account_id": "usdc.royltee-dev.testnet",
+      "role": "mock USDC (testnet); full-access key kept (step 6 parked)",
+      "balance_yocto": "2513486807902146000000013",
+      "balance_near": "2.513486807902146000000013",
+      "storage_usage_bytes": 182919,
+      "code_hash_base58": "47ybTZxhaJ9ZW3FC9jwaDdLfwgkJ59cCrnkSn5oop67t",
+      "keys": [
+        {
+          "public_key": "ed25519:3kRdSW3K666bbrctf9nAS8vVMMWMt8ddfWA5Z9EHMXRy",
+          "permission": "full_access",
+          "note": "deliberately kept; step 6 parked"
+        }
+      ],
+      "key_count": 1
+    },
+    "registrar.royltee-dev.testnet": {
+      "variable": "REGISTRAR",
+      "account_id": "registrar.royltee-dev.testnet",
+      "role": "registrar",
+      "balance_yocto": "986350948137074199999999",
+      "balance_near": "0.986350948137074199999999",
+      "storage_usage_bytes": 182,
+      "code_hash_base58": null,
+      "keys": [
+        {
+          "public_key": "ed25519:GrSwijGB7hmXxoaNkywEA1319vMCw2apLz5AHzDyVBSh",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1
+    },
+    "writer-a.royltee-dev.testnet": {
+      "variable": "WA",
+      "account_id": "writer-a.royltee-dev.testnet",
+      "role": "member, writer",
+      "balance_yocto": "3236132083328670799999999",
+      "balance_near": "3.236132083328670799999999",
+      "storage_usage_bytes": 182,
+      "code_hash_base58": null,
+      "keys": [
+        {
+          "public_key": "ed25519:BwS28gr7pYbPXRa7WRZ8Nucy7N22aiS877AyUaNsdUhU",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1
+    },
+    "writer-b.royltee-dev.testnet": {
+      "variable": "WB",
+      "account_id": "writer-b.royltee-dev.testnet",
+      "role": "member, writer, dispute claimant",
+      "balance_yocto": "1372247840334463599999999",
+      "balance_near": "1.372247840334463599999999",
+      "storage_usage_bytes": 182,
+      "code_hash_base58": null,
+      "keys": [
+        {
+          "public_key": "ed25519:3sxpfDsp8EK4xq2YziBGADfUWomxLsDmnnbAz9DbE21M",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1
+    },
+    "buyer-pub.royltee-dev.testnet": {
+      "variable": "BUYER",
+      "account_id": "buyer-pub.royltee-dev.testnet",
+      "role": "member, publisher, catalog buyer, agent organisation",
+      "balance_yocto": "1391116015880764599999998",
+      "balance_near": "1.391116015880764599999998",
+      "storage_usage_bytes": 182,
+      "code_hash_base58": null,
+      "keys": [
+        {
+          "public_key": "ed25519:5ufjanjzDAo6vVJJ7vruDAT7MKoLuDYYaFdu4fsqEnTZ",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1
+    },
+    "pay-agent.buyer-pub.royltee-dev.testnet": {
+      "variable": "AGENT",
+      "account_id": "pay-agent.buyer-pub.royltee-dev.testnet",
+      "role": "payment agent, function-call key only after step 12",
+      "balance_yocto": "498056910189627800000000",
+      "balance_near": "0.4980569101896278",
+      "storage_usage_bytes": 262,
+      "code_hash_base58": null,
+      "keys": [
+        {
+          "public_key": "ed25519:DtkqdkEcEtTjjfBSharsFhk1i53EJ6fVKBJynYc4g6Tk",
+          "permission": "function_call",
+          "contract": "reg.royltee-dev.testnet",
+          "methods": [
+            "pay_from_allowance",
+            "report"
+          ],
+          "allowance_near_at_record": "0.2495029622256934",
+          "note": "only key on the account after the full-access key was deleted"
+        }
+      ],
+      "key_count": 1,
+      "deleted_full_access_key": {
+        "public_key": "ed25519:EjyEfkGbkM8BXwJeVx1Z1RJbZ8i6VgB7qwDkZhsiDr8i",
+        "deleted_in": "7Bwi9rmQk4R4iApdVTXMWLkGjMgDnh2qZiVEfGPY5NAH",
+        "note": "confirmed from the delete-key transaction; no longer on the account"
+      }
+    },
+    "payer.royltee-dev.testnet": {
+      "variable": "PAYER",
+      "account_id": "payer.royltee-dev.testnet",
+      "role": "simulated payer and mock USDC minter",
+      "balance_yocto": "993484760420760399999996",
+      "balance_near": "0.993484760420760399999996",
+      "storage_usage_bytes": 182,
+      "code_hash_base58": null,
+      "keys": [
+        {
+          "public_key": "ed25519:9vuWrU4CHBgvxaworTWzz1hdFvDA8gNSTijqAgrSeS6j",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1
+    },
+    "outsider.royltee-dev.testnet": {
+      "variable": "OUTSIDER",
+      "account_id": "outsider.royltee-dev.testnet",
+      "role": "no credential, used to show refusals",
+      "balance_yocto": "799100726232201000000000",
+      "balance_near": "0.799100726232201",
+      "storage_usage_bytes": 182,
+      "code_hash_base58": null,
+      "keys": [
+        {
+          "public_key": "ed25519:7CWEd9agEDB6EyfdAz5nAHRMxNKLXk4L669u4HoeSdhR",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1
+    },
+    "s1.reg.royltee-dev.testnet": {
+      "variable": "S1",
+      "account_id": "s1.reg.royltee-dev.testnet",
+      "role": "share vault s1, keyless, embedded vault wasm",
+      "balance_yocto": "99999999999999999999999",
+      "balance_near": "0.099999999999999999999999",
+      "storage_usage_bytes": 7520,
+      "code_hash_base58": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU",
+      "keys": [],
+      "key_count": 0
+    },
+    "s2.reg.royltee-dev.testnet": {
+      "variable": "S2",
+      "account_id": "s2.reg.royltee-dev.testnet",
+      "role": "share vault s2, keyless, embedded vault wasm",
+      "balance_yocto": "99999999999999999999999",
+      "balance_near": "0.099999999999999999999999",
+      "storage_usage_bytes": 7520,
+      "code_hash_base58": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU",
+      "keys": [],
+      "key_count": 0
+    },
+    "s3.reg.royltee-dev.testnet": {
+      "variable": "S3",
+      "account_id": "s3.reg.royltee-dev.testnet",
+      "role": "share vault s3, keyless, embedded vault wasm",
+      "balance_yocto": "100000000000000000000000",
+      "balance_near": "0.1",
+      "storage_usage_bytes": 7520,
+      "code_hash_base58": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU",
+      "keys": [],
+      "key_count": 0
+    },
+    "s4.reg.royltee-dev.testnet": {
+      "variable": "S4",
+      "account_id": "s4.reg.royltee-dev.testnet",
+      "role": "share vault s4, keyless, embedded vault wasm",
+      "balance_yocto": "100000000000000000000000",
+      "balance_near": "0.1",
+      "storage_usage_bytes": 7520,
+      "code_hash_base58": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU",
+      "keys": [],
+      "key_count": 0
+    },
+    "s5.reg.royltee-dev.testnet": {
+      "variable": "S5",
+      "account_id": "s5.reg.royltee-dev.testnet",
+      "role": "share vault s5, keyless, embedded vault wasm",
+      "balance_yocto": "100000000000000000000000",
+      "balance_near": "0.1",
+      "storage_usage_bytes": 7520,
+      "code_hash_base58": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU",
+      "keys": [],
+      "key_count": 0
+    },
+    "s6.reg.royltee-dev.testnet": {
+      "variable": "S6",
+      "account_id": "s6.reg.royltee-dev.testnet",
+      "role": "share vault s6, keyless, embedded vault wasm",
+      "balance_yocto": "100000000000000000000000",
+      "balance_near": "0.1",
+      "storage_usage_bytes": 7520,
+      "code_hash_base58": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU",
+      "keys": [],
+      "key_count": 0
+    },
+    "s7.reg.royltee-dev.testnet": {
+      "variable": "S7",
+      "account_id": "s7.reg.royltee-dev.testnet",
+      "role": "share vault s7, keyless, embedded vault wasm",
+      "balance_yocto": "100000000000000000000000",
+      "balance_near": "0.1",
+      "storage_usage_bytes": 7520,
+      "code_hash_base58": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU",
+      "keys": [],
+      "key_count": 0
+    }
+  },
+  "accounting_after_step_13": {
+    "allowance_total": "400000",
+    "escrow_total": "0",
+    "forwards_in_flight_total": "0",
+    "unallocated_total": "0",
+    "undelivered_total": "0",
+    "registry_musdc_amount": "400000",
+    "registry_musdc_equals_counter_total": true,
+    "source": "get_accounting and view-ft-balance after step 13, rechecked while writing this record"
+  },
+  "transactions": [
+    {
+      "step": 1,
+      "transaction_hash": "Dc9UC9uoBvbnUCHBhhYH61spAHNQwdGRaexvGJj5Jjv2",
+      "signer": "testnet",
+      "receiver": "royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "10000000000000000000000000",
+      "block_height": 277466777,
+      "block_timestamp_utc": "2026-11-13T05:22:31.509Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "faucet account royltee-dev.testnet funded with 10 NEAR by signer testnet"
+    },
+    {
+      "step": 1,
+      "transaction_hash": "GBArKSzp5EZvuAsmazaApecEgsnDq8ZzRQZn7aCDq9WH",
+      "signer": "testnet",
+      "receiver": "royltee-fund-1.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "10000000000000000000000000",
+      "block_height": 277466781,
+      "block_timestamp_utc": "2026-11-13T05:22:33.892Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "faucet account royltee-fund-1.testnet funded with 10 NEAR by signer testnet"
+    },
+    {
+      "step": 1,
+      "transaction_hash": "CqgWcrji8eNHpbqQjgTXBaedeB2VjQ4aHbJ7jvy76LbR",
+      "signer": "testnet",
+      "receiver": "royltee-fund-2.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "10000000000000000000000000",
+      "block_height": 277466785,
+      "block_timestamp_utc": "2026-11-13T05:22:36.293Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "faucet account royltee-fund-2.testnet funded with 10 NEAR by signer testnet"
+    },
+    {
+      "step": 2,
+      "transaction_hash": "3p5XicR5K6VZZ3fyXd3ajme18jK9GVCvF1MptUjQCzhV",
+      "signer": "royltee-fund-1.testnet",
+      "receiver": "royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "TRANSFER",
+          "method": null
+        }
+      ],
+      "method": "TRANSFER",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "44636512500000000000",
+      "fee_near": "0.0000446365125",
+      "attached_deposit_yocto": "9900000000000000000000000",
+      "block_height": 277466949,
+      "block_timestamp_utc": "2026-11-13T05:24:15.588Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "9.9 NEAR to royltee-dev.testnet"
+    },
+    {
+      "step": 2,
+      "transaction_hash": "DuHBA6BhJL6xBtJnmgFiTQSp8SPBQma6oNiK1t4fCG5q",
+      "signer": "royltee-fund-2.testnet",
+      "receiver": "royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "TRANSFER",
+          "method": null
+        }
+      ],
+      "method": "TRANSFER",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "44636512500000000000",
+      "fee_near": "0.0000446365125",
+      "attached_deposit_yocto": "9900000000000000000000000",
+      "block_height": 277466956,
+      "block_timestamp_utc": "2026-11-13T05:24:19.950Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "9.9 NEAR to royltee-dev.testnet"
+    },
+    {
+      "step": 3,
+      "transaction_hash": "2w6e8cpFR3Te6SN37boNG2yjQBaF1nSYoEgtaJQh7oLL",
+      "signer": "royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "8000000000000000000000000",
+      "block_height": 277467037,
+      "block_timestamp_utc": "2026-11-13T05:25:08.981Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "reg.royltee-dev.testnet funded with 8 NEAR"
+    },
+    {
+      "step": 3,
+      "transaction_hash": "4SdSyjyavgTHmguaH6wwhaL44A9kD6i9qJ7mkFqFJ4HW",
+      "signer": "royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "2500000000000000000000000",
+      "block_height": 277467045,
+      "block_timestamp_utc": "2026-11-13T05:25:13.762Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "usdc.royltee-dev.testnet funded with 2.5 NEAR"
+    },
+    {
+      "step": 3,
+      "transaction_hash": "J3Nsa96BCjRdTcoKPH2aRMTpcmjaJkhbK76DZp6prtY4",
+      "signer": "royltee-dev.testnet",
+      "receiver": "registrar.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "1000000000000000000000000",
+      "block_height": 277467053,
+      "block_timestamp_utc": "2026-11-13T05:25:18.598Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "registrar.royltee-dev.testnet funded with 1 NEAR"
+    },
+    {
+      "step": 3,
+      "transaction_hash": "3zMViPrv5wSvaEQjwzmK6Ed4yHawgf5WHirG3vHhMeUP",
+      "signer": "royltee-dev.testnet",
+      "receiver": "writer-a.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "4000000000000000000000000",
+      "block_height": 277467060,
+      "block_timestamp_utc": "2026-11-13T05:25:22.846Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "writer-a.royltee-dev.testnet funded with 4 NEAR"
+    },
+    {
+      "step": 3,
+      "transaction_hash": "BUHnhUj8L4SzsFw4nj17UwmvawKu7uZiThVrnQorvR4N",
+      "signer": "royltee-dev.testnet",
+      "receiver": "writer-b.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "1500000000000000000000000",
+      "block_height": 277467068,
+      "block_timestamp_utc": "2026-11-13T05:25:27.697Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "writer-b.royltee-dev.testnet funded with 1.5 NEAR"
+    },
+    {
+      "step": 3,
+      "transaction_hash": "55zQtvog1Jm8Wag82p6tr9SyqVdQB8EX6xadmRM2Kfkb",
+      "signer": "royltee-dev.testnet",
+      "receiver": "buyer-pub.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "2000000000000000000000000",
+      "block_height": 277467075,
+      "block_timestamp_utc": "2026-11-13T05:25:31.975Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "buyer-pub.royltee-dev.testnet funded with 2 NEAR"
+    },
+    {
+      "step": 3,
+      "transaction_hash": "Cro9NxTB5hdV6sdeQhZFm8eRhWJTYiJMeKRtjkeUFPde",
+      "signer": "royltee-dev.testnet",
+      "receiver": "payer.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "1000000000000000000000000",
+      "block_height": 277467083,
+      "block_timestamp_utc": "2026-11-13T05:25:36.882Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "payer.royltee-dev.testnet funded with 1 NEAR"
+    },
+    {
+      "step": 3,
+      "transaction_hash": "DJovCyZmzC5x4Qnzg6eAzc2VvgPfkAC3hqcMP7PRdyNB",
+      "signer": "royltee-dev.testnet",
+      "receiver": "outsider.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "300000000000000000000000",
+      "block_height": 277467090,
+      "block_timestamp_utc": "2026-11-13T05:25:41.081Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "outsider.royltee-dev.testnet funded with 0.3 NEAR"
+    },
+    {
+      "step": 4,
+      "transaction_hash": "APzCzPmVMWStFkwXkJXYX4JQPQqYYghjkWKYR3c6vcmK",
+      "signer": "usdc.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "DEPLOY_CONTRACT",
+          "method": null
+        },
+        {
+          "action": "FUNCTION_CALL",
+          "method": "new"
+        }
+      ],
+      "method": "deploy+new",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "1513192097854000000000",
+      "fee_near": "0.001513192097854",
+      "attached_deposit_yocto": "0",
+      "block_height": 277467174,
+      "block_timestamp_utc": "2026-11-13T05:26:32.061Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "mock USDC deploy and init in one transaction"
+    },
+    {
+      "step": 5,
+      "transaction_hash": "Ckk8dvY7sR2fKpDBEQ1akEVx8QSviSNmJCKkyBRjpXeN",
+      "signer": "reg.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "DEPLOY_CONTRACT",
+          "method": null
+        },
+        {
+          "action": "FUNCTION_CALL",
+          "method": "new"
+        }
+      ],
+      "method": "deploy+new",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "5247305480726200000000",
+      "fee_near": "0.0052473054807262",
+      "attached_deposit_yocto": "0",
+      "block_height": 277467972,
+      "block_timestamp_utc": "2026-11-13T05:34:28.408Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "registry deploy and init in one transaction; nft symbol ROYLT"
+    },
+    {
+      "step": 7,
+      "transaction_hash": "C1GNRhzLHUR7Tj4dvro66rzd2m7W9B2kgNtKm5CVP7y7",
+      "signer": "payer.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "storage_deposit"
+        }
+      ],
+      "method": "storage_deposit",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "233705927241500000000",
+      "fee_near": "0.0002337059272415",
+      "attached_deposit_yocto": "10000000000000000000000",
+      "block_height": 277468598,
+      "block_timestamp_utc": "2026-11-13T05:40:47.659Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "token storage for the registry, 0.01 NEAR attached"
+    },
+    {
+      "step": 7,
+      "transaction_hash": "2JuQenXQYe8DiWZBfAN6AhdvDAeZbbRLM1PwwdXuU1Ty",
+      "signer": "payer.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "storage_deposit"
+        }
+      ],
+      "method": "storage_deposit",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "234654289703300000000",
+      "fee_near": "0.0002346542897033",
+      "attached_deposit_yocto": "10000000000000000000000",
+      "block_height": 277468606,
+      "block_timestamp_utc": "2026-11-13T05:40:52.536Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "token storage for the payer, 0.01 NEAR attached"
+    },
+    {
+      "step": 7,
+      "transaction_hash": "D1kHgerP4xVj7jmCp8JoGUSvHZE8grp19U7XcBHCh8Hs",
+      "signer": "payer.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "mint"
+        }
+      ],
+      "method": "mint",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "192554424596400000000",
+      "fee_near": "0.0001925544245964",
+      "attached_deposit_yocto": "0",
+      "block_height": 277468614,
+      "block_timestamp_utc": "2026-11-13T05:40:58.036Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "mint 1000000000 (1000 mUSDC) to the payer"
+    },
+    {
+      "step": 8,
+      "transaction_hash": "Bv7cDUgGrGxgqaXr5FJnGpauqw1DcLpJmUuTMnrydFa6",
+      "signer": "registrar.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "grant_credential"
+        }
+      ],
+      "method": "grant_credential",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "746969949382800000000",
+      "fee_near": "0.0007469699493828",
+      "attached_deposit_yocto": "20000000000000000000000",
+      "block_height": 277469316,
+      "block_timestamp_utc": "2026-11-13T05:48:03.791Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final"
+    },
+    {
+      "step": 8,
+      "transaction_hash": "8QffMekUyzGzF6UvPX256tUBBBcXsjhy5M6GTHibUjkB",
+      "signer": "registrar.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "grant_credential"
+        }
+      ],
+      "method": "grant_credential",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "747298614862100000000",
+      "fee_near": "0.0007472986148621",
+      "attached_deposit_yocto": "20000000000000000000000",
+      "block_height": 277469325,
+      "block_timestamp_utc": "2026-11-13T05:48:09.234Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final"
+    },
+    {
+      "step": 8,
+      "transaction_hash": "3dqBCz6QkbdbDqkZFSqvmfzHjuZHRkVt45A5kbAvg6Vq",
+      "signer": "registrar.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "grant_credential"
+        }
+      ],
+      "method": "grant_credential",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "747881949382800000000",
+      "fee_near": "0.0007478819493828",
+      "attached_deposit_yocto": "20000000000000000000000",
+      "block_height": 277469371,
+      "block_timestamp_utc": "2026-11-13T05:48:37.063Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final"
+    },
+    {
+      "step": 9,
+      "transaction_hash": "BPPDyNSdA8T3uUR1DFmWGj48Wx7mjQtnh9h931g2myL6",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "register_work"
+        }
+      ],
+      "method": "register_work",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "349215631853900000000",
+      "fee_near": "0.0003492156318539",
+      "attached_deposit_yocto": "50000000000000000000000",
+      "block_height": 277469467,
+      "block_timestamp_utc": "2026-11-13T05:49:35.160Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "work id 0"
+    },
+    {
+      "step": 9,
+      "transaction_hash": "DNYpArZtk7YFkwVSemz9tqqJ412Z9d9bAzeZfqLVUC8g",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "register_work"
+        }
+      ],
+      "method": "register_work",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "349672290058700000000",
+      "fee_near": "0.0003496722900587",
+      "attached_deposit_yocto": "50000000000000000000000",
+      "block_height": 277469475,
+      "block_timestamp_utc": "2026-11-13T05:49:40.079Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "work id 1"
+    },
+    {
+      "step": 9,
+      "transaction_hash": "FUXXssztjGSmyiuTFbdM2cajmUU1U83VjG5ghNcTKKMK",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "register_work"
+        }
+      ],
+      "method": "register_work",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "350128290058700000000",
+      "fee_near": "0.0003501282900587",
+      "attached_deposit_yocto": "50000000000000000000000",
+      "block_height": 277469483,
+      "block_timestamp_utc": "2026-11-13T05:49:44.917Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "work id 2"
+    },
+    {
+      "step": 9,
+      "transaction_hash": "7wxZ7Bmstzu9qTUayrvzbGP97tcD6GRLMaZo7pTVAqzh",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "register_share"
+        }
+      ],
+      "method": "register_share",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "8453624754292100000000",
+      "fee_near": "0.0084536247542921",
+      "attached_deposit_yocto": "500000000000000000000000",
+      "block_height": 277469491,
+      "block_timestamp_utc": "2026-11-13T05:49:49.811Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "expected token s1; vault is keyless"
+    },
+    {
+      "step": 9,
+      "transaction_hash": "5w2dvQS54div1eWYPrfFBteYK541cQiCxfvfKhEYw51c",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "register_share"
+        }
+      ],
+      "method": "register_share",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "8500088251751400000000",
+      "fee_near": "0.0085000882517514",
+      "attached_deposit_yocto": "500000000000000000000000",
+      "block_height": 277469502,
+      "block_timestamp_utc": "2026-11-13T05:49:56.435Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "expected token s2; vault is keyless"
+    },
+    {
+      "step": 9,
+      "transaction_hash": "6TM8ZRPrH88GXN9AcgBCF7WGkyLLnn64PnkRnqNEg3Fz",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "register_share"
+        }
+      ],
+      "method": "register_share",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "8587633874405400000000",
+      "fee_near": "0.0085876338744054",
+      "attached_deposit_yocto": "500000000000000000000000",
+      "block_height": 277469514,
+      "block_timestamp_utc": "2026-11-13T05:50:03.787Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "expected token s3; vault is keyless"
+    },
+    {
+      "step": 9,
+      "transaction_hash": "DPSu7aR4HCsTp4mvvAKgbTbwcAzDnvADYBmvsoSpANuH",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "register_share"
+        }
+      ],
+      "method": "register_share",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "8554079693747400000000",
+      "fee_near": "0.0085540796937474",
+      "attached_deposit_yocto": "500000000000000000000000",
+      "block_height": 277469525,
+      "block_timestamp_utc": "2026-11-13T05:50:10.338Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "expected token s4; vault is keyless"
+    },
+    {
+      "step": 9,
+      "transaction_hash": "79TqB2ZMs8DcTGpsvYidKvffe4ytf7gWngWDveJnVhDf",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "register_share"
+        }
+      ],
+      "method": "register_share",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "8638921287999100000000",
+      "fee_near": "0.0086389212879991",
+      "attached_deposit_yocto": "500000000000000000000000",
+      "block_height": 277469536,
+      "block_timestamp_utc": "2026-11-13T05:50:17.072Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "expected token s5; vault is keyless"
+    },
+    {
+      "step": 9,
+      "transaction_hash": "4VFK3fPFo5Amk9B6r2KzBqpkVEmYNtN53vpcHyLC9q5J",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "register_share"
+        }
+      ],
+      "method": "register_share",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "8684621749118800000000",
+      "fee_near": "0.0086846217491188",
+      "attached_deposit_yocto": "500000000000000000000000",
+      "block_height": 277469547,
+      "block_timestamp_utc": "2026-11-13T05:50:23.745Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "expected token s6; vault is keyless"
+    },
+    {
+      "step": 10,
+      "transaction_hash": "HBzKi5ptr5sGvPSgwWQSUNMKBRJksNCp3tAeT4xByo8u",
+      "signer": "payer.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "ft_transfer_call"
+        }
+      ],
+      "method": "ft_transfer_call",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "1681708876351800000000",
+      "fee_near": "0.0016817088763518",
+      "attached_deposit_yocto": "1",
+      "block_height": 277470230,
+      "block_timestamp_utc": "2026-11-13T05:57:09.493Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "pay work 0, 1.0 mUSDC, statement line-1"
+    },
+    {
+      "step": 10,
+      "transaction_hash": "5wiQVMdfYtuFvUsYcaTeM31sZPizytAaT8etsDx9dQZo",
+      "signer": "payer.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "ft_transfer"
+        }
+      ],
+      "method": "ft_transfer",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "214612341686500000000",
+      "fee_near": "0.0002146123416865",
+      "attached_deposit_yocto": "1",
+      "block_height": 277470241,
+      "block_timestamp_utc": "2026-11-13T05:57:15.538Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "plain 0.2 mUSDC to s3"
+    },
+    {
+      "step": 10,
+      "transaction_hash": "2Jsht1EatGqZfeVrZePKyVMQPyqyeqTCpEcoaHWK44LY",
+      "signer": "outsider.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "sync"
+        }
+      ],
+      "method": "sync",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "683765144117400000000",
+      "fee_near": "0.0006837651441174",
+      "attached_deposit_yocto": "0",
+      "block_height": 277470248,
+      "block_timestamp_utc": "2026-11-13T05:57:19.014Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "outsider called sync on s3, returned 200000"
+    },
+    {
+      "step": 11,
+      "transaction_hash": "FLzUW7hfLkY1waMuwRDoLCdhAxKsXyxv2FmJ4UoRnsNH",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "claim"
+        }
+      ],
+      "method": "claim",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "899930848043700000000",
+      "fee_near": "0.0008999308480437",
+      "attached_deposit_yocto": "1",
+      "block_height": 277470460,
+      "block_timestamp_utc": "2026-11-13T05:59:16.712Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "writer-a claimed s1"
+    },
+    {
+      "step": 11,
+      "transaction_hash": "HZ9pD2kLbqbjmKqC68ao6KBTUpQmQstyd2Tro8hWwYPy",
+      "signer": "writer-b.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "nft_transfer"
+        }
+      ],
+      "method": "nft_transfer",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "475000425676600000000",
+      "fee_near": "0.0004750004256766",
+      "attached_deposit_yocto": "1",
+      "block_height": 277470470,
+      "block_timestamp_utc": "2026-11-13T05:59:22.382Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "writer-b sold s2 to buyer-pub"
+    },
+    {
+      "step": 11,
+      "transaction_hash": "M4pWDbEgnUfz4TiJA8ZZdNVCnwV9vzsBnnEqRgALDrp",
+      "signer": "buyer-pub.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "claim"
+        }
+      ],
+      "method": "claim",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "899728227657000000000",
+      "fee_near": "0.000899728227657",
+      "attached_deposit_yocto": "1",
+      "block_height": 277470477,
+      "block_timestamp_utc": "2026-11-13T05:59:25.899Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "buyer-pub claimed s2; unclaimed balance travelled with the token"
+    },
+    {
+      "step": 11,
+      "transaction_hash": "Agtkfe5qEGaXzYQJsHdUxXL7ELx4D432sM4bHPRSiM8R",
+      "signer": "royltee-dev.testnet",
+      "receiver": "outsider.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "TRANSFER",
+          "method": null
+        }
+      ],
+      "method": "TRANSFER",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "44636512500000000000",
+      "fee_near": "0.0000446365125",
+      "attached_deposit_yocto": "500000000000000000000000",
+      "block_height": 277470677,
+      "block_timestamp_utc": "2026-11-13T06:01:20.022Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "0.5 NEAR top-up from royltee-dev.testnet to outsider.royltee-dev.testnet, not in the original plan commands, before the refused claim"
+    },
+    {
+      "step": 11,
+      "transaction_hash": "GvcHLtG7vLQXihNgbH6cmGSnG8QWhsNgzYGFQ2URwAVB",
+      "signer": "outsider.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "claim"
+        }
+      ],
+      "method": "claim",
+      "success": false,
+      "result": "failed",
+      "fee_yocto": "215508623681600000000",
+      "fee_near": "0.0002155086236816",
+      "attached_deposit_yocto": "1",
+      "block_height": 277470687,
+      "block_timestamp_utc": "2026-11-13T06:01:26.185Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "outsider claim on s1 refused",
+      "error": "only the current holder can claim"
+    },
+    {
+      "step": 12,
+      "transaction_hash": "9ysr9ZjYxTi2noGfDLRe7msVAqAqbpG4FvePejnHXdf8",
+      "signer": "buyer-pub.royltee-dev.testnet",
+      "receiver": "pay-agent.buyer-pub.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "500000000000000000000000",
+      "block_height": 277474444,
+      "block_timestamp_utc": "2026-11-13T06:38:18.382Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "created pay-agent.buyer-pub.royltee-dev.testnet with 0.5 NEAR; full-access key ed25519:EjyEfkGbkM8BXwJeVx1Z1RJbZ8i6VgB7qwDkZhsiDr8i"
+    },
+    {
+      "step": 12,
+      "transaction_hash": "CnXEfU7QdnoBPEqvkf1fU1rPd3idUDWABhz6eYzS7Xuf",
+      "signer": "pay-agent.buyer-pub.royltee-dev.testnet",
+      "receiver": "pay-agent.buyer-pub.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "ADD_KEY",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "42065436721200000000",
+      "fee_near": "0.0000420654367212",
+      "attached_deposit_yocto": "0",
+      "block_height": 277474472,
+      "block_timestamp_utc": "2026-11-13T06:38:35.328Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "added function-call key ed25519:DtkqdkEcEtTjjfBSharsFhk1i53EJ6fVKBJynYc4g6Tk for pay_from_allowance and report on the registry, 0.25 NEAR allowance"
+    },
+    {
+      "step": 12,
+      "transaction_hash": "5W1zDz8JVPt8p39PXxZhY7c5vZ5gyUdiTC3vKRSR9rAo",
+      "signer": "buyer-pub.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "grant_role"
+        }
+      ],
+      "method": "grant_role",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "354890879669000000000",
+      "fee_near": "0.000354890879669",
+      "attached_deposit_yocto": "100000000000000000000000",
+      "block_height": 277474497,
+      "block_timestamp_utc": "2026-11-13T06:38:50.471Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "0.1 NEAR deposit"
+    },
+    {
+      "step": 12,
+      "transaction_hash": "3HjExU75Ge7kzRu9boJbmKuEv3nirxfhYGHdxseYfi4k",
+      "signer": "payer.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "ft_transfer"
+        }
+      ],
+      "method": "ft_transfer",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "214335708036100000000",
+      "fee_near": "0.0002143357080361",
+      "attached_deposit_yocto": "1",
+      "block_height": 277474505,
+      "block_timestamp_utc": "2026-11-13T06:38:55.403Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "payer sent 0.5 mUSDC to buyer-pub"
+    },
+    {
+      "step": 12,
+      "transaction_hash": "28CT65SBxByM6HA9KDRoJQSFpqymz6KxafdFJEMXhBaQ",
+      "signer": "buyer-pub.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "ft_transfer_call"
+        }
+      ],
+      "method": "ft_transfer_call",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "674375474409400000000",
+      "fee_near": "0.0006743754744094",
+      "attached_deposit_yocto": "1",
+      "block_height": 277474512,
+      "block_timestamp_utc": "2026-11-13T06:38:59.668Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "buyer-pub funded the agent allowance with 0.5 mUSDC"
+    },
+    {
+      "step": 12,
+      "transaction_hash": "7DJThzgCgnZYf9uNhPgH5ZsuJKx8mJqHkiLcqszdRSTu",
+      "signer": "pay-agent.buyer-pub.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "pay_from_allowance"
+        }
+      ],
+      "method": "pay_from_allowance",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "1363385374344400000000",
+      "fee_near": "0.0013633853743444",
+      "attached_deposit_yocto": "0",
+      "block_height": 277474531,
+      "block_timestamp_utc": "2026-11-13T06:39:11.102Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "0.1 mUSDC on agent-line-1; signed by the full-access key ed25519:EjyEfkGbkM8BXwJeVx1Z1RJbZ8i6VgB7qwDkZhsiDr8i, before that key was deleted. Does not count as proof of the function-call key."
+    },
+    {
+      "step": 12,
+      "transaction_hash": "CmRvd9ZNcfsR5EnMsc3VJ6YYncE3mQgLWqF21YhS1w5G",
+      "signer": "pay-agent.buyer-pub.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "report"
+        }
+      ],
+      "method": "report",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "259880093121300000000",
+      "fee_near": "0.0002598800931213",
+      "attached_deposit_yocto": "0",
+      "block_height": 277475094,
+      "block_timestamp_utc": "2026-11-13T06:45:05.826Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "signed by the function-call key ed25519:DtkqdkEcEtTjjfBSharsFhk1i53EJ6fVKBJynYc4g6Tk"
+    },
+    {
+      "step": 12,
+      "transaction_hash": "7Bwi9rmQk4R4iApdVTXMWLkGjMgDnh2qZiVEfGPY5NAH",
+      "signer": "pay-agent.buyer-pub.royltee-dev.testnet",
+      "receiver": "pay-agent.buyer-pub.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "DELETE_KEY",
+          "method": null
+        }
+      ],
+      "method": "DELETE_KEY",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "40601225000000000000",
+      "fee_near": "0.000040601225",
+      "attached_deposit_yocto": "0",
+      "block_height": 277475109,
+      "block_timestamp_utc": "2026-11-13T06:45:15.045Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "deleted the agent's full-access key ed25519:EjyEfkGbkM8BXwJeVx1Z1RJbZ8i6VgB7qwDkZhsiDr8i"
+    },
+    {
+      "step": 12,
+      "transaction_hash": "2547uRUDcHokGMabzgLXdHZVfuG1VzDyxBc2X1rxmFb3",
+      "signer": "pay-agent.buyer-pub.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "pay_from_allowance"
+        }
+      ],
+      "method": "pay_from_allowance",
+      "success": false,
+      "result": "failed",
+      "fee_yocto": "237157681185300000000",
+      "fee_near": "0.0002371576811853",
+      "attached_deposit_yocto": "0",
+      "block_height": 277475146,
+      "block_timestamp_utc": "2026-11-13T06:45:37.520Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "duplicate agent-line-1, signed by the function-call key",
+      "error": "statement line already paid"
+    },
+    {
+      "step": 12,
+      "transaction_hash": null,
+      "method": "claim",
+      "success": false,
+      "result": "refused client-side, no transaction",
+      "error": "Having a deposit with a function call action is not allowed with a function call access key",
+      "note": "agent tried to claim s4 with 1 yoctoNEAR attached, signed by the function-call key; the protocol refused before a transaction was sent"
+    },
+    {
+      "step": 13,
+      "transaction_hash": "3uKby5aP5pN6sMEp1EJSWn7xDEzyH2nASNzS7ccstJba",
+      "signer": "writer-b.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "register_share"
+        }
+      ],
+      "method": "register_share",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "8747159239859800000000",
+      "fee_near": "0.0087471592398598",
+      "attached_deposit_yocto": "500000000000000000000000",
+      "block_height": 277480889,
+      "block_timestamp_utc": "2026-11-13T07:42:25.256Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "writer-b 20 percent contesting s5; minted s7 and opened dispute 0 (over-allocation)"
+    },
+    {
+      "step": 13,
+      "transaction_hash": "C8H28Nx1MZ5Pjb13uzkvheAh7S6Jf5mdqqHqmM1n7Mu",
+      "signer": "payer.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "ft_transfer_call"
+        }
+      ],
+      "method": "ft_transfer_call",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "1243668011624000000000",
+      "fee_near": "0.001243668011624",
+      "attached_deposit_yocto": "1",
+      "block_height": 277480917,
+      "block_timestamp_utc": "2026-11-13T07:42:40.068Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "payer paid work 2, 1.0 mUSDC, line-3; s6 received 0.3, s5's 0.7 went to escrow under dispute 0, s7 received nothing"
+    },
+    {
+      "step": 13,
+      "transaction_hash": "7wvLcnuB5L6w3rh3tBL2Jgg7yTMErD9QduC1XLSAYUVi",
+      "signer": "registrar.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "resolve"
+        }
+      ],
+      "method": "resolve",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "866901349298100000000",
+      "fee_near": "0.0008669013492981",
+      "attached_deposit_yocto": "1",
+      "block_height": 277480944,
+      "block_timestamp_utc": "2026-11-13T07:42:54.535Z",
+      "confirmed_by": "near transaction view-status, final_execution_status Final",
+      "note": "registrar resolved dispute 0 as uphold_existing; s7 voided; 0.7 escrow released to s5 only"
+    }
+  ],
+  "step_6": {
+    "status": "parked",
+    "transactions": [],
+    "note": "The owner asked to keep the registry and mock USDC full-access keys until they say they can be deleted. list-keys still shows one full-access key on each account."
+  }
+}
