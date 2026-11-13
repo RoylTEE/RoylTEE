@@ -108,9 +108,14 @@ export async function handle(request: Request, route: string, deps: Deps): Promi
     }
     if (route === 'tickets' && method === 'POST') {
       const input = await body(request);
+      // Check the submission token before any ticket reads. It is only used up once the request is valid,
+      // so a 422 or a full open slot lets the user fix it and send again without a refresh.
+      const submitKey = typeof input.submitNonce === 'string' && sessionId.test(input.submitNonce) ? `ticket-submit:${input.submitNonce}` : '';
+      const owner = `${session.sid}:${session.wallet}`;
+      if (!submitKey || await store.get(submitKey) !== owner) fail(400, 'That ticket request was used or expired. Please refresh and try again.');
       const fields = ticketText(input);
-      await assertOpenSlot(store, session.wallet);
-      if (typeof input.submitNonce !== 'string' || !sessionId.test(input.submitNonce) || await store.take(`ticket-submit:${input.submitNonce}`) !== `${session.sid}:${session.wallet}`) fail(400, 'That ticket request was used or expired. Please refresh and try again.');
+      await assertOpenSlot(store, session.wallet, now);
+      if (await store.take(submitKey) !== owner) fail(400, 'That ticket request was used or expired. Please refresh and try again.');
       await rate(store, `ticket-wallet:${session.wallet}`, 5, 86400);
       await rate(store, `ticket-ip:${ip}`, 10, 86400);
       const ticket = await createTicket(store, session.wallet, fields, now);

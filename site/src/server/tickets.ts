@@ -10,6 +10,8 @@ export const PAGE_SIZE = 100;
 const LIVE_SECONDS = OPEN_SECONDS;
 export const LIMITS = { subject: 120, message: 2000, reply: 2000, page: PAGE_SIZE, openPerWallet: OPEN_PER_WALLET, openDays: 30 };
 const wallet = (w: string) => `tickets:wallet:${w}`;
+/** Open and answered tickets for one wallet, scored by the last write, which also sets the record TTL. */
+const openIndex = (w: string) => `tickets:open:${w}`;
 export type TicketPage = { tickets: Ticket[]; cursor: string | null };
 export function encodeCursor(createdAt: number, id: string) { return `${createdAt}:${id}`; }
 export function decodeCursor(value: string | null): { createdAt: number; id: string } | null {
@@ -30,23 +32,31 @@ function clean(value: unknown, max: number) {
 export function ticketText(input: Record<string, unknown>) {
   return { subject: clean(input.subject, LIMITS.subject), message: clean(input.message, LIMITS.message) };
 }
-export async function openCount(store: Store, owner: string) {
+/**
+ * Bounded: one prune of entries whose record TTL has passed, one range of at most OPEN_PER_WALLET
+ * members, and at most OPEN_PER_WALLET record reads. It never scans the wallet's full history.
+ */
+export async function openCount(store: Store, owner: string, now = Date.now()) {
+  const index = openIndex(owner);
+  await store.removeBelow(index, now - OPEN_SECONDS * 1000);
   let n = 0;
-  for (const id of await store.rangeNewest(wallet(owner), Number.MAX_SAFE_INTEGER, 500)) {
+  for (const id of await store.rangeNewest(index, Number.MAX_SAFE_INTEGER, OPEN_PER_WALLET)) {
     const t = await store.get<Ticket>(`ticket:${id}`);
     if (t && t.status !== 'closed') n++;
+    else await store.remove(index, id);
   }
   return n;
 }
-export async function assertOpenSlot(store: Store, owner: string) {
-  if (await openCount(store, owner) >= OPEN_PER_WALLET) fail(429, 'You already have the maximum number of open tickets. Please wait for a reply or for an older ticket to close.');
+export async function assertOpenSlot(store: Store, owner: string, now = Date.now()) {
+  if (await openCount(store, owner, now) >= OPEN_PER_WALLET) fail(429, 'You already have the maximum number of open tickets. Please wait for a reply or for an older ticket to close.');
 }
 export async function createTicket(store: Store, owner: string, input: Record<string, unknown>, now: number) {
   const fields = ticketText(input);
-  await assertOpenSlot(store, owner);
+  await assertOpenSlot(store, owner, now);
   const ticket: Ticket = { id: randomId(), wallet: owner, subject: fields.subject, message: fields.message, status: 'open', reply: null, createdAt: now, updatedAt: now, closedAt: null };
   await store.put(`ticket:${ticket.id}`, ticket, LIVE_SECONDS);
   await store.add(wallet(owner), now, ticket.id);
+  await store.add(openIndex(owner), now, ticket.id);
   await store.add('tickets:all', now, ticket.id);
   return ticket;
 }
@@ -86,6 +96,8 @@ export async function adminUpdate(store: Store, id: unknown, action: 'reply' | '
   if (!await store.cas(`ticket:${id}`, t, ticket, action === 'close' ? RETAIN_CLOSED_MS / 1000 : LIVE_SECONDS)) {
     fail(409, 'This ticket changed. Please refresh and try again.');
   }
+  if (action === 'close') await store.remove(openIndex(ticket.wallet), id);
+  else await store.add(openIndex(ticket.wallet), now, id);
   return ticket;
 }
 /** Expiry is enforced by store TTL; the sweep removes due records and indexes. */
@@ -99,6 +111,7 @@ export async function sweep(store: Store, now: number) {
     await store.remove('tickets:closed', member);
     await store.remove('tickets:all', id);
     await store.remove(wallet(owner), id);
+    await store.remove(openIndex(owner), id);
     removed++;
   }
   return removed;

@@ -12,6 +12,8 @@ export interface Store {
   range(index: string, max?: number, limit?: number): Promise<string[]>;
   rangeNewest(index: string, max?: number, limit?: number): Promise<string[]>;
   remove(index: string, member: string): Promise<void>;
+  /** Removes every member with a score at or below max in one call. */
+  removeBelow(index: string, max: number): Promise<void>;
 }
 const key = (k: string) => `royltee:v1:${k}`;
 export class MemoryStore implements Store {
@@ -50,6 +52,10 @@ export class MemoryStore implements Store {
     return [...(this.indexes.get(index) ?? [])].filter(([, s]) => s <= max).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0)).slice(0, limit).map(([m]) => m);
   }
   async remove(index: string, member: string) { this.indexes.get(index)?.delete(member); }
+  async removeBelow(index: string, max: number) {
+    const m = this.indexes.get(index); if (!m) return;
+    for (const [member, score] of [...m]) if (score <= max) m.delete(member);
+  }
 }
 export class RedisStore implements Store {
   constructor(private url: string, private token: string, private fetcher: typeof fetch = fetch) {
@@ -74,4 +80,5 @@ export class RedisStore implements Store {
   async range(i: string, max = Number.MAX_SAFE_INTEGER, limit = 100) { return this.command<string[]>('ZRANGEBYSCORE', key(i), '-inf', max, 'LIMIT', 0, limit); }
   async rangeNewest(i: string, max = Number.MAX_SAFE_INTEGER, limit = 100) { return this.command<string[]>('ZREVRANGEBYSCORE', key(i), max, '-inf', 'LIMIT', 0, limit); }
   async remove(i: string, m: string) { await this.command('ZREM', key(i), m); }
+  async removeBelow(i: string, max: number) { await this.command('ZREMRANGEBYSCORE', key(i), '-inf', max); }
 }
