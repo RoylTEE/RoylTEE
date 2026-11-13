@@ -33,7 +33,7 @@ Terms used below (full detail in DESIGN.md):
 - Attack: what the adversary does.
 - Impact: what they gain or what breaks if unmitigated.
 - Mitigation: what the design does (see DESIGN.md for exact methods and fields).
-- Test: test number from the test plan (1 to 17 are from the brief, 18 and up are added here), plus named unit and sandbox tests. Review regression tests live in `contracts/registry/src/review_fixes.rs` (unit) and `contracts/tests/tests/review.rs` (sandbox). The planned `verify-keys` and `verify:testnet` scripts do not exist yet (see T13); until they do, key lists and code hashes are checked by hand with near-cli-rs and recorded in `deployments/testnet.json`.
+- Test: test number from the test plan (1 to 17 are from the brief, 18 and up are added here), plus named unit and sandbox tests. Review regression tests live in `contracts/registry/src/review_fixes.rs` (unit) and `contracts/tests/tests/review.rs` (sandbox). Live checks: `npm run verify:testnet` (`scripts/verify-testnet.mjs`, read-only RPC, added in block 7) reads every vault's key list, the code hashes of the registry, mock USDC and vaults, the registry and mock USDC key counts, and the solvency sum, and compares them with `deployments/testnet.json`. It replaces the separate `verify-keys` script planned earlier.
 
 ## Rows from the brief (T1 to T16)
 
@@ -41,7 +41,7 @@ Terms used below (full detail in DESIGN.md):
 - Attack: the seller (or whoever minted) holds an access key on `s<N>.REG` and uses it to send the USDC out directly, or to delete the account.
 - Impact: total loss of the share's money for every later holder.
 - Mitigation: the vault is created by `REG` in a single batch of `CreateAccount`, `Transfer`, `DeployContract`, with no `AddKey` action, so it never has any key. The vault contract has no method that adds keys, deploys code or deletes the account. Holders never receive a key; control is a registry check, so there is nothing to hand over or rotate.
-- Test: test 1 (mint, then `view_access_key_list` on the vault returns empty). On testnet the vault key lists are read by hand with near-cli-rs; the `verify-keys` script is not written yet.
+- Test: test 1 (mint, then `view_access_key_list` on the vault returns empty). On testnet: `npm run verify:testnet` checks that every vault key list is empty.
 
 ### T2. Seller claims after sale
 - Attack: the old holder calls `claim(token_id)` after the NFT moved.
@@ -115,7 +115,7 @@ Terms used below (full detail in DESIGN.md):
 - Impact: total loss.
 - Mitigation: no upgrade method in `REG` or the vault. Vaults have no keys from birth. Code hashes are published in `deployments/testnet.json` and compared with a local build.
 - Current state (review, Security Suite F-12): the full-access keys on `REG` and on the mock USDC account are STILL PRESENT on testnet. Deleting them is planned but parked (it is a delete and needs the owner's yes), so today whoever holds the `REG` key can redeploy the registry. This is a testnet demo state, not the production design.
-- Test: the `verify-keys` and `verify:testnet` scripts are not written yet; key lists and code hashes are read by hand with near-cli-rs. Reproducible build tooling for an exact hash match is UNVERIFIED.
+- Test: `npm run verify:testnet` compares the live code hashes and key counts with `deployments/testnet.json` (today it expects one full-access key on `REG` and on mock USDC, as recorded). Reproducible build tooling for an exact hash match is UNVERIFIED.
 
 ### T14. Revoked agent keeps acting
 - Attack: agent keeps calling after the organisation revokes it.
@@ -159,7 +159,7 @@ Terms used below (full detail in DESIGN.md):
 - Attack: someone deletes `s<N>.REG` (balance goes to a beneficiary), redeploys it, or adds a key.
 - Impact: total loss of the share's money.
 - Mitigation: vault has zero keys; vault contract has only `withdraw` and no method that issues `DeleteAccount`, `DeployContract` or `AddKey`; `REG` has no method that targets an existing vault with anything except a `withdraw` function call. `withdraw` only calls `ft_transfer` on the token argument, so it cannot call `storage_unregister` either. Relies on the runtime rule that a parent cannot act on an existing sub-account (shown in the sandbox by test 21). New vaults also export `ft_on_transfer`, which returns "0" and does nothing else (T21).
-- Test: test 21, sandbox `t21_parent_cannot_delete_redeploy_or_key_a_vault` (`REG`'s account signs batches with `DeleteAccount`, `DeployContract` and `AddKey` on an existing vault; all fail; code hash unchanged; key list empty; balance intact). Testnet key lists are read by hand until `verify-keys` exists.
+- Test: test 21, sandbox `t21_parent_cannot_delete_redeploy_or_key_a_vault` (`REG`'s account signs batches with `DeleteAccount`, `DeployContract` and `AddKey` on an existing vault; all fail; code hash unchanged; key list empty; balance intact). Testnet vault key lists and code hashes are checked by `npm run verify:testnet`.
 
 ### T21. Sync race with claim or with an inbound forward
 - Attack or fault: `sync` reads the vault balance while a claim or a routed payment is moving; the callback then writes a stale balance, double-counting an inbound payment or resurrecting money already paid out.
@@ -226,7 +226,7 @@ Terms used below (full detail in DESIGN.md):
 - Attack or fault: a bug credits allowance, escrow or undelivered balances that `REG` does not actually hold.
 - Impact: later payouts from `REG` fail or pay one party with another's money.
 - Mitigation: invariant `allowance_total + unallocated_total + escrow_total + undelivered_total + forwards_in_flight_total <= ft_balance_of(REG)`. Every debit happens before a transfer, every credit after money arrived.
-- Test: invariant asserted at the end of every sandbox test (helper `assert_solvent`). The live `verify:testnet` script is not written yet; on testnet the two sides are read by hand.
+- Test: invariant asserted at the end of every sandbox test (helper `assert_solvent`). On testnet `npm run verify:testnet` checks the tracked counters against the registry's mock USDC balance.
 
 ### T32. Note and metadata used for injection or oversize griefing
 - Attack: holder sets a share note (holder power) containing script, a fake payee or a huge string.
@@ -312,8 +312,7 @@ Terms used below (full detail in DESIGN.md):
 | 29 | T28 |
 | 30 | T12, T29 |
 | 31 | T32 |
-| `verify-keys` script | T1, T13, T20 (planned, not written) |
-| `verify:testnet` script | T1, T13, T31 (planned, not written) |
+| `npm run verify:testnet` | T1, T13, T20, T31 (live, read only) |
 | `assert_solvent` helper | T31 |
 | `review_fixes.rs`, `review.rs` | T7, T11, T12, T15, T19, T21, T24, T27, T35, T38, T39 |
 

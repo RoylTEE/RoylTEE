@@ -527,7 +527,7 @@ Rust unit tests plus near-workspaces sandbox tests. `npm run test` runs all of t
 | 30 | System accounts cannot be credentialed or receive; registrar cannot claim others' shares | 3 | T12, T29 |
 | 31 | Oversize note and non-holder note fail | 2 | T32 |
 
-Scripts planned, not written yet: `verify-keys` (T1, T13, T20), `npm run verify:testnet` (T1, T13, T31); `package.json` has no `verify:testnet` entry today. Helper `assert_solvent` at the end of every sandbox test (T31). Also `cargo clippy -- -D warnings`, `cargo fmt --check`, frontend typecheck, and the audit checklist into AUDIT.md.
+Live check: `npm run verify:testnet` (`scripts/verify-testnet.mjs`, read-only RPC, block 7) covers T1, T13, T20 and T31 against `deployments/testnet.json`; it replaces the separate `verify-keys` script planned earlier. Helper `assert_solvent` at the end of every sandbox test (T31). Also `cargo clippy -- -D warnings`, `cargo fmt --check`, frontend typecheck, and the audit checklist into AUDIT.md.
 
 ## 12. What is SIMULATED
 
