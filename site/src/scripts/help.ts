@@ -37,19 +37,40 @@ const who = box.querySelector<HTMLElement>('[data-who]')!;
 const list = box.querySelector<HTMLElement>('[data-tickets]')!;
 const note = box.querySelector<HTMLElement>('[data-support-status]')!;
 const ticketForm = box.querySelector<HTMLFormElement>('[data-ticket-form]')!;
-let expiry = 0; let submitNonce = '';
+let expiry = 0; let submitNonce = ''; let ticketCursor: string | null = null;
 function signedIn(account: string | null) {
   box.dataset.state = account ? 'in' : 'out'; who.textContent = account ? `Signed in as ${account}` : '';
   if (!account) list.replaceChildren();
 }
-async function load() {
+function ticketRow(t: { subject: string; message: string; status: string; reply: string | null }) {
+  return el('li', { className: `ticket ${t.status}` },
+    el('div', { className: 'ticket-head' }, el('strong', { textContent: t.subject }), el('span', { className: 'tag-mono', textContent: t.status })),
+    el('p', { textContent: t.message }), ...(t.reply ? [el('p', { className: 'reply', textContent: `Reply: ${t.reply}` })] : []));
+}
+function renderTickets(tickets: { subject: string; message: string; status: string; reply: string | null }[], append: boolean) {
+  list.querySelector('[data-more]')?.remove();
+  if (!append) {
+    list.replaceChildren(...(tickets.length ? tickets.map(ticketRow) : [el('li', { className: 'muted', textContent: 'No tickets yet.' })]));
+  } else if (tickets.length) {
+    list.querySelector('.muted')?.remove();
+    list.append(...tickets.map(ticketRow));
+  }
+  if (ticketCursor) {
+    const more = el('li', { className: 'row' }, el('button', { type: 'button', className: 'btn no-chip outline', textContent: 'Load more tickets' }));
+    more.setAttribute('data-more', '');
+    more.querySelector('button')!.onclick = () => { void load(true); };
+    list.append(more);
+  }
+}
+async function load(more = false) {
   try {
-    const r = await api<{ accountId: string; submitNonce: string; tickets: { subject: string; message: string; status: string; reply: string | null; createdAt: number }[] }>('/api/tickets');
-    signedIn(r.accountId); submitNonce = r.submitNonce;
-    list.replaceChildren(...(r.tickets.length ? r.tickets.map(t => el('li', { className: `ticket ${t.status}` },
-      el('div', { className: 'ticket-head' }, el('strong', { textContent: t.subject }), el('span', { className: 'tag-mono', textContent: t.status })),
-      el('p', { textContent: t.message }), ...(t.reply ? [el('p', { className: 'reply', textContent: `Reply: ${t.reply}` })] : []))) : [el('li', { className: 'muted', textContent: 'No tickets yet.' })]));
-  } catch (err) { signedIn(null); if ((err as { status?: number }).status !== 401) note.textContent = (err as Error).message; }
+    const q = more && ticketCursor ? `?cursor=${encodeURIComponent(ticketCursor)}` : '';
+    const r = await api<{ accountId: string; submitNonce: string; cursor: string | null; tickets: { subject: string; message: string; status: string; reply: string | null; createdAt: number }[] }>(`/api/tickets${q}`);
+    signedIn(r.accountId);
+    if (!more) submitNonce = r.submitNonce;
+    ticketCursor = r.cursor;
+    renderTickets(r.tickets, more);
+  } catch (err) { if (!more) signedIn(null); if ((err as { status?: number }).status !== 401) note.textContent = (err as Error).message; }
 }
 box.querySelector('[data-sign-in]')?.addEventListener('click', async () => {
   note.textContent = 'Waiting for your wallet...';

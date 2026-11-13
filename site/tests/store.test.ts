@@ -2,14 +2,17 @@ import { RedisStore, MemoryStore } from '../src/server/store';
 describe('storage', () => {
   it('sends Upstash REST commands as JSON arrays with a bearer token', async () => {
     const sent: { url: string; init: RequestInit }[] = [];
-    const replies = ['OK', '{"a":1}', '{"a":1}', 1, 2];
+    const replies = ['OK', '{"a":1}', '{"a":1}', 1, 1, ['a'], ['a']];
     const fetcher = (async (url: string, init: RequestInit) => { sent.push({ url, init }); return new Response(JSON.stringify({ result: replies.shift() })); }) as typeof fetch;
     const s = new RedisStore('https://example.upstash.invalid', 'token-for-test', fetcher);
     await s.put('ticket:x', { a: 1 }, 60);
     expect(await s.get('ticket:x')).toEqual({ a: 1 });
     expect(await s.take('ticket:x')).toEqual({ a: 1 });
     expect(await s.count('rate:x', 60)).toBe(1);
-    expect(sent.map(x => JSON.parse(String(x.init.body))[0])).toEqual(['SET', 'GET', 'GETDEL', 'EVAL']);
+    await s.add('tickets:all', 1, 'a');
+    await s.range('tickets:all', 10, 5);
+    await s.rangeNewest('tickets:all', 10, 5);
+    expect(sent.map(x => JSON.parse(String(x.init.body))[0])).toEqual(['SET', 'GET', 'GETDEL', 'EVAL', 'ZADD', 'ZRANGEBYSCORE', 'ZREVRANGEBYSCORE']);
     expect(JSON.parse(String(sent[0].init.body))).toEqual(['SET', 'royltee:v1:ticket:x', '{"a":1}', 'EX', 60]);
     expect((sent[0].init.headers as Record<string, string>).Authorization).toBe('Bearer token-for-test');
   });

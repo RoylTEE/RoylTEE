@@ -3,12 +3,23 @@ type Ticket = { id: string; wallet: string; subject: string; message: string; st
 const root = document.querySelector<HTMLElement>('[data-admin]')!;
 const note = root.querySelector<HTMLElement>('[data-admin-status]')!;
 const list = root.querySelector<HTMLElement>('[data-admin-list]')!;
-async function load() {
+let ticketCursor: string | null = null;
+async function load(more = false) {
   try {
-    const { tickets } = await api<{ tickets: Ticket[] }>('/api/admin/tickets');
+    const q = more && ticketCursor ? `?cursor=${encodeURIComponent(ticketCursor)}` : '';
+    const page = await api<{ tickets: Ticket[]; cursor: string | null }>(`/api/admin/tickets${q}`);
     root.dataset.state = 'in';
-    list.replaceChildren(...(tickets.length ? tickets.map(row) : [el('li', { className: 'muted', textContent: 'No tickets.' })]));
-  } catch (err) { root.dataset.state = 'out'; list.replaceChildren(); note.textContent = (err as Error).message; }
+    ticketCursor = page.cursor;
+    list.querySelector('[data-more]')?.remove();
+    if (!more) list.replaceChildren(...(page.tickets.length ? page.tickets.map(row) : [el('li', { className: 'muted', textContent: 'No tickets.' })]));
+    else if (page.tickets.length) { list.querySelector('.muted')?.remove(); list.append(...page.tickets.map(row)); }
+    if (ticketCursor) {
+      const moreRow = el('li', { className: 'row' }, el('button', { type: 'button', className: 'btn no-chip outline', textContent: 'Load more tickets' }));
+      moreRow.setAttribute('data-more', '');
+      moreRow.querySelector('button')!.onclick = () => { void load(true); };
+      list.append(moreRow);
+    }
+  } catch (err) { if (!more) { root.dataset.state = 'out'; list.replaceChildren(); } note.textContent = (err as Error).message; }
 }
 function row(t: Ticket) {
   const reply = el('textarea', { maxLength: 2000, rows: 3, placeholder: 'Reply', disabled: t.status === 'closed' });

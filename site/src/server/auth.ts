@@ -23,12 +23,18 @@ export async function fullAccessKey(rpc: string, accountId: string, publicKey: s
   const j = await r.json();
   return j.result?.permission === 'FullAccess';
 }
-export type Session = { sid: string; wallet: string; exp: number };
+export type Session = { sid: string; wallet: string; exp: number; publicKey?: string };
+export type SessionRecord = { wallet: string; publicKey?: string };
+export function recordWallet(value: unknown): SessionRecord | null {
+  if (typeof value === 'string') return { wallet: value };
+  if (value && typeof value === 'object' && typeof (value as SessionRecord).wallet === 'string') return value as SessionRecord;
+  return null;
+}
 export function sessionToken(secret: string, session: Session) {
   const data = Buffer.from(JSON.stringify(session)).toString('base64url'); return `${data}.${mac(secret, ['support-session-v1', data])}`;
 }
 export function readSession(secret: string, token: string, now: number): Session {
   const [data, signature = '', extra] = token.split('.');
   if (!data || extra || !equal(signature, mac(secret, ['support-session-v1', data]))) return fail(401, 'Please sign in with your wallet again.');
-  try { const s = JSON.parse(Buffer.from(data, 'base64url').toString()); if (typeof s.sid !== 'string' || typeof s.wallet !== 'string' || s.exp <= now) throw new Error(); return s; } catch { return fail(401, 'Please sign in with your wallet again.'); }
+  try { const s = JSON.parse(Buffer.from(data, 'base64url').toString()); if (typeof s.sid !== 'string' || typeof s.wallet !== 'string' || typeof s.exp !== 'number' || s.exp <= now) throw new Error(); if (s.publicKey !== undefined && typeof s.publicKey !== 'string') throw new Error(); return s; } catch { return fail(401, 'Please sign in with your wallet again.'); }
 }

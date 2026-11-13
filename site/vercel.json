@@ -1,3 +1,19 @@
 {
-  "crons": [{ "path": "/api/cron/sweep", "schedule": "0 3 * * *" }]
+  "crons": [{ "path": "/api/cron/sweep", "schedule": "0 3 * * *" }],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://raw.githubusercontent.com https://app.hot-labs.org https://storage.herewallet.app https://www.mynearwallet.com https://res.cloudinary.com https://evm-on-near.dev; font-src 'self'; connect-src 'self' https://test.rpc.fastnear.com https://rpc.testnet.near.org https://raw.githubusercontent.com https://cdn.jsdelivr.net https://wallet.intear.tech https://near-mobile-production.aws.peersyst.tech https://trezu.app https://evm-on-near.dev; frame-src 'self' https://wallet.meteorwallet.app https://app.mynearwallet.com https://wallet.intear.tech https://staging.wallet.intear.tech https://app.hot-labs.org https://hot-labs.org https://download.hot-labs.org https://www.okx.com https://trezu.app https://nearmobile.app https://www.hana.money https://evm-on-near.dev https://wallet.near.org https://t.me; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+        },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=(), payment=(), interest-cohort=()" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
+      ]
+    }
+  ]
 }

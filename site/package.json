@@ -4,7 +4,7 @@
   "description": "",
   "scripts": {
     "dev": "astro dev --host 127.0.0.1 --port 4321",
-    "build": "astro build",
+    "build": "astro build && node scripts/apply-security-headers.mjs",
     "preview": "astro preview --host 127.0.0.1 --port 4322",
     "test": "vitest run",
     "typecheck": "astro check",

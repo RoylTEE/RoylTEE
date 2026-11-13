@@ -3,7 +3,7 @@ import { signTurn, cleanAnswer, VERSION, reportedProviderTee, nearAiModel, TEE_L
 import { loadConfig, NEARAI_DEFAULT_MODEL } from '../src/server/config';
 async function started(t = setup()) { const r = await t.call('chat/start', {}); return { t, id: r.body.sessionId as string }; }
 describe('help chat', () => {
-  it('signs each assistant turn with HMAC over version, session, index and text', async () => {
+  it('signs each assistant turn with HMAC over version, session, index, text and tee', async () => {
     const { t, id } = await started();
     const r = await t.call('chat', { sessionId: id, history: [], message: 'What happens to unclaimed money in a sale?' });
     expect(r.status).toBe(200);
@@ -175,13 +175,13 @@ describe('provider TEE flag', () => {
     calls.length = 0;
     const missing = (async (url: string | URL | Request) => {
       const href = String(url);
-      if (href.endsWith('/chat/completions')) return new Response(JSON.stringify({ id: 'chatcmpl-test-1', choices: [{ message: { role: 'assistant', content: 'ok' } }] }));
+      if (href.endsWith('/chat/completions')) return new Response(JSON.stringify({ id: 'chatcmpl-test-1', choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }] }));
       return new Response(JSON.stringify({ error: { message: 'not found', type: 'not_found' } }), { status: 404 });
     }) as typeof fetch;
     expect(await nearAiModel(config, missing)([{ role: 'user', text: 'hi' }])).toEqual({ text: 'ok', tee: false });
     const malformed = (async (url: string | URL | Request) => {
       const href = String(url);
-      if (href.endsWith('/chat/completions')) return new Response(JSON.stringify({ id: 'chatcmpl-test-1', choices: [{ message: { role: 'assistant', content: 'ok' } }] }));
+      if (href.endsWith('/chat/completions')) return new Response(JSON.stringify({ id: 'chatcmpl-test-1', choices: [{ message: { role: 'assistant', content: 'ok' }, finish_reason: 'stop' }] }));
       return new Response('not-json', { status: 200, headers: { 'content-type': 'text/plain' } });
     }) as typeof fetch;
     expect(await nearAiModel(config, malformed)([{ role: 'user', text: 'hi' }])).toEqual({ text: 'ok', tee: false });

@@ -3,14 +3,21 @@ import Base from '../layouts/Base.astro';
 import { PROJECT_NAME } from '../consts';
 import { loadConfig, storeFor } from '../server/config';
 import { readSession } from '../server/auth';
-import { cookie } from '../server/security';
-import { SESSION_COOKIE } from '../server/api';
+import { sessionCookie } from '../server/security';
+import { recordWallet } from '../server/auth';
 export const prerender = false;
 const config = loadConfig(process.env);
 let permitted = false;
 try {
-  const session = readSession(config.sessionSecret, cookie(Astro.request, SESSION_COOKIE), Date.now());
-  permitted = !!config.adminWallet && session.wallet === config.adminWallet && await storeFor(config)?.get(`session:${session.sid}`) === session.wallet;
+  if (!config.sessionSecret || !config.adminWallet) {
+    permitted = false;
+  } else {
+    const session = readSession(config.sessionSecret, sessionCookie(Astro.request), Date.now());
+    const record = recordWallet(await storeFor(config)?.get(`session:${session.sid}`));
+    const pin = config.adminPublicKey;
+    const keyOk = !pin || record?.publicKey === pin;
+    permitted = !!record && record.wallet === session.wallet && session.wallet === config.adminWallet && keyOk;
+  }
 } catch { /* The sign in shell contains no ticket data. */ }
 Astro.response.status = permitted ? 200 : 401;
 Astro.response.headers.set('Cache-Control', 'private, no-store');

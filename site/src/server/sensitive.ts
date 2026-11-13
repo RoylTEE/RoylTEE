@@ -11,6 +11,7 @@ export function sensitive(value: string): string | null {
   }
   const scan = value.replace(/\b\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2})?)?\b/g, ' ');
   for (const match of scan.matchAll(/\+?\d[\d ().-]{5,}\d/g)) {
+    if (/^\d{1,3}(?:\.\d{3})+(?:\.\d+)?$/.test(match[0])) continue;
     const digits = match[0].replace(/\D/g, '');
     if (digits.length >= 13 && digits.length <= 19 && luhn(digits)) return 'a card number';
     const formatted = /^\+|[ ().-]/.test(match[0]);

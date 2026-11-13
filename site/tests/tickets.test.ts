@@ -17,6 +17,7 @@ describe('NEP-413 sign in', () => {
     expect(ch.body.recipient).toBe('royltee.example');
     const r = await t.call('auth/verify', await w.sign(ch.body));
     expect(r.status).toBe(200);
+    expect(r.cookie).toMatch(/^__Host-royltee_support=/);
     expect(r.cookie).toMatch(/HttpOnly; SameSite=Strict; Path=\/; Max-Age=900; Secure/);
     expect(t.rpcCalls[0]).toMatchObject({ request_type: 'view_access_key', account_id: A, finality: 'final' });
   });
@@ -100,7 +101,7 @@ describe('support tickets', () => {
     expect((await t.call('tickets', { subject: 'x'.repeat(121), message: 'ok' }, { cookie: a })).status).toBe(400);
     expect((await t.call('tickets', { subject: 'ok', message: 'x'.repeat(2001) }, { cookie: a })).status).toBe(400);
     expect((await t.call('tickets', { subject: ' ', message: 'ok' }, { cookie: a })).status).toBe(400);
-    expect((await t.call('tickets', JSON.stringify({ subject: 'ok', message: 'x'.repeat(70000) }), { cookie: a })).status).toBe(413);
+    expect((await t.call('tickets', JSON.stringify({ subject: 'ok', message: 'x'.repeat(200000) }), { cookie: a })).status).toBe(413);
   });
   it.each([
     ['email', 'reach me at sam@example.com'], ['phone', 'call +1 (555) 010-0199'], ['card', 'card 4111 1111 1111 1111'],
@@ -113,7 +114,7 @@ describe('support tickets', () => {
   });
   it('allows normal demo text with dates, amounts, hashes and public keys', async () => {
     const publicKey = (await setup().wallet(A, false)).kp.getPublicKey().toString();
-    for (const ok of ['Payment of 1000000 base units on 2026-11-13 to s3', 'doc hash ' + 'a'.repeat(64), `public ${publicKey}`, 'please help with the share vault after a sale today', 'Order 1234567890123 failed']) expect(sensitive(ok), ok).toBeNull();
+    for (const ok of ['Payment of 1000000 base units on 2026-11-13 to s3', 'Payment of 1.000.000 mUSDC to s1', 'doc hash ' + 'a'.repeat(64), `public ${publicKey}`, 'please help with the share vault after a sale today', 'Order 1234567890123 failed']) expect(sensitive(ok), ok).toBeNull();
   });
   it('rate limits per wallet and per IP', async () => {
     const t = setup(); const a = await t.signIn(A);
@@ -146,22 +147,27 @@ describe('support tickets', () => {
     expect((await t.call('admin/tickets', { action: 'close', id }, { cookie: admin })).body.ticket.status).toBe('closed');
     expect((await t.call('admin/tickets', { action: 'reply', id, reply: 'late' }, { cookie: admin })).status).toBe(409);
   });
-  it('deletes tickets 30 days after close, and keeps open ones', async () => {
+  it('deletes tickets 30 days after close, and expires open tickets 30 days after the last update', async () => {
     const t = setup(); const a = await t.signIn(A);
     const closed = (await t.call('tickets', { subject: 'Old', message: 'demo' }, { cookie: a })).body.ticket.id;
-    await t.call('tickets', { subject: 'Still open', message: 'demo' }, { cookie: a });
+    const openEarly = (await t.call('tickets', { subject: 'Still open', message: 'demo' }, { cookie: a })).body.ticket.id;
     const admin = await t.signIn(ADMIN);
     await t.call('admin/tickets', { action: 'close', id: closed }, { cookie: admin });
-    t.clock.now += 29 * 86400_000;
+    t.clock.now += 20 * 86400_000;
     let a2 = await t.signIn(A);
-    expect((await t.call('tickets', undefined, { cookie: a2 })).body.tickets).toHaveLength(2);
+    const later = (await t.call('tickets', { subject: 'Newer open', message: 'demo' }, { cookie: a2 })).body.ticket.id;
+    expect(later).toBeTruthy();
+    t.clock.now += 9 * 86400_000;
+    a2 = await t.signIn(A);
+    expect((await t.call('tickets', undefined, { cookie: a2 })).body.tickets.map((x: any) => x.subject).sort()).toEqual(['Newer open', 'Still open', 'Old'].sort());
     t.clock.now += 2 * 86400_000;
     expect((await t.call('cron/sweep', undefined, { auth: 'Bearer wrong' })).status).toBe(401);
     const swept = await t.call('cron/sweep', undefined, { auth: `Bearer ${'k'.repeat(40)}` });
     expect(swept.body.removed).toBe(1);
     expect(await t.store.get(`ticket:${closed}`)).toBeNull();
+    expect(await t.store.get(`ticket:${openEarly}`)).toBeNull();
     a2 = await t.signIn(A);
-    expect((await t.call('tickets', undefined, { cookie: a2 })).body.tickets.map((x: any) => x.subject)).toEqual(['Still open']);
+    expect((await t.call('tickets', undefined, { cookie: a2 })).body.tickets.map((x: any) => x.subject)).toEqual(['Newer open']);
   });
   it('closed tickets also expire by storage TTL without a sweep', async () => {
     const t = setup(); const a = await t.signIn(A);

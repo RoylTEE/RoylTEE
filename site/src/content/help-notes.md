@@ -68,7 +68,7 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 ## This help chat and support
 
 - The help chat answers from these notes only. When a NEAR AI Cloud key is set, questions go to NEAR AI Cloud (an OpenAI compatible API). A TEE label is shown only when NEAR AI Cloud reports signature_kind provider_tee for that reply. Attestation is not verified by this app. The site does not store chat text.
-- Support tickets: sign in with a NEAR testnet wallet by signing a NEP-413 message. No email and no personal data. Tickets hold a subject, a message, a status (open, answered or closed) and the owner's reply. They live in private server storage tied only to the wallet account id, never on chain and never in logs. Closed tickets are deleted 30 days after they close. A sign in lasts 15 minutes.
+- Support tickets: sign in with a NEAR testnet wallet by signing a NEP-413 message. No email and no personal data. Tickets hold a subject, a message, a status (open, answered or closed) and the owner's reply. They live in private server storage tied only to the wallet account id, never on chain and never in logs. Open tickets expire 30 days after the last update. Closed tickets are deleted 30 days after they close. A sign in lasts 15 minutes.
 - Please never put a seed phrase, private key, email address, phone number or card number in a ticket. The form refuses things that look like them.
 
 ## Common first questions

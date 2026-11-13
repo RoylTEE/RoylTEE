@@ -8,6 +8,7 @@ export interface Store {
   count(key: string, seconds: number): Promise<number>;
   add(index: string, score: number, member: string): Promise<void>;
   range(index: string, max?: number, limit?: number): Promise<string[]>;
+  rangeNewest(index: string, max?: number, limit?: number): Promise<string[]>;
   remove(index: string, member: string): Promise<void>;
 }
 const key = (k: string) => `royltee:v1:${k}`;
@@ -37,7 +38,10 @@ export class MemoryStore implements Store {
     this.indexes.get(index)!.set(member, score);
   }
   async range(index: string, max = Number.MAX_SAFE_INTEGER, limit = 100) {
-    return [...(this.indexes.get(index) ?? [])].filter(([, s]) => s <= max).sort((a, b) => a[1] - b[1]).slice(0, limit).map(([m]) => m);
+    return [...(this.indexes.get(index) ?? [])].filter(([, s]) => s <= max).sort((a, b) => a[1] - b[1] || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)).slice(0, limit).map(([m]) => m);
+  }
+  async rangeNewest(index: string, max = Number.MAX_SAFE_INTEGER, limit = 100) {
+    return [...(this.indexes.get(index) ?? [])].filter(([, s]) => s <= max).sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? 1 : a[0] > b[0] ? -1 : 0)).slice(0, limit).map(([m]) => m);
   }
   async remove(index: string, member: string) { this.indexes.get(index)?.delete(member); }
 }
@@ -61,5 +65,6 @@ export class RedisStore implements Store {
   async count(k: string, s: number) { return this.command<number>('EVAL', "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return n", 1, key(k), s); }
   async add(i: string, score: number, m: string) { await this.command('ZADD', key(i), score, m); }
   async range(i: string, max = Number.MAX_SAFE_INTEGER, limit = 100) { return this.command<string[]>('ZRANGEBYSCORE', key(i), '-inf', max, 'LIMIT', 0, limit); }
+  async rangeNewest(i: string, max = Number.MAX_SAFE_INTEGER, limit = 100) { return this.command<string[]>('ZREVRANGEBYSCORE', key(i), max, '-inf', 'LIMIT', 0, limit); }
   async remove(i: string, m: string) { await this.command('ZREM', key(i), m); }
 }

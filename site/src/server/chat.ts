@@ -4,14 +4,15 @@ import { digest, equal, fail, mac, rate, text } from './security';
 import { SYSTEM_PROMPT } from './prompt';
 import { sensitive } from './sensitive';
 export type Turn = { role: 'user' | 'assistant'; text: string; index?: number; signature?: string; tee?: boolean };
-export type ChatState = { count: number; digest: string; busy: boolean };
+export type ChatState = { count: number; digest: string; busy: boolean; busyUntil?: number };
 export type ModelResult = { text: string; tee: boolean };
 export type Model = (turns: Turn[]) => Promise<string | ModelResult>;
-export const VERSION = 'royltee-chat-v1';
+export const VERSION = 'royltee-chat-v2';
 export const TEE_LABEL = 'Inference ran in a TEE (reported by NEAR AI Cloud)';
-const emptyState = (): ChatState => ({ count: 0, digest: digest([]), busy: false });
+export const BUSY_MS = 90_000;
+const emptyState = (): ChatState => ({ count: 0, digest: digest([]), busy: false, busyUntil: 0 });
 export async function startChat(store: Store, id: string) { await store.put(`chat:${id}`, emptyState(), 3600); }
-export const signTurn = (secret: string, id: string, index: number, value: string) => mac(secret, [VERSION, id, index, value]);
+export const signTurn = (secret: string, id: string, index: number, value: string, tee = false) => mac(secret, [VERSION, id, index, value, tee === true]);
 const jailbreak = /ignore\b.{0,60}\b(?:instructions|rules|prompt)|(?:system|developer|hidden|initial)\s*(?:prompt|message|instructions)|(?:reveal|show|print|repeat|leak|dump)\b.{0,40}(?:prompt|instructions|notes|secret|env|token|api key)|(?:your|the server'?s?|site'?s?)\s+(?:api|hmac|session|secret|signing)\s*(?:key|secret|token)|\bjailbreak|\bDAN\b|developer mode|pretend\b.{0,40}(?:unrestricted|no rules|no limits)|bypass\b.{0,30}(?:safety|filter|rules)|<\/?(?:system|assistant)>/is;
 const unrelated = /\b(?:recipe|cook(?:ing)?|weather|election|president|football|soccer|movie|poem|joke|horoscope|stock price|bitcoin price|homework|capital of|travel|dating)\b/i;
 export function refusal(question: string) {
@@ -52,14 +53,21 @@ export function nearAiModel(config: Config, fetcher = fetch): Model {
     const r = await fetcher(`${config.nearAiBaseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.nearAiKey}` }, body: JSON.stringify({ model: config.nearAiModel, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...turns.map(t => ({ role: t.role, content: t.text }))], max_tokens: 650, stream: false, chat_template_kwargs: { enable_thinking: false }, reasoning_effort: 'low' }), signal: AbortSignal.timeout(45000) });
     if (!r.ok) fail(503, 'Chat is taking a break. Please try again shortly.');
     const j = await r.json();
-    const answer = j.choices?.[0]?.message?.content;
-    if (typeof answer !== 'string' || !answer.trim()) fail(503, 'Chat could not finish that answer. Please try again.');
+    const choice = j.choices?.[0];
+    const answer = choice?.message?.content;
+    if (typeof answer !== 'string' || !answer.trim() || choice?.finish_reason !== 'stop') fail(503, 'Chat could not finish that answer. Please try again.');
     const id = typeof j.id === 'string' && j.id ? j.id : '';
     const signature = id ? await readSignature(fetcher, `${config.nearAiBaseUrl}/signature/${encodeURIComponent(id)}?signing_algo=ecdsa`, config.nearAiKey) : null;
     return { text: answer.trim(), tee: reportedProviderTee(signature) };
   };
 }
-export async function chat(store: Store, config: Config, id: string, input: Record<string, unknown>, ip: string, model: Model) {
+function isBusy(state: ChatState, now: number) {
+  return state.busy === true && typeof state.busyUntil === 'number' && state.busyUntil > now;
+}
+function signedReserve(config: Config) {
+  return Math.min(Math.max(0, config.chatSignedReserve), Math.max(0, config.chatGlobalDayCap - 1));
+}
+export async function chat(store: Store, config: Config, id: string, input: Record<string, unknown>, ip: string, model: Model, now = Date.now(), signedIn = false) {
   const state = await store.get<ChatState>(`chat:${id}`) ?? fail(400, 'This chat has expired. Please start a new conversation.');
   const turns = input.history;
   if (!Array.isArray(turns) || turns.length !== state.count * 2) fail(400, 'That chat history is not valid. Please start again.');
@@ -69,30 +77,35 @@ export async function chat(store: Store, config: Config, id: string, input: Reco
     if (!raw || typeof raw !== 'object' || raw.role !== (i % 2 ? 'assistant' : 'user') || typeof raw.text !== 'string' || raw.text.length > 6000) fail(400, 'That chat history is not valid. Please start again.');
     if (i % 2) {
       const index = (i - 1) / 2;
-      if (raw.index !== index || typeof raw.signature !== 'string' || !equal(raw.signature, signTurn(config.chatSecret, id, index, raw.text))) fail(400, 'That chat history is not valid. Please start again.');
-      history.push({ role: 'assistant', text: raw.text, index, signature: raw.signature });
+      const tee = raw.tee === true;
+      if (raw.index !== index || typeof raw.signature !== 'string' || !equal(raw.signature, signTurn(config.chatSecret, id, index, raw.text, tee))) fail(400, 'That chat history is not valid. Please start again.');
+      history.push({ role: 'assistant', text: raw.text, index, signature: raw.signature, tee });
     } else history.push({ role: 'user', text: raw.text });
   }
-  if (state.busy || digest(history) !== state.digest) fail(400, 'That turn was already used or changed. Please start again.');
+  if (isBusy(state, now) || digest(history) !== state.digest) fail(400, 'That turn was already used or changed. Please start again.');
   const question = text(input.message, 1500);
   if (state.count >= config.chatSessionCap) fail(429, 'This conversation has reached its limit. Please come back later.');
-  await rate(store, `chat:ip:${ip}`, config.chatDayCap, 86400);
-  await rate(store, 'chat:global', config.chatGlobalDayCap, 86400);
-  const busy = { ...state, busy: true };
+  const busy: ChatState = { ...state, busy: true, busyUntil: now + BUSY_MS };
   if (!await store.cas(`chat:${id}`, state, busy, 3600)) fail(400, 'That turn was already used. Please start again.');
   try {
     const user: Turn = { role: 'user', text: question };
     const blocked = refusal(question);
+    if (!blocked) {
+      const reserve = signedReserve(config);
+      if (!signedIn && reserve > 0) await rate(store, 'chat:global:anon', config.chatGlobalDayCap - reserve, 86400);
+      await rate(store, 'chat:global', config.chatGlobalDayCap, 86400);
+      await rate(store, `chat:ip:${ip}`, config.chatDayCap, 86400);
+    }
     const modelOut = blocked ? { text: blocked, tee: false } : modelResult(await model([...history, user]));
     const cleaned = cleanAnswer(modelOut.text);
     const output = cleaned ?? 'I could not give a safe answer to that one. Could you ask about a specific part of RoylTEE? [Contact support](/help#support) is there too.';
     const tee = cleaned !== null && modelOut.tee;
-    const assistant: Turn = { role: 'assistant', text: output, index: state.count, signature: signTurn(config.chatSecret, id, state.count, output) };
+    const assistant: Turn = { role: 'assistant', text: output, index: state.count, signature: signTurn(config.chatSecret, id, state.count, output, tee), tee };
     const all = [...history, user, assistant];
-    await store.put(`chat:${id}`, { count: state.count + 1, digest: digest(all), busy: false }, 3600);
+    await store.put(`chat:${id}`, { count: state.count + 1, digest: digest(all), busy: false, busyUntil: 0 }, 3600);
     return { sessionId: id, version: VERSION, assistant: { ...assistant, tee }, tee };
   } catch (e) {
-    await store.cas(`chat:${id}`, busy, state, 3600);
+    await store.cas(`chat:${id}`, busy, { ...state, busy: false, busyUntil: 0 }, 3600);
     throw e;
   }
 }

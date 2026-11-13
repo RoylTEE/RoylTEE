@@ -4,33 +4,75 @@ import type { Store } from './store';
 export type Status = 'open' | 'answered' | 'closed';
 export type Ticket = { id: string; wallet: string; subject: string; message: string; status: Status; reply: string | null; createdAt: number; updatedAt: number; closedAt: number | null };
 export const RETAIN_CLOSED_MS = 30 * 24 * 3600 * 1000;
-const LIVE_SECONDS = 0;
-export const LIMITS = { subject: 120, message: 2000, reply: 2000 };
+export const OPEN_SECONDS = 30 * 24 * 3600;
+export const OPEN_PER_WALLET = 10;
+export const PAGE_SIZE = 100;
+const LIVE_SECONDS = OPEN_SECONDS;
+export const LIMITS = { subject: 120, message: 2000, reply: 2000, page: PAGE_SIZE, openPerWallet: OPEN_PER_WALLET, openDays: 30 };
 const wallet = (w: string) => `tickets:wallet:${w}`;
+export type TicketPage = { tickets: Ticket[]; cursor: string | null };
+export function encodeCursor(createdAt: number, id: string) { return `${createdAt}:${id}`; }
+export function decodeCursor(value: string | null): { createdAt: number; id: string } | null {
+  if (!value) return null;
+  const at = value.indexOf(':');
+  if (at < 1) return null;
+  const createdAt = Number(value.slice(0, at));
+  const id = value.slice(at + 1);
+  if (!Number.isFinite(createdAt) || !/^[a-f0-9]{48}$/.test(id)) return null;
+  return { createdAt, id };
+}
 function clean(value: unknown, max: number) {
   const v = text(value, max);
   const kind = sensitive(v);
   if (kind) fail(422, `That looks like ${kind}. Please remove it and use demo details only.`);
   return v;
 }
+export function ticketText(input: Record<string, unknown>) {
+  return { subject: clean(input.subject, LIMITS.subject), message: clean(input.message, LIMITS.message) };
+}
+export async function openCount(store: Store, owner: string) {
+  let n = 0;
+  for (const id of await store.rangeNewest(wallet(owner), Number.MAX_SAFE_INTEGER, 500)) {
+    const t = await store.get<Ticket>(`ticket:${id}`);
+    if (t && t.status !== 'closed') n++;
+  }
+  return n;
+}
+export async function assertOpenSlot(store: Store, owner: string) {
+  if (await openCount(store, owner) >= OPEN_PER_WALLET) fail(429, 'You already have the maximum number of open tickets. Please wait for a reply or for an older ticket to close.');
+}
 export async function createTicket(store: Store, owner: string, input: Record<string, unknown>, now: number) {
-  const ticket: Ticket = { id: randomId(), wallet: owner, subject: clean(input.subject, LIMITS.subject), message: clean(input.message, LIMITS.message), status: 'open', reply: null, createdAt: now, updatedAt: now, closedAt: null };
+  const fields = ticketText(input);
+  await assertOpenSlot(store, owner);
+  const ticket: Ticket = { id: randomId(), wallet: owner, subject: fields.subject, message: fields.message, status: 'open', reply: null, createdAt: now, updatedAt: now, closedAt: null };
   await store.put(`ticket:${ticket.id}`, ticket, LIVE_SECONDS);
   await store.add(wallet(owner), now, ticket.id);
   await store.add('tickets:all', now, ticket.id);
   return ticket;
 }
-export async function listTickets(store: Store, owner: string | null, now: number) {
+export async function listTickets(store: Store, owner: string | null, now: number, cursorValue: string | null = null, limit = PAGE_SIZE): Promise<TicketPage> {
   await sweep(store, now);
-  const ids = await store.range(owner ? wallet(owner) : 'tickets:all', Number.MAX_SAFE_INTEGER, 500);
+  const cursor = decodeCursor(cursorValue);
+  const index = owner ? wallet(owner) : 'tickets:all';
+  const take = Math.min(Math.max(limit, 1), 500);
+  const ids = await store.rangeNewest(index, cursor ? cursor.createdAt : Number.MAX_SAFE_INTEGER, take + 2);
   const tickets: Ticket[] = [];
+  let seenCursor = !cursor;
   for (const id of ids) {
     const t = await store.get<Ticket>(`ticket:${id}`);
-    if (!t) { await store.remove(owner ? wallet(owner) : 'tickets:all', id); continue; }
+    if (!t) { await store.remove(index, id); continue; }
     if (owner !== null && t.wallet !== owner) continue;
+    if (!seenCursor) {
+      if (id === cursor!.id && t.createdAt === cursor!.createdAt) seenCursor = true;
+      continue;
+    }
     tickets.push(t);
+    if (tickets.length === take + 1) break;
   }
-  return tickets.reverse();
+  const more = tickets.length > take;
+  const page = more ? tickets.slice(0, take) : tickets;
+  const last = page[page.length - 1];
+  return { tickets: page, cursor: more && last ? encodeCursor(last.createdAt, last.id) : null };
 }
 export async function adminUpdate(store: Store, id: unknown, action: 'reply' | 'close', input: Record<string, unknown>, now: number) {
   if (typeof id !== 'string' || !/^[a-f0-9]{48}$/.test(id)) fail(400, 'Ticket id is not valid.');

@@ -1,22 +1,52 @@
 import { randomBytes } from 'node:crypto';
-import type { Config } from './config';
+import { storeFor, type Config } from './config';
 import type { Store } from './store';
-import { ACCOUNT_ID, HttpError, body, clientKey, cookie, digest, equal, fail, json, originCheck, randomId, rate, setCookie } from './security';
-import { fullAccessKey, readSession, sessionToken, verifySignature, type Challenge, type Session } from './auth';
+import { ACCOUNT_ID, ED25519_KEY, HttpError, body, clientKey, cookieSecure, digest, equal, fail, json, originCheck, randomId, rate, sessionCookie, sessionSetCookie } from './security';
+import { fullAccessKey, readSession, recordWallet, sessionToken, verifySignature, type Challenge, type Session } from './auth';
 import { chat, startChat, type Model } from './chat';
-import { adminUpdate, createTicket, listTickets, sweep, LIMITS } from './tickets';
-export type Deps = { config: Config; store: Store | null; model: Model; now?: () => number; fetcher?: typeof fetch; address?: string };
+import { adminUpdate, assertOpenSlot, createTicket, listTickets, sweep, ticketText, LIMITS } from './tickets';
+export type Deps = { config: Config; store?: Store | null; model: Model; now?: () => number; fetcher?: typeof fetch; address?: string };
 export const SESSION_COOKIE = 'royltee_support';
 export const SESSION_SECONDS = 15 * 60;
 export const SIGN_IN_MESSAGE = 'Sign in to RoylTEE support on NEAR testnet. This does not create a transaction.';
 const sessionId = /^[a-f0-9]{48}$/;
+function pinnedAdminKey(config: Config) {
+  const key = config.adminPublicKey;
+  if (!key) return '';
+  return ED25519_KEY.test(key) ? key : fail(503, 'Support sign in is not configured yet.');
+}
+function isAdmin(config: Config, wallet: string, publicKey?: string) {
+  if (!config.adminWallet || wallet !== config.adminWallet) return false;
+  const pin = config.adminPublicKey;
+  if (!pin) return true;
+  if (!ED25519_KEY.test(pin)) return false;
+  return publicKey === pin;
+}
+async function storedSession(store: Store, session: Session) {
+  const record = recordWallet(await store.get(`session:${session.sid}`));
+  if (!record || record.wallet !== session.wallet) fail(401, 'Please sign in with your wallet again.');
+  return record;
+}
+async function optionalSignedIn(store: Store, config: Config, request: Request, now: number) {
+  const token = sessionCookie(request);
+  if (!token || !config.sessionSecret) return false;
+  try {
+    const session = readSession(config.sessionSecret, token, now);
+    await storedSession(store, session);
+    return true;
+  } catch (e) {
+    if (e instanceof HttpError && e.status === 401) return false;
+    throw e;
+  }
+}
 export async function handle(request: Request, route: string, deps: Deps): Promise<Response> {
   const now = deps.now?.() ?? Date.now();
   try {
     const { config } = deps;
-    const store = deps.store ?? fail(503, 'Support storage is not configured yet.');
+    const store = ('store' in deps ? deps.store : storeFor(config)) ?? fail(503, 'Support storage is not configured yet.');
     if (!config.allowedOrigins.length) fail(503, 'This feature is not configured yet.');
     const method = request.method;
+    const secure = cookieSecure(request);
     if (route === 'cron/sweep') {
       const expected = `Bearer ${config.cronSecret}`, got = request.headers.get('authorization') ?? '';
       if (!config.cronSecret || !equal(digest(got), digest(expected))) fail(401, 'Not allowed.');
@@ -34,7 +64,8 @@ export async function handle(request: Request, route: string, deps: Deps): Promi
       if (!config.chatSecret) fail(503, 'Chat is not configured yet.');
       const input = await body(request);
       if (typeof input.sessionId !== 'string' || !sessionId.test(input.sessionId)) fail(400, 'That chat history is not valid. Please start again.');
-      return json(await chat(store, config, input.sessionId as string, input, ip, deps.model));
+      const signedIn = await optionalSignedIn(store, config, request, now);
+      return json(await chat(store, config, input.sessionId as string, input, ip, deps.model, now, signedIn));
     }
     if (!config.sessionSecret || !config.rpcUrl) fail(503, 'Support sign in is not configured yet.');
     if (route === 'auth/challenge' && method === 'POST') {
@@ -49,38 +80,49 @@ export async function handle(request: Request, route: string, deps: Deps): Promi
       const input = await body(request);
       const { accountId, publicKey, signature, nonce } = input;
       if (typeof accountId !== 'string' || !ACCOUNT_ID.test(accountId) || typeof publicKey !== 'string' || typeof signature !== 'string' || typeof nonce !== 'string' || !/^[A-Za-z0-9+/]{43}=$/.test(nonce)) fail(400, 'Sign in data is not valid.');
-      const challenge = await store.take<Challenge>(`challenge:${Buffer.from(nonce as string, 'base64').toString('hex')}`);
+      const key = `challenge:${Buffer.from(nonce as string, 'base64').toString('hex')}`;
+      const held = await store.get<Challenge>(key);
+      if (!held || held.expires <= now || held.nonce !== nonce || held.binding !== ip || held.recipient !== new URL(request.headers.get('origin')!).host) fail(400, 'That sign in request was used or expired. Please try again.');
+      const challenge = await store.take<Challenge>(key);
       if (!challenge || challenge.expires <= now || challenge.nonce !== nonce || challenge.binding !== ip || challenge.recipient !== new URL(request.headers.get('origin')!).host) fail(400, 'That sign in request was used or expired. Please try again.');
       if (!verifySignature(challenge!, publicKey as string, signature as string)) fail(401, 'The wallet signature did not check out.');
       if (!await fullAccessKey(config.rpcUrl, accountId as string, publicKey as string, deps.fetcher)) fail(401, 'That key is not a full access key for this account.');
-      const session: Session = { sid: randomId(), wallet: accountId as string, exp: now + SESSION_SECONDS * 1000 };
-      await store.put(`session:${session.sid}`, session.wallet, SESSION_SECONDS);
-      return json({ accountId, expiresAt: session.exp, admin: accountId === config.adminWallet }, 200, { 'set-cookie': setCookie(SESSION_COOKIE, sessionToken(config.sessionSecret, session), SESSION_SECONDS, new URL(request.url).protocol === 'https:') });
+      if (accountId === config.adminWallet && pinnedAdminKey(config) && publicKey !== pinnedAdminKey(config)) fail(401, 'That key is not the pinned admin key.');
+      const session: Session = { sid: randomId(), wallet: accountId as string, exp: now + SESSION_SECONDS * 1000, publicKey: publicKey as string };
+      await store.put(`session:${session.sid}`, { wallet: session.wallet, publicKey: session.publicKey }, SESSION_SECONDS);
+      return json({ accountId, expiresAt: session.exp, admin: isAdmin(config, session.wallet, session.publicKey) }, 200, { 'set-cookie': sessionSetCookie(sessionToken(config.sessionSecret, session), SESSION_SECONDS, secure) });
     }
-    const session = readSession(config.sessionSecret, cookie(request, SESSION_COOKIE), now);
-    if (await store.get<string>(`session:${session.sid}`) !== session.wallet) fail(401, 'Please sign in with your wallet again.');
+    const session = readSession(config.sessionSecret, sessionCookie(request), now);
+    const stored = await storedSession(store, session);
     if (route === 'auth/logout' && method === 'POST') {
       await store.del(`session:${session.sid}`);
-      return json({ ok: true }, 200, { 'set-cookie': setCookie(SESSION_COOKIE, '', 0, new URL(request.url).protocol === 'https:') });
+      return json({ ok: true }, 200, { 'set-cookie': sessionSetCookie('', 0, secure) });
     }
     await rate(store, `support-read:${session.wallet}`, 60, 60);
+    const cursor = new URL(request.url).searchParams.get('cursor');
     if (route === 'tickets' && method === 'GET') {
       const submitNonce = randomId();
       await store.put(`ticket-submit:${submitNonce}`, `${session.sid}:${session.wallet}`, 300);
-      return json({ accountId: session.wallet, tickets: (await listTickets(store, session.wallet, now)).map(({ wallet: _w, ...t }) => t), limits: LIMITS, submitNonce });
+      const page = await listTickets(store, session.wallet, now, cursor);
+      return json({ accountId: session.wallet, tickets: page.tickets.map(({ wallet: _w, ...t }) => t), cursor: page.cursor, limits: LIMITS, submitNonce });
     }
     if (route === 'tickets' && method === 'POST') {
+      const input = await body(request);
+      const fields = ticketText(input);
+      await assertOpenSlot(store, session.wallet);
+      if (typeof input.submitNonce !== 'string' || !sessionId.test(input.submitNonce) || await store.take(`ticket-submit:${input.submitNonce}`) !== `${session.sid}:${session.wallet}`) fail(400, 'That ticket request was used or expired. Please refresh and try again.');
       await rate(store, `ticket-wallet:${session.wallet}`, 5, 86400);
       await rate(store, `ticket-ip:${ip}`, 10, 86400);
-      const input = await body(request);
-      if (typeof input.submitNonce !== 'string' || !sessionId.test(input.submitNonce) || await store.take(`ticket-submit:${input.submitNonce}`) !== `${session.sid}:${session.wallet}`) fail(400, 'That ticket request was used or expired. Please refresh and try again.');
-      const ticket = await createTicket(store, session.wallet, input, now);
+      const ticket = await createTicket(store, session.wallet, fields, now);
       const { wallet: _w, ...visible } = ticket;
       return json({ ticket: visible }, 201);
     }
     if (route.startsWith('admin/')) {
-      if (!config.adminWallet || session.wallet !== config.adminWallet) fail(403, 'This page is only for the support owner.');
-      if (route === 'admin/tickets' && method === 'GET') return json({ tickets: await listTickets(store, null, now) });
+      if (!isAdmin(config, session.wallet, stored.publicKey ?? session.publicKey)) fail(403, 'This page is only for the support owner.');
+      if (route === 'admin/tickets' && method === 'GET') {
+        const page = await listTickets(store, null, now, cursor);
+        return json({ tickets: page.tickets, cursor: page.cursor });
+      }
       if (route === 'admin/tickets' && method === 'POST') {
         const input = await body(request);
         if (input.action !== 'reply' && input.action !== 'close') fail(400, 'Choose reply or close.');
