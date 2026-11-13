@@ -243,3 +243,57 @@ async fn r03_m1_callback_gas_fits_the_reservations() -> anyhow::Result<()> {
     assert!(max(&fwd) < 10.0 && max(&ready) < 20.0 && max(&sync_gas) < 5.0 && max(&claim) < 10.0);
     e.assert_solvent().await
 }
+
+/// Test 21 (T20): the registry account, signing its own transactions,
+/// cannot delete, redeploy or add a key to an existing vault. The vault's
+/// code hash and empty key list are unchanged afterwards.
+#[tokio::test]
+async fn t21_parent_cannot_delete_redeploy_or_key_a_vault() -> anyhow::Result<()> {
+    use near_workspaces::types::{AccessKey, KeyType, SecretKey};
+    let e = setup().await?;
+    let w = e.register_work("USRC12600001").await?;
+    let t = e.mint(w, e.writer_a.id(), 10_000).await?;
+    check(e.pay_work(w, 100_000).await?);
+    let vault = e.vault(&t);
+    let before = e.worker.view_code(&vault).await?;
+    let reg = e.reg.as_account();
+    let refused = |r: anyhow::Result<ExecutionFinalResult>| match r {
+        Ok(r) => {
+            let f = format!("{:?}", r.failures());
+            println!("outcome: {f}");
+            r.is_failure() && f.contains("ActorNoPermission")
+        }
+        Err(err) => {
+            println!("rejected: {err}");
+            true
+        }
+    };
+    let del = reg
+        .batch(&vault)
+        .delete_account(e.reg.id())
+        .transact()
+        .await
+        .map_err(anyhow::Error::from);
+    assert!(refused(del), "DeleteAccount by the parent must fail");
+    let dep = reg
+        .batch(&vault)
+        .deploy(&wasm("test_receiver"))
+        .transact()
+        .await
+        .map_err(anyhow::Error::from);
+    assert!(refused(dep), "DeployContract by the parent must fail");
+    let pk = SecretKey::from_random(KeyType::ED25519).public_key();
+    let key = reg
+        .batch(&vault)
+        .add_key(pk, AccessKey::full_access())
+        .transact()
+        .await
+        .map_err(anyhow::Error::from);
+    assert!(refused(key), "AddKey by the parent must fail");
+    let after = e.worker.view_code(&vault).await?;
+    assert_eq!(before, after, "vault code unchanged");
+    assert_eq!(after, wasm("vault"), "vault runs the built vault code");
+    e.assert_keyless(&t).await?;
+    assert_eq!(e.balance(&vault).await?, 100_000);
+    e.assert_solvent().await
+}
