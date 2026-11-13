@@ -46,3 +46,27 @@ jobs:
           echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  /tmp/gitleaks.tgz" | sha256sum -c -
           tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
           /tmp/gitleaks detect --source . --log-opts=--all --redact --no-banner --exit-code 1
+  audit:
+    # Dependency advisories, reported only: this job never fails the build.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: 1.99.1
+      - name: Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: cargo audit
+        continue-on-error: true
+        run: |
+          cargo install cargo-audit --locked --version 0.23.0
+          cargo audit
+      - name: npm audit (site, all dependencies)
+        working-directory: site
+        continue-on-error: true
+        run: npm audit
