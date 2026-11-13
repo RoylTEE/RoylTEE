@@ -590,3 +590,54 @@ fn l9_registrar_refunds_unallocated_of_a_void_work() {
     );
     assert!(get_logs().join("\n").contains("unallocated_refunded"));
 }
+
+// ---------- M1 ----------
+
+/// M1: a share whose mint callbacks never committed no longer blocks its
+/// group forever: after STALE_MINT_NS anyone fails it, and a late
+/// callback mints nothing.
+#[test]
+fn m1_stale_mint_is_released_and_late_callbacks_mint_nothing() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let _a = mint(&mut c, w, "bob.near", 5000);
+    let p = register_as(&mut c, "alice.near", w, "carol.near", 5000, None);
+    callback(ok(b""));
+    let _ = c.on_vault_created(p.clone(), acc("alice.near"));
+    // on_vault_ready lost.
+    let created = c.get_share(p.clone()).unwrap().created_at.0;
+    at(
+        &acc("anyone.near"),
+        NearToken::from_yoctonear(0),
+        created + STALE_MINT_NS - 1,
+        10,
+    );
+    assert_panics("not stale yet", || c.release_stale_mint(p.clone()));
+    at(
+        &acc("anyone.near"),
+        NearToken::from_yoctonear(0),
+        created + STALE_MINT_NS,
+        10,
+    );
+    c.release_stale_mint(p.clone());
+    assert!(get_logs().join("\n").contains("mint_released_stale"));
+    assert_eq!(c.get_share(p.clone()).unwrap().status, ShareStatus::Failed);
+    assert_eq!(group_of(&c, w).reserved_bps, 0);
+    at(
+        &acc("anyone.near"),
+        NearToken::from_yoctonear(0),
+        created + STALE_MINT_NS,
+        10,
+    );
+    assert_panics("not minting", || c.release_stale_mint(p.clone()));
+    // The lost callback arrives late: nothing minted.
+    callback(ok(
+        b"{\"total\":\"1250000000000000000000\",\"available\":\"0\"}",
+    ));
+    assert!(!c.on_vault_ready(p.clone(), acc("alice.near")));
+    assert!(get_logs().join("\n").contains("late_mint_callback"));
+    assert_eq!(c.owner_of(&p), None);
+    // The group is usable again.
+    let _b = mint(&mut c, w, "carol.near", 5000);
+    assert_eq!(group_of(&c, w).active_bps, 10_000);
+}

@@ -339,12 +339,20 @@ impl Registry {
         payer: AccountId,
     ) -> PromiseOrValue<bool> {
         let vault = self.share(&token_id).vault.clone();
+        let pending = self.share(&token_id).status == ShareStatus::Pending;
         if env::promise_results_count() != 1 || env::promise_result_checked(0, 64).is_err() {
             // The NEAR sent with the failed batch came back to the registry.
-            self.fail_share(&token_id, "vault account creation failed");
+            if pending {
+                self.fail_share(&token_id, "vault account creation failed");
+            }
             Promise::new(payer)
                 .transfer(VAULT_NEAR.saturating_add(FT_STORAGE_DEPOSIT))
                 .detach();
+            return PromiseOrValue::Value(false);
+        }
+        if !pending {
+            // Released by release_stale_mint meanwhile (review M1).
+            Self::late_mint_callback(&token_id);
             return PromiseOrValue::Value(false);
         }
         Promise::new(self.usdc.clone())
@@ -364,9 +372,16 @@ impl Registry {
 
     #[private]
     pub fn on_vault_ready(&mut self, token_id: TokenId, payer: AccountId) -> bool {
+        let pending = self.share(&token_id).status == ShareStatus::Pending;
         if callback_result(512).is_none() {
-            self.fail_share(&token_id, "vault token registration failed");
+            if pending {
+                self.fail_share(&token_id, "vault token registration failed");
+            }
             Promise::new(payer).transfer(FT_STORAGE_DEPOSIT).detach();
+            return false;
+        }
+        if !pending {
+            Self::late_mint_callback(&token_id);
             return false;
         }
         let share = self.share(&token_id).clone();
@@ -428,6 +443,29 @@ impl Registry {
         );
         true
     }
+
+    /// Fails a share whose mint callbacks never committed (review M1), so
+    /// its reserved bps stop blocking the group. Anyone may call it once
+    /// the share has been Pending for `STALE_MINT_NS`. A callback that
+    /// still arrives later finds the share Failed and mints nothing. The
+    /// NEAR attached at registration is not refunded here: it may already
+    /// be spent on the vault account.
+    pub fn release_stale_mint(&mut self, token_id: TokenId) {
+        let share = self.share(&token_id);
+        require!(share.status == ShareStatus::Pending, "share is not minting");
+        require!(
+            env::block_timestamp() >= share.created_at.0.saturating_add(STALE_MINT_NS),
+            "mint is not stale yet"
+        );
+        self.fail_share(
+            &token_id,
+            "mint callbacks did not complete: released as stale",
+        );
+        emit(
+            "mint_released_stale",
+            json!({ "token_id": token_id, "by": env::predecessor_account_id() }),
+        );
+    }
 }
 
 impl Registry {
@@ -448,6 +486,13 @@ impl Registry {
         emit(
             "vault_failed",
             json!({ "token_id": token_id, "vault": share.vault, "reason": reason }),
+        );
+    }
+
+    fn late_mint_callback(token_id: &TokenId) {
+        emit(
+            "anomaly",
+            json!({ "token_id": token_id, "kind": "late_mint_callback", "detail": "share is no longer minting: nothing minted" }),
         );
     }
 
