@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { setup } from './helpers';
-import { chat, startChat, chatLimits, type Turn } from '../src/server/chat';
+import { chat, startChat, chatLimits, budgetDay, type Turn } from '../src/server/chat';
+const today = () => budgetDay(Date.now());
 import { MemoryStore } from '../src/server/store';
 import { loadConfig } from '../src/server/config';
 import { clientKey } from '../src/server/security';
@@ -21,8 +22,8 @@ function direct() {
 describe('F-16 per-client limits run before shared daily budgets', () => {
   it('orders limits narrowest first and keys none of them on the chat session', () => {
     const { config } = direct();
-    expect(chatLimits(config, 'ipk', null).map(l => l.id)).toEqual(['chat:ip:ipk', 'chat:global:anon', 'chat:global']);
-    expect(chatLimits(config, 'ipk', 'w.testnet').map(l => l.id)).toEqual(['chat:ip:ipk', 'chat:wallet:w.testnet', 'chat:global']);
+    expect(chatLimits(config, 'ipk', null).map(l => l.id)).toEqual(['chat:ip:ipk', `chat:global:anon:${today()}`, `chat:global:${today()}`]);
+    expect(chatLimits(config, 'ipk', 'w.testnet').map(l => l.id)).toEqual(['chat:ip:ipk', 'chat:wallet:w.testnet', `chat:global:${today()}`]);
   });
 
   it('PoC: one anonymous client sending 700 requests cannot lock out other anonymous clients', async () => {
@@ -31,8 +32,8 @@ describe('F-16 per-client limits run before shared daily budgets', () => {
     for (let i = 0; i < 700; i++) if (await d.ask('attacker') === 200) served++;
     expect(served).toBe(d.config.chatDayCap);
     expect(d.model.calls).toBe(d.config.chatDayCap);
-    expect(await d.store.get('rate:chat:global:anon')).toBe(d.config.chatDayCap);
-    expect(await d.store.get('rate:chat:global')).toBe(d.config.chatDayCap);
+    expect(await d.store.get(`rate:chat:global:anon:${today()}`)).toBe(d.config.chatDayCap);
+    expect(await d.store.get(`rate:chat:global:${today()}`)).toBe(d.config.chatDayCap);
     expect(await d.store.get('rate:chat:ip:attacker')).toBe(d.config.chatDayCap);
     expect(await d.ask('honest-anon')).toBe(200);
   });
@@ -51,8 +52,8 @@ describe('F-16 per-client limits run before shared daily budgets', () => {
     for (let i = 0; i < 560; i++) if (await d.ask('attacker', null, id) === 429) refused++;
     expect(refused).toBe(560);
     expect(d.model.calls).toBe(40);
-    expect(await d.store.get('rate:chat:global:anon')).toBe(40);
-    expect(await d.store.get('rate:chat:global')).toBe(40);
+    expect(await d.store.get(`rate:chat:global:anon:${today()}`)).toBe(40);
+    expect(await d.store.get(`rate:chat:global:${today()}`)).toBe(40);
     expect(await d.ask('honest-anon')).toBe(200);
   });
 
@@ -60,7 +61,7 @@ describe('F-16 per-client limits run before shared daily budgets', () => {
     const d = direct();
     for (let i = 0; i < 900; i++) await d.ask('attacker', 'attacker.testnet');
     expect(d.model.calls).toBe(d.config.chatWalletDayCap);
-    expect(await d.store.get('rate:chat:global')).toBe(d.config.chatWalletDayCap);
+    expect(await d.store.get(`rate:chat:global:${today()}`)).toBe(d.config.chatWalletDayCap);
     expect(await d.ask('honest', 'honest.testnet')).toBe(200);
   });
 
@@ -81,12 +82,12 @@ describe('F-16 per-client limits run before shared daily budgets', () => {
     expect(await ask('b')).toBe(200);
     expect(await ask('c')).toBe(429);
     expect(await d.store.get('rate:chat:ip:c')).toBe(0);
-    expect(await d.store.get('rate:chat:global:anon')).toBe(2);
+    expect(await d.store.get(`rate:chat:global:anon:${today()}`)).toBe(2);
     expect(await ask('d', 'w.testnet')).toBe(200);
     expect(await ask('e', 'w.testnet')).toBe(429);
     expect(await d.store.get('rate:chat:ip:e')).toBe(0);
     expect(await d.store.get('rate:chat:wallet:w.testnet')).toBe(1);
-    expect(await d.store.get('rate:chat:global')).toBe(3);
+    expect(await d.store.get(`rate:chat:global:${today()}`)).toBe(3);
   });
 
   it('the per-client day cap survives new chat sessions and covers the whole IPv6 /64', async () => {
@@ -99,7 +100,7 @@ describe('F-16 per-client limits run before shared daily budgets', () => {
     for (let i = 4; i <= 12; i++) expect(await send(`2001:db8:0:7::${i.toString(16)}`)).toBe(429);
     expect(t.modelCalls).toHaveLength(3);
     expect(await t.store.get(`rate:chat:ip:${clientKey('2001:db8:0:7::1', t.config.sessionSecret)}`)).toBe(3);
-    expect(await t.store.get('rate:chat:global')).toBe(3);
+    expect(await t.store.get(`rate:chat:global:${today()}`)).toBe(3);
     expect(await send('2001:db8:0:8::1')).toBe(200);
   });
 });

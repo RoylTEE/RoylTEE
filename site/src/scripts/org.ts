@@ -4,6 +4,7 @@ import { sendCalls } from './wallet';
 import { REGISTRY, REGISTRAR, TOKEN_DECIMALS } from '../data/testnet';
 import { h, badge, acct, fail } from './ui';
 import { grantChecks, lineChecks, revokeChecks, withdrawChecks, allOk, parseUnits, grantDeposit, LINE_COST_YOCTO, type Check, type RoleFacts } from './agent-rules';
+import { outcomeText } from './tx-outcome';
 
 const TGAS = (n: number) => `${n}000000000000`;
 const list = (c: Check[]) => h('ul', { class: 'checklist' }, ...c.map((x) => h('li', {}, badge(x.ok ? 'OK' : 'Blocks', x.ok ? 'ok' : 'bad'), h('span', { text: x.text }))));
@@ -27,7 +28,7 @@ export function renderOrg(box: Element, viewing: string, signer: string, status:
   };
   const sign = async (label: string, method: string, args: Record<string, unknown>, deposit: string, gas: number) => {
     status.textContent = 'Waiting for the organisation wallet...';
-    try { await sendCalls(REGISTRY, [{ method, args, deposit, gas: TGAS(gas) }]); status.textContent = `${label} sent. Reading the role again.`; await read(); }
+    try { const out = await sendCalls(REGISTRY, [{ method, args, deposit, gas: TGAS(gas) }]); status.textContent = outcomeText(out, label, 'Reading the role again.'); await read(); }
     catch (err) { status.textContent = `Not sent: ${(err as Error).message || 'cancelled in the wallet'}.`; }
   };
   const signBtn = (text: string, ok: boolean, fn: () => void) => h('div', { class: 'actions' },
@@ -93,7 +94,7 @@ export function renderOrg(box: Element, viewing: string, signer: string, status:
     h('form', { class: 'field', onsubmit: (e: Event) => { e.preventDefault(); void read(); } },
       h('label', { for: 'o-agent', text: 'Agent account' }),
       h('div', { class: 'inline' }, agentIn, h('button', { class: 'btn', type: 'submit', text: 'Read the role' })),
-      h('p', { class: 'hint', text: 'An agent must be a direct sub-account of the organisation. Try pay-agent.buyer-pub.royltee-dev.testnet.' })),
+      h('p', { class: 'hint', text: 'An agent must be a direct sub-account of the organisation. Create it with a function call key only (receiver the registry, methods pay_from_allowance and report) and delete any full access key: the contract does not check the agent account\'s keys, and a full access key could attach deposits and call anything. Try pay-agent.buyer-pub.royltee-dev.testnet.' })),
     out);
   if (org) void read();
 }

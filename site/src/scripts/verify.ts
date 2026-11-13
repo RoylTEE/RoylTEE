@@ -1,5 +1,5 @@
 /** Verify: live code hashes against the deploy record, keyless share accounts, keys left on contract accounts. */
-import { allTokens, view, viewAccount, accessKeys, pool, base58ToHex } from './chain';
+import { allTokens, view, viewAccount, accessKeys, pool } from './chain';
 import { DEPLOY_RECORD, REGISTRY, TOKEN } from '../data/testnet';
 import { h, badge, acct, fig, fail, stamp } from './ui';
 
@@ -20,7 +20,8 @@ async function load() {
       ['Mock USDC (testnet)', DEPLOY_RECORD.mockUsdc.codeHash, usdc.code_hash, usdc.code_hash === DEPLOY_RECORD.mockUsdc.codeHash],
       ['Vault code the registry deploys', DEPLOY_RECORD.vault.sha256, vaultHex, vaultHex === DEPLOY_RECORD.vault.sha256],
     ];
-    const vaultOk = vaults.map((v) => v.code_hash === DEPLOY_RECORD.vault.codeHash && base58ToHex(v.code_hash) === vaultHex);
+    // Each share account must run a recorded vault build: the current one or one from an earlier deploy (review 03d L5).
+    const vaultOk = vaults.map((v) => v.code_hash === DEPLOY_RECORD.vault.codeHash || DEPLOY_RECORD.earlierVaultCodeHashes.includes(v.code_hash));
     const keyless = vkeys.filter((k) => k.length === 0).length;
     const full = (ks: typeof regKeys) => ks.filter((k) => k.access_key.permission === 'FullAccess').length;
     $('[data-vfig]').replaceChildren(

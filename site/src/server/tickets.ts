@@ -50,18 +50,62 @@ export async function openCount(store: Store, owner: string, now = Date.now()) {
 export async function assertOpenSlot(store: Store, owner: string, now = Date.now()) {
   if (await openCount(store, owner, now) >= OPEN_PER_WALLET) fail(429, 'You already have the maximum number of open tickets. Please wait for a reply or for an older ticket to close.');
 }
+/** Seconds a per wallet slot reservation lives if a worker dies while holding it. */
+const SLOT_LOCK_SECONDS = 15;
 export async function createTicket(store: Store, owner: string, input: Record<string, unknown>, now: number) {
   const fields = ticketText(input);
-  await assertOpenSlot(store, owner, now);
-  const ticket: Ticket = { id: randomId(), wallet: owner, subject: fields.subject, message: fields.message, status: 'open', reply: null, createdAt: now, updatedAt: now, closedAt: null };
-  await store.put(`ticket:${ticket.id}`, ticket, LIVE_SECONDS);
-  await store.add(wallet(owner), now, ticket.id);
-  await store.add(openIndex(owner), now, ticket.id);
-  await store.add('tickets:all', now, ticket.id);
-  return ticket;
+  // Reserve the wallet's open slot atomically (one INCR) so the count check and the write cannot
+  // interleave with another submit from the same wallet (review 03b L3, second reviewer item 6).
+  const lock = `tickets:slot:${owner}`;
+  if (await store.count(lock, SLOT_LOCK_SECONDS) > 1) {
+    await store.uncount(lock);
+    fail(429, 'Another ticket from this wallet is being saved. Please try again in a moment.');
+  }
+  try {
+    await assertOpenSlot(store, owner, now);
+    const ticket: Ticket = { id: randomId(), wallet: owner, subject: fields.subject, message: fields.message, status: 'open', reply: null, createdAt: now, updatedAt: now, closedAt: null };
+    await store.put(`ticket:${ticket.id}`, ticket, LIVE_SECONDS);
+    await store.add(wallet(owner), now, ticket.id);
+    await store.add(openIndex(owner), now, ticket.id);
+    await store.add('tickets:all', now, ticket.id);
+    return ticket;
+  } finally {
+    await store.uncount(lock);
+  }
 }
-/** Upper bound on index entries read for one page. */
-const MAX_WINDOW = 4096;
+export type BackfillReport = { scanned: number; indexed: number; ttlSet: number; expired: number; applied: boolean };
+/**
+ * One time, idempotent backfill for tickets written before open tickets had a TTL and the per wallet
+ * open index (review 03b L1, second reviewer item 4). For every ticket that is not closed: if its last
+ * update is older than 30 days it is deleted as expired; otherwise it is put again with the TTL left
+ * from its last update and added to the open index. Dry run unless `apply` is true. Running it again
+ * changes nothing new. Closed tickets are left to the existing closed sweep.
+ */
+export async function backfillOpenTickets(store: Store, now: number, apply = false): Promise<BackfillReport> {
+  const report: BackfillReport = { scanned: 0, indexed: 0, ttlSet: 0, expired: 0, applied: apply };
+  for (const id of await store.range('tickets:all', Number.MAX_SAFE_INTEGER, 1_000_000)) {
+    const t = await store.get<Ticket>(`ticket:${id}`);
+    if (!t || t.status === 'closed') continue;
+    report.scanned++;
+    const left = Math.floor((t.updatedAt + OPEN_SECONDS * 1000 - now) / 1000);
+    if (left <= 0) {
+      report.expired++;
+      if (apply) {
+        await store.del(`ticket:${id}`);
+        await store.remove('tickets:all', id);
+        await store.remove(wallet(t.wallet), id);
+        await store.remove(openIndex(t.wallet), id);
+      }
+      continue;
+    }
+    report.ttlSet++; report.indexed++;
+    if (apply) {
+      await store.put(`ticket:${id}`, t, left);
+      await store.add(openIndex(t.wallet), t.updatedAt, id);
+    }
+  }
+  return report;
+}
 export async function listTickets(store: Store, owner: string | null, now: number, cursorValue: string | null = null, limit = PAGE_SIZE): Promise<TicketPage> {
   await sweep(store, now);
   const cursor = decodeCursor(cursorValue);
@@ -72,7 +116,7 @@ export async function listTickets(store: Store, owner: string | null, now: numbe
   // list. Tickets on the cursor's own millisecond that were already shown are skipped, and the window
   // grows if they fill it, so ties never end the list early either.
   let tickets: Ticket[] = [];
-  for (let window = take + 2; ; window = Math.min(window * 2, MAX_WINDOW)) {
+  for (let window = take + 2; ; window *= 2) {
     const ids = await store.rangeNewest(index, cursor ? cursor.createdAt : Number.MAX_SAFE_INTEGER, window);
     tickets = [];
     for (const id of ids) {
@@ -83,7 +127,7 @@ export async function listTickets(store: Store, owner: string | null, now: numbe
       tickets.push(t);
       if (tickets.length === take + 1) break;
     }
-    if (tickets.length === take + 1 || ids.length < window || window === MAX_WINDOW) break;
+    if (tickets.length === take + 1 || ids.length < window) break;
   }
   const more = tickets.length > take;
   const page = more ? tickets.slice(0, take) : tickets;

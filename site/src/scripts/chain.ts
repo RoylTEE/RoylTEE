@@ -1,5 +1,6 @@
 /** Read only NEAR testnet client for the registry pages. View calls only: nothing here signs or sends. */
 import { RPC_URLS, REGISTRY, TOKEN, TOKEN_DECIMALS } from '../data/testnet';
+import { shownClaimable } from './claimable';
 
 export class ViewError extends Error { constructor(message: string, readonly missingMethod = false) { super(message); } }
 
@@ -50,7 +51,7 @@ export type Group = { work_id: number; right_type: string; territory: string };
 export type Work = { id: number; code_type: string; code: string; provenance: string; registered_by: string; status: string; groups: Group[]; created_at: string };
 export type Share = { token_id: string; number: number; group: Group; percent_bps: number; basis: string; status: string; vault: string; holder_at_mint: string; registered_by: string; dispute: unknown; confirmations: string[]; last_effective_from: string | null; created_at: string; note: string | null };
 export type Ledger = { known_balance: string; total_paid_out: string; earned: string; claimable: string; total_routed_in: string; undelivered: string; escrowed: string; payout_in_flight: unknown; transfer_pending: unknown };
-export type TokenExtra = { work_id: number; right_type: string; territory: string; percent_bps: number; basis: string; provenance: string; evidence_tier: string; status: string; vault: string; earned: string; paid_out: string; claimable: string; escrowed: string; payout_in_flight: boolean; transfer_pending: boolean; approval?: string; dispute: unknown };
+export type TokenExtra = { work_id: number; right_type: string; territory: string; percent_bps: number; basis: string; provenance: string; evidence_tier: string; status: string; vault: string; earned: string; paid_out: string; claimable: string; escrowed: string; payout_in_flight: boolean; transfer_pending: boolean; approval?: string; dispute: unknown; ledger_claimable?: string; vault_balance?: string | null };
 export type Token = { token_id: string; owner_id: string; extra: TokenExtra };
 export type Dispute = { id: number; kind: Record<string, { group?: Group; claimant?: string; contested?: string[]; work_id?: number; original?: number }>; opened_by: string; opened_at: string; status: 'open' | { resolved: { outcome: string; doc_hash: string; at: string } } | string };
 export type Role = { agent: string; org: string; methods: string[]; per_tx_limit: string; daily_limit: string; max_tx_per_day: number; expires_at: string; revoked: boolean; expired: boolean; allowance: string; line_credits: number; spent_last_24h: string; tx_last_24h: number };
@@ -58,16 +59,31 @@ export type Accounting = { allowance_total: string; unallocated_total: string; e
 
 type RawToken = { token_id: string; owner_id: string; metadata: { extra: string | null } };
 const parseToken = (t: RawToken): Token => ({ token_id: t.token_id, owner_id: t.owner_id, extra: JSON.parse(t.metadata.extra || '{}') });
+/**
+ * Caps each token's claimable at its vault's real mock USDC balance (review 03d M1, T21). The ledger
+ * figure is kept in `ledger_claimable`. If the vault balance cannot be read, the ledger figure is shown
+ * and `vault_balance` is null.
+ */
+async function capClaimable(tokens: Token[]): Promise<Token[]> {
+  await pool(tokens, async (t) => {
+    let bal: string | null = null;
+    try { bal = await tokenBalance(t.extra.vault); } catch { bal = null; }
+    t.extra.ledger_claimable = t.extra.claimable;
+    t.extra.vault_balance = bal;
+    t.extra.claimable = shownClaimable(t.extra.claimable, bal);
+  });
+  return tokens;
+}
 export async function allTokens(): Promise<Token[]> {
   const out: Token[] = [];
   for (let from = 0; ; from += 50) {
     const page = await view<RawToken[]>('nft_tokens', { from_index: String(from), limit: 50 });
     out.push(...page.map(parseToken));
-    if (page.length < 50) return out;
+    if (page.length < 50) return capClaimable(out);
   }
 }
-export const tokensFor = async (account_id: string) => (await view<RawToken[]>('nft_tokens_for_owner', { account_id, limit: 100 })).map(parseToken);
-export const oneToken = async (token_id: string) => { const t = await view<RawToken | null>('nft_token', { token_id }); return t ? parseToken(t) : null; };
+export const tokensFor = async (account_id: string) => capClaimable((await view<RawToken[]>('nft_tokens_for_owner', { account_id, limit: 100 })).map(parseToken));
+export const oneToken = async (token_id: string) => { const t = await view<RawToken | null>('nft_token', { token_id }); return t ? (await capClaimable([parseToken(t)]))[0] : null; };
 
 /** Split sheet status. The deployed registry predates this view, so a missing method is reported as such. */
 export async function approvalOf(token: Token): Promise<'approved' | 'pending' | 'rejected' | 'not deployed'> {

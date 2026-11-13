@@ -18,7 +18,7 @@ import PowerTable from '../components/PowerTable.astro';
       <div class="stack">
         <h2 class="h-sm">What the holder can do</h2>
         <PowerTable who="holder" />
-        <p class="caption">Marketplace approvals (nft_approve) are disabled by design, so no outside contract can list or move a share.</p>
+        <p class="caption">Marketplace approvals (nft_approve) are disabled by design, so no third party can be approved to list or move a share for its holder. A contract account with an active credential can still become the holder (for example through nft_transfer_call) and then has the normal holder powers.</p>
       </div>
     </div>
   </section>

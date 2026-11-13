@@ -60,6 +60,13 @@ export const DEPLOY_RECORD = {
   registry: { account: 'reg.royltee-dev.testnet', codeHash: 'GZkyojcHYDip7pZsDYvkgkjEtgGakPZZcX28cgSyAVhq', sha256: 'e7439e120c7c00e3b71a658b1083dfd28bfd67708d820ef84a10157c87de10f8' },
   mockUsdc: { account: 'usdc.royltee-dev.testnet', codeHash: '47ybTZxhaJ9ZW3FC9jwaDdLfwgkJ59cCrnkSn5oop67t', sha256: '2e5c896b2ead7d1bd12a2944971d6a393902084cf47616c54d18e7a577efc0bb' },
   vault: { codeHash: 'BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU', sha256: '973b2cbdbe904de710dcc7bf54a7b4164156f8c81d2932191e6968514aaaa727' },
+  /**
+   * Vault code hashes from earlier deploys. Existing share accounts keep the vault code they were
+   * created with, so after the planned registry update the old vaults run an earlier build. When the
+   * registry is redeployed, move the old vault code hash here and update the three entries above from
+   * deployments/testnet.json (tests/review-03b.test.ts checks that they agree when that file is present).
+   */
+  earlierVaultCodeHashes: [] as readonly string[],
 } as const;
 
 /** register_share transactions that minted each share (deployments/testnet.json, steps 9 and 13). */

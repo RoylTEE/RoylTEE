@@ -6,6 +6,8 @@ import { h, badge, acct, shareState, rightLabel, loading, fail, stamp } from './
 import { statement } from './sharecard';
 import { transferChecks, canTransfer } from './transfer-rules';
 import { renderOrg } from './org';
+import { outcomeText } from './tx-outcome';
+import { overLimit, type GroupTotals } from './draft-check';
 
 const root = document.querySelector<HTMLElement>('[data-member]')!;
 const q = <T extends Element>(s: string) => root.querySelector<T>(s)!;
@@ -90,7 +92,7 @@ function renderTransfer(mine: Token[], ledgers: Ledger[]) {
           h('p', { class: 'small muted', text: 'Your wallet signs nft_transfer on the registry with 1 yoctoNEAR attached. The contract checks every rule above again.' }),
           h('div', { class: 'actions' }, h('button', { class: 'btn primary', type: 'button', text: `Sign the transfer of ${t.token_id}`, disabled: !ok, onclick: async () => {
             status.textContent = `Waiting for your wallet to sign nft_transfer(${t.token_id})...`;
-            try { await sendCalls(REGISTRY, [{ method: 'nft_transfer', args: { receiver_id: receiver, token_id: t.token_id, ...(memo.value.trim() ? { memo: memo.value.trim() } : {}) }, deposit: '1', gas: TGAS(100) }]); status.textContent = `Transfer of ${t.token_id} sent. Refreshing.`; await refresh(); }
+            try { const out = await sendCalls(REGISTRY, [{ method: 'nft_transfer', args: { receiver_id: receiver, token_id: t.token_id, ...(memo.value.trim() ? { memo: memo.value.trim() } : {}) }, deposit: '1', gas: TGAS(100) }]); status.textContent = outcomeText(out, `Transfer of ${t.token_id}`, 'Refreshing.'); await refresh(); }
             catch (err) { status.textContent = `Transfer not sent: ${(err as Error).message || 'cancelled in the wallet'}.`; }
           } }), ok ? null : h('span', { class: 'small muted', text: 'Fix what blocks it first.' }))));
     } catch (err) { fail(result, err, () => void check()); }
@@ -107,7 +109,7 @@ function renderTransfer(mine: Token[], ledgers: Ledger[]) {
 
 async function claim(t: Token) {
   status.textContent = `Waiting for your wallet to sign claim(${t.token_id})...`;
-  try { await sendCalls(REGISTRY, [{ method: 'claim', args: { token_id: t.token_id }, deposit: '1', gas: TGAS(100) }]); status.textContent = `Claim for ${t.token_id} sent. Refreshing.`; await refresh(); }
+  try { const out = await sendCalls(REGISTRY, [{ method: 'claim', args: { token_id: t.token_id }, deposit: '1', gas: TGAS(100) }]); status.textContent = outcomeText(out, `Claim for ${t.token_id}`, 'Refreshing.'); await refresh(); }
   catch (err) { status.textContent = `Claim not sent: ${(err as Error).message || 'cancelled in the wallet'}.`; }
 }
 
@@ -142,7 +144,7 @@ function reviewCard(t: Token, all: Token[]) {
   const rows = group.map((x) => ({ holder: x.owner_id, role: rightLabel[x.extra.right_type], bps: x.extra.percent_bps, state: x.token_id === t.token_id ? badge('Waiting for approval', 'warn') : badge('Approved', 'ok') }));
   const act = (method: 'approve_share' | 'reject_share') => async () => {
     status.textContent = `Waiting for your wallet to sign ${method}(${t.token_id})...`;
-    try { await sendCalls(REGISTRY, [{ method, args: { token_id: t.token_id, doc_hash: null }, deposit: '1', gas: TGAS(100) }]); status.textContent = `${method} for ${t.token_id} sent. Refreshing.`; await refresh(); }
+    try { const out = await sendCalls(REGISTRY, [{ method, args: { token_id: t.token_id, doc_hash: null }, deposit: '1', gas: TGAS(100) }]); status.textContent = outcomeText(out, `${method} for ${t.token_id}`, 'Refreshing.'); await refresh(); }
     catch (err) { status.textContent = `Not sent: ${(err as Error).message || 'cancelled in the wallet'}.`; }
   };
   const can = signer === viewing;
@@ -208,9 +210,21 @@ async function draft() {
       review.replaceChildren(h('div', { class: 'review' },
         h('div', { class: 'insp-head' }, h('h3', { text: 'Review before you sign' }), badge(blocked ? 'Cannot send' : 'Ready to sign', blocked ? 'bad' : 'ok')),
         sheetTable(rows.map((r, i) => ({ holder: r.holder, role: rightLabel[r.role], bps: bpsOf(r), state: creds[i]?.status === 'active' ? badge('Member', 'ok') : badge('No active credential', 'bad') })), rows.reduce((a, r) => a + bpsOf(r), 0)),
-        h('p', { class: 'small muted', text: signer && signer !== w.registered_by ? `You did not register work ${w.id}. After the planned registry update each new share waits until ${short(w.registered_by)} approves it; on the deployed build it is paid as soon as it is minted.` : `${rows.length} transaction${rows.length > 1 ? 's' : ''} to ${REGISTRY}, 0.2 NEAR attached to each. Evidence hash ${digest.slice(0, 12)}...` }),
+        h('p', { class: 'small muted', text: signer && signer !== w.registered_by ? `You did not register work ${w.id}. On the registry deployed on testnet today, each new share is paid as soon as it is minted, with no approval step. Approval by ${short(w.registered_by)} comes only with the planned registry update.` : `${rows.length} transaction${rows.length > 1 ? 's' : ''} to ${REGISTRY}, 0.2 NEAR attached to each. Evidence hash ${digest.slice(0, 12)}...` }),
         h('div', { class: 'actions' },
-          h('button', { class: 'btn primary', type: 'button', text: `Sign ${rows.length} in your wallet`, disabled: blocked || !signer, onclick: async () => { status.textContent = 'Waiting for your wallet...'; try { await sendCalls(REGISTRY, calls); status.textContent = 'Sent. New shares appear in the catalog once minted.'; } catch (err) { status.textContent = `Not sent: ${(err as Error).message || 'cancelled in the wallet'}.`; } } }),
+          h('button', { class: 'btn primary', type: 'button', text: `Sign ${rows.length} in your wallet`, disabled: blocked || !signer, onclick: async () => {
+            status.textContent = 'Reading the current split from testnet...';
+            try {
+              for (const role of new Set(rows.map((r) => r.role))) {
+                const g = await view<GroupTotals>('get_group', { work_id: w.id, right_type: role, territory: terr.value.toUpperCase() });
+                const over = overLimit(g, rows.filter((r) => r.role === role).reduce((a, r) => a + bpsOf(r), 0));
+                if (over !== null) { status.textContent = `Not sent: ${rightLabel[role]} on work ${w.id} would now add up to ${pct(over)}. The split changed since you opened the draft; above 100 percent the deployed registry freezes every share in the group.`; return; }
+              }
+            } catch (err) { status.textContent = `Not sent: could not re-read the split (${(err as Error).message}).`; return; }
+            status.textContent = 'Waiting for your wallet...';
+            try { const out = await sendCalls(REGISTRY, calls); status.textContent = outcomeText(out, 'Registration', 'New shares appear in the catalog once minted.'); }
+            catch (err) { status.textContent = `Not sent: ${(err as Error).message || 'cancelled in the wallet'}.`; }
+          } }),
           h('button', { class: 'btn', type: 'button', text: 'Back to editing', onclick: () => review.replaceChildren() }),
           !signer ? h('span', { class: 'caption', text: 'Connect a wallet to sign.' }) : null)));
     };

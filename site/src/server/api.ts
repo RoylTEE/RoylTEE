@@ -4,7 +4,7 @@ import type { Store } from './store';
 import { ACCOUNT_ID, ED25519_KEY, HttpError, body, challengeCookie, challengeSetCookie, clientKey, cookieSecure, digest, equal, fail, json, originCheck, randomId, rate, sessionCookie, sessionSetCookie } from './security';
 import { fullAccessKey, readSession, recordWallet, sessionToken, verifySignature, type Challenge, type Session } from './auth';
 import { chat, startChat, type Model } from './chat';
-import { adminUpdate, assertOpenSlot, createTicket, listTickets, sweep, ticketText, LIMITS } from './tickets';
+import { adminUpdate, assertOpenSlot, backfillOpenTickets, createTicket, listTickets, sweep, ticketText, LIMITS } from './tickets';
 export type Deps = { config: Config; store?: Store | null; model: Model; now?: () => number; fetcher?: typeof fetch; address?: string };
 export const SESSION_COOKIE = 'royltee_support';
 export const SESSION_SECONDS = 15 * 60;
@@ -134,6 +134,11 @@ export async function handle(request: Request, route: string, deps: Deps): Promi
         const input = await body(request);
         if (input.action !== 'reply' && input.action !== 'close') fail(400, 'Choose reply or close.');
         return json({ ticket: await adminUpdate(store, input.id, input.action as 'reply' | 'close', input, now) });
+      }
+      if (route === 'admin/backfill' && method === 'POST') {
+        // Dry run unless the body says {"apply": true}. Idempotent. See site/README.md "Support tickets".
+        const input = await body(request);
+        return json({ report: await backfillOpenTickets(store, now, input.apply === true) });
       }
     }
     return fail(404, 'Not found.');

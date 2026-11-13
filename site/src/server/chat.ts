@@ -1,10 +1,10 @@
 import type { Config } from './config';
 import type { Store } from './store';
-import { digest, equal, fail, mac, rateAll, text, type Limit } from './security';
+import { digest, equal, fail, mac, randomId, rateAll, text, type Limit } from './security';
 import { SYSTEM_PROMPT } from './prompt';
 import { sensitive } from './sensitive';
 export type Turn = { role: 'user' | 'assistant'; text: string; index?: number; signature?: string; tee?: boolean };
-export type ChatState = { count: number; digest: string; busy: boolean; busyUntil?: number };
+export type ChatState = { count: number; digest: string; busy: boolean; busyUntil?: number; owner?: string };
 export type ModelResult = { text: string; tee: boolean };
 export type Model = (turns: Turn[]) => Promise<string | ModelResult>;
 export const VERSION = 'royltee-chat-v2';
@@ -69,18 +69,23 @@ function isBusy(state: ChatState, now: number) {
 function signedReserve(config: Config) {
   return Math.min(Math.max(0, config.chatSignedReserve), Math.max(0, config.chatGlobalDayCap - 1));
 }
+/** UTC calendar day used to bucket the shared daily budgets. */
+export const budgetDay = (now: number) => new Date(now).toISOString().slice(0, 10);
 /**
  * Daily limits for one model call, narrowest first: the client address group (IPv6 /64), then the
  * signed-in wallet, then the anonymous share, then the global cap. Keys never use the chat session,
  * so starting a new session does not reset them, and a refused call gives back every charge.
+ * The anonymous share and the global cap use the same UTC day key, so they always start and end
+ * together and anonymous calls cannot reach into the signed-in reserve (review 03b, second reviewer item 2).
  */
-export function chatLimits(config: Config, ip: string, wallet: string | null): Limit[] {
+export function chatLimits(config: Config, ip: string, wallet: string | null, now = Date.now()): Limit[] {
   const day = 86400;
+  const bucket = budgetDay(now);
   const limits: Limit[] = [{ id: `chat:ip:${ip}`, max: config.chatDayCap, seconds: day }];
   const reserve = signedReserve(config);
   if (wallet) limits.push({ id: `chat:wallet:${wallet}`, max: config.chatWalletDayCap, seconds: day });
-  else if (reserve > 0) limits.push({ id: 'chat:global:anon', max: config.chatGlobalDayCap - reserve, seconds: day });
-  limits.push({ id: 'chat:global', max: config.chatGlobalDayCap, seconds: day });
+  else if (reserve > 0) limits.push({ id: `chat:global:anon:${bucket}`, max: config.chatGlobalDayCap - reserve, seconds: 2 * day });
+  limits.push({ id: `chat:global:${bucket}`, max: config.chatGlobalDayCap, seconds: 2 * day });
   return limits;
 }
 export async function chat(store: Store, config: Config, id: string, input: Record<string, unknown>, ip: string, model: Model, now = Date.now(), wallet: string | null = null) {
@@ -101,19 +106,23 @@ export async function chat(store: Store, config: Config, id: string, input: Reco
   if (isBusy(state, now) || digest(history) !== state.digest) fail(400, 'That turn was already used or changed. Please start again.');
   const question = text(input.message, 1500);
   if (state.count >= config.chatSessionCap) fail(429, 'This conversation has reached its limit. Please come back later.');
-  const busy: ChatState = { ...state, busy: true, busyUntil: now + BUSY_MS };
+  // A unique owner token: if this lock expires and another request takes the turn over, this
+  // worker's commit no longer matches and its answer is discarded (review 03b, second reviewer item 7).
+  const busy: ChatState = { ...state, busy: true, busyUntil: now + BUSY_MS, owner: randomId() };
   if (!await store.cas(`chat:${id}`, state, busy, 3600)) fail(400, 'That turn was already used. Please start again.');
   try {
     const user: Turn = { role: 'user', text: question };
     const blocked = refusal(question);
-    if (!blocked) await rateAll(store, chatLimits(config, ip, wallet));
+    if (!blocked) await rateAll(store, chatLimits(config, ip, wallet, now));
     const modelOut = blocked ? { text: blocked, tee: false } : modelResult(await model([...history, user]));
     const cleaned = cleanAnswer(modelOut.text);
     const output = cleaned ?? 'I could not give a safe answer to that one. Could you ask about a specific part of RoylTEE? [Contact support](/help#support) is there too.';
     const tee = cleaned !== null && modelOut.tee;
     const assistant: Turn = { role: 'assistant', text: output, index: state.count, signature: signTurn(config.chatSecret, id, state.count, output, tee), tee };
     const all = [...history, user, assistant];
-    await store.put(`chat:${id}`, { count: state.count + 1, digest: digest(all), busy: false, busyUntil: 0 }, 3600);
+    if (!await store.cas(`chat:${id}`, busy, { count: state.count + 1, digest: digest(all), busy: false, busyUntil: 0 }, 3600)) {
+      fail(409, 'A newer request took over this turn. Please start again.');
+    }
     return { sessionId: id, version: VERSION, assistant: { ...assistant, tee }, tee };
   } catch (e) {
     await store.cas(`chat:${id}`, busy, { ...state, busy: false, busyUntil: 0 }, 3600);

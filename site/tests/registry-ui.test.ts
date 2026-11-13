@@ -43,14 +43,14 @@ describe('registry pages: no new hosts, no secrets, honest data', () => {
     expect(EXPLORER).toBe('https://testnet.nearblocks.io');
     expect(SCENES.filter(s => /payer pays/i.test(s.what)).every(s => s.simulated)).toBe(true);
   });
-  it('only view calls are made outside the wallet module', () => {
+  it('no script outside the wallet module calls a send or broadcast method', () => {
     for (const f of readdirSync(new URL('../src/scripts/', import.meta.url))) {
       if (f === 'wallet.ts') continue;
       expect(src(`scripts/${f}`), f).not.toMatch(/signAndSendTransaction|broadcast_tx|send_tx/);
     }
     expect(src('scripts/chain.ts')).toMatch(/request_type: 'call_function'/);
   });
-  it('every change call from Your shares attaches a deposit and goes to the registry', () => {
+  it('Your shares sends its change calls to the registry and uses a 1 yoctoNEAR deposit', () => {
     const m = src('scripts/member.ts');
     for (const method of ['claim', 'approve_share', 'reject_share', 'register_share']) expect(m).toContain(`'${method}'`);
     expect(m.match(/sendCalls\(/g)!.length).toBe(m.match(/sendCalls\(REGISTRY,/g)!.length);
