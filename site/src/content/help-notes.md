@@ -55,7 +55,7 @@ Sources: the repository README, DESIGN.md, THREAT_MODEL.md, DEPLOY_PLAN.md, DECI
 
 ## What is Simulated
 
-KYB and identity, the fiat rail and payer statements, payer attestations, provenance evidence (human, AI assisted, fully AI is a declared field), arbitration documents, license legal terms, the agent (scripted, not a model), and USDC (a mock token). The dashboard page is a mockup with example data and is not yet wired to testnet.
+KYB and identity, the fiat rail and payer statements, payer attestations, provenance evidence (human, AI assisted, fully AI is a declared field), arbitration documents, license legal terms, the agent (scripted, not a model), and USDC (a mock token). The dashboard page is a mockup with example data and is not yet wired to testnet. The claim view on that page is a mockup too. It does not show a live claimable balance, and live vault balances are not shown in the app today. Claims happen on chain by the current holder.
 
 ## Not built
 
