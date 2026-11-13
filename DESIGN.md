@@ -737,7 +737,8 @@ Above 10000 bps `contests` is mandatory. Each named share must be an active, app
 // unallocated escrow, it leaves the group list. Emits share_rejected {token_id, by, doc_hash, to_unallocated}.
 #[payable] pub fn recover_rejected_vault(&mut self, token_id: TokenId, receiver: AccountId,
     amount: U128, doc_hash: Hash32) -> Promise;
-// 1y, registrar. Rejected share with an empty ledger only. Sends plain deposits out of its vault.
+// 1y, registrar. Rejected share with an empty ledger only, receiver not the registrar. Sends plain
+// deposits out of its vault.
 // Emits rejected_vault_recovered {token_id, receiver, amount, doc_hash, ok}.
 pub fn get_share_approval(&self, token_id: TokenId) -> String; // "approved" | "pending" | "rejected"
 ```
@@ -749,7 +750,7 @@ A share registered by anyone other than the work's `registered_by` is pending (c
 - L5: `payer_confirmed` counts only while the attesting account still has the payer role; `grant_role` refuses payer accounts.
 - L6: `on_vault_ready` fails the share (no NFT) if the holder no longer has an active credential.
 - L8: `pay_share` needs at least `MIN_GROUP_PAYMENT`, like a group payment.
-- L9: `refund_unallocated(group, receiver, amount, doc_hash)`, 1y, registrar, only for a Void work: sends unallocated escrow out (debit first, restored by `on_unallocated_refunded` if the transfer fails). Emits `unallocated_refunded`.
+- L9: `refund_unallocated(group, receiver, amount, doc_hash)`, 1y, registrar, only for a Void work, receiver not the registrar: sends unallocated escrow out (debit first, restored by `on_unallocated_refunded` if the transfer fails). Emits `unallocated_refunded`.
 - L2: the agent window also counts the bucket of the hour 24 hours back (`l2t:<agent>`), so it is 24 to 25 hours. `grant_role` writes the slot, so the organisation pays its storage.
 - M1: `release_stale_mint(token_id)`, anyone, once a share has been Pending for `STALE_MINT_NS` (20 minutes): fails the share and frees its bps; `on_vault_created` and `on_vault_ready` do nothing (emit `anomaly` `late_mint_callback`) when the share is no longer Pending. `GAS_FORWARD_CB` is 10 Tgas (was 5); measured use about 2.2 Tgas, and a 16-share payment still fits. A lost `on_forward` is not recoverable by a method (THREAT_MODEL T19).
 
