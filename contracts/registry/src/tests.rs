@@ -1938,3 +1938,33 @@ fn only_the_registry_account_itself_can_initialise() {
 
 #[path = "review_fixes.rs"]
 mod review_fixes;
+
+/// Review 03d L7: the site's grant deposit is 0.01 NEAR for role storage plus
+/// 0.001 NEAR per statement line. Check that 0.01 NEAR covers the role's
+/// storage on its own and that 0.01 + 5 x 0.001 NEAR buys at least 5 lines.
+#[test]
+fn r03d_l7_grant_deposit_of_site_covers_role_storage() {
+    let mut c = setup();
+    call(&acc("alice.near"), NearToken::from_millinear(10));
+    c.grant_role(
+        agent(),
+        vec![AgentMethod::PayFromAllowance, AgentMethod::Report],
+        U128(1),
+        U128(1),
+        1,
+        U64(FAR),
+    );
+    let bare = c.get_role(agent()).unwrap().line_credits;
+    call(&acc("alice.near"), NearToken::from_millinear(15));
+    c.grant_role(
+        acc("pay2.alice.near"),
+        vec![AgentMethod::PayFromAllowance, AgentMethod::Report],
+        U128(1),
+        U128(1),
+        1,
+        U64(FAR),
+    );
+    let r = c.get_role(acc("pay2.alice.near")).unwrap();
+    assert!(r.line_credits >= 5, "{}", r.line_credits);
+    println!("role storage leaves {bare} spare lines at 0.01 NEAR");
+}
