@@ -1,6 +1,6 @@
 import type { Config } from './config';
 import type { Store } from './store';
-import { digest, equal, fail, mac, rate, text } from './security';
+import { digest, equal, fail, mac, rateAll, text, type Limit } from './security';
 import { SYSTEM_PROMPT } from './prompt';
 import { sensitive } from './sensitive';
 export type Turn = { role: 'user' | 'assistant'; text: string; index?: number; signature?: string; tee?: boolean };
@@ -67,7 +67,21 @@ function isBusy(state: ChatState, now: number) {
 function signedReserve(config: Config) {
   return Math.min(Math.max(0, config.chatSignedReserve), Math.max(0, config.chatGlobalDayCap - 1));
 }
-export async function chat(store: Store, config: Config, id: string, input: Record<string, unknown>, ip: string, model: Model, now = Date.now(), signedIn = false) {
+/**
+ * Daily limits for one model call, narrowest first: the client address group (IPv6 /64), then the
+ * signed-in wallet, then the anonymous share, then the global cap. Keys never use the chat session,
+ * so starting a new session does not reset them, and a refused call gives back every charge.
+ */
+export function chatLimits(config: Config, ip: string, wallet: string | null): Limit[] {
+  const day = 86400;
+  const limits: Limit[] = [{ id: `chat:ip:${ip}`, max: config.chatDayCap, seconds: day }];
+  const reserve = signedReserve(config);
+  if (wallet) limits.push({ id: `chat:wallet:${wallet}`, max: config.chatWalletDayCap, seconds: day });
+  else if (reserve > 0) limits.push({ id: 'chat:global:anon', max: config.chatGlobalDayCap - reserve, seconds: day });
+  limits.push({ id: 'chat:global', max: config.chatGlobalDayCap, seconds: day });
+  return limits;
+}
+export async function chat(store: Store, config: Config, id: string, input: Record<string, unknown>, ip: string, model: Model, now = Date.now(), wallet: string | null = null) {
   const state = await store.get<ChatState>(`chat:${id}`) ?? fail(400, 'This chat has expired. Please start a new conversation.');
   const turns = input.history;
   if (!Array.isArray(turns) || turns.length !== state.count * 2) fail(400, 'That chat history is not valid. Please start again.');
@@ -90,12 +104,7 @@ export async function chat(store: Store, config: Config, id: string, input: Reco
   try {
     const user: Turn = { role: 'user', text: question };
     const blocked = refusal(question);
-    if (!blocked) {
-      const reserve = signedReserve(config);
-      if (!signedIn && reserve > 0) await rate(store, 'chat:global:anon', config.chatGlobalDayCap - reserve, 86400);
-      await rate(store, 'chat:global', config.chatGlobalDayCap, 86400);
-      await rate(store, `chat:ip:${ip}`, config.chatDayCap, 86400);
-    }
+    if (!blocked) await rateAll(store, chatLimits(config, ip, wallet));
     const modelOut = blocked ? { text: blocked, tee: false } : modelResult(await model([...history, user]));
     const cleaned = cleanAnswer(modelOut.text);
     const output = cleaned ?? 'I could not give a safe answer to that one. Could you ask about a specific part of RoylTEE? [Contact support](/help#support) is there too.';

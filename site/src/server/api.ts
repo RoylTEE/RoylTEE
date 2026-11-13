@@ -27,15 +27,15 @@ async function storedSession(store: Store, session: Session) {
   if (!record || record.wallet !== session.wallet) fail(401, 'Please sign in with your wallet again.');
   return record;
 }
-async function optionalSignedIn(store: Store, config: Config, request: Request, now: number) {
+/** The signed-in wallet for this request, or null when there is no valid session. */
+async function optionalWallet(store: Store, config: Config, request: Request, now: number): Promise<string | null> {
   const token = sessionCookie(request);
-  if (!token || !config.sessionSecret) return false;
+  if (!token || !config.sessionSecret) return null;
   try {
     const session = readSession(config.sessionSecret, token, now);
-    await storedSession(store, session);
-    return true;
+    return (await storedSession(store, session)).wallet;
   } catch (e) {
-    if (e instanceof HttpError && e.status === 401) return false;
+    if (e instanceof HttpError && e.status === 401) return null;
     throw e;
   }
 }
@@ -64,8 +64,8 @@ export async function handle(request: Request, route: string, deps: Deps): Promi
       if (!config.chatSecret) fail(503, 'Chat is not configured yet.');
       const input = await body(request);
       if (typeof input.sessionId !== 'string' || !sessionId.test(input.sessionId)) fail(400, 'That chat history is not valid. Please start again.');
-      const signedIn = await optionalSignedIn(store, config, request, now);
-      return json(await chat(store, config, input.sessionId as string, input, ip, deps.model, now, signedIn));
+      const wallet = await optionalWallet(store, config, request, now);
+      return json(await chat(store, config, input.sessionId as string, input, ip, deps.model, now, wallet));
     }
     if (!config.sessionSecret || !config.rpcUrl) fail(503, 'Support sign in is not configured yet.');
     if (route === 'auth/challenge' && method === 'POST') {

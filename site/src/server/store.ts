@@ -6,6 +6,8 @@ export interface Store {
   del(key: string): Promise<void>;
   cas(key: string, before: unknown, after: unknown, seconds: number): Promise<boolean>;
   count(key: string, seconds: number): Promise<number>;
+  /** Gives back one unit taken by count. Never goes below zero and keeps the expiry. */
+  uncount(key: string): Promise<void>;
   add(index: string, score: number, member: string): Promise<void>;
   range(index: string, max?: number, limit?: number): Promise<string[]>;
   rangeNewest(index: string, max?: number, limit?: number): Promise<string[]>;
@@ -32,6 +34,10 @@ export class MemoryStore implements Store {
   async count(k: string, seconds: number) {
     const old = this.raw(k); const n = old === null ? 1 : JSON.parse(old) + 1;
     this.values.set(k, { text: JSON.stringify(n), expires: old === null ? seconds ? this.now() + seconds * 1000 : Infinity : this.values.get(k)!.expires }); return n;
+  }
+  async uncount(k: string) {
+    const old = this.raw(k); if (old === null) return;
+    const n = JSON.parse(old); if (n > 0) this.values.set(k, { text: JSON.stringify(n - 1), expires: this.values.get(k)!.expires });
   }
   async add(index: string, score: number, member: string) {
     if (!this.indexes.has(index)) this.indexes.set(index, new Map());
@@ -63,6 +69,7 @@ export class RedisStore implements Store {
     return (await this.command<number>('EVAL', "if redis.call('GET',KEYS[1]) == ARGV[1] then if tonumber(ARGV[3])>0 then redis.call('SET',KEYS[1],ARGV[2],'EX',ARGV[3]) else redis.call('SET',KEYS[1],ARGV[2]) end; return 1 else return 0 end", 1, key(k), JSON.stringify(before), JSON.stringify(after), s)) === 1;
   }
   async count(k: string, s: number) { return this.command<number>('EVAL', "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return n", 1, key(k), s); }
+  async uncount(k: string) { await this.command('EVAL', "local v=redis.call('GET',KEYS[1]); if v and tonumber(v)>0 then redis.call('DECR',KEYS[1]) end; return 0", 1, key(k)); }
   async add(i: string, score: number, m: string) { await this.command('ZADD', key(i), score, m); }
   async range(i: string, max = Number.MAX_SAFE_INTEGER, limit = 100) { return this.command<string[]>('ZRANGEBYSCORE', key(i), '-inf', max, 'LIMIT', 0, limit); }
   async rangeNewest(i: string, max = Number.MAX_SAFE_INTEGER, limit = 100) { return this.command<string[]>('ZREVRANGEBYSCORE', key(i), max, '-inf', 'LIMIT', 0, limit); }

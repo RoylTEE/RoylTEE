@@ -20,6 +20,7 @@ export function loadConfig(env: Env) {
     cronSecret: secret('CRON_SECRET'),
     chatSessionCap: int(env.CHAT_SESSION_CAP, 12),
     chatDayCap: int(env.CHAT_DAY_CAP, 40),
+    chatWalletDayCap: int(env.CHAT_WALLET_DAY_CAP, 20),
     chatGlobalDayCap: int(env.CHAT_GLOBAL_DAY_CAP, 800),
     chatSignedReserve: int(env.CHAT_SIGNED_RESERVE, 200),
     storageMode: env.STORAGE_MODE,

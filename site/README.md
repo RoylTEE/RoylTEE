@@ -34,7 +34,7 @@ Names only; values live in the host's environment settings, never in the repo.
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN` | both | private Upstash storage for chat state, rate limits, sessions and tickets, as set by the Vercel marketplace integration. Fallback names: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`. The read only token is not used. |
 | `STORAGE_MODE` | local only | `memory` uses in process storage; never for production |
 | `CRON_SECRET` | ticket sweep | 32+ random characters; sent by the scheduler as a bearer token |
-| `CHAT_SESSION_CAP`, `CHAT_DAY_CAP`, `CHAT_GLOBAL_DAY_CAP`, `CHAT_SIGNED_RESERVE` | help chat | optional caps, defaults 12 per session, 40 per client address per day, 800 model calls per day overall, of which 200 are reserved for signed-in wallets. Client addresses are grouped by IPv6 /64. Refused turns do not count against the daily budgets. |
+| `CHAT_SESSION_CAP`, `CHAT_DAY_CAP`, `CHAT_WALLET_DAY_CAP`, `CHAT_GLOBAL_DAY_CAP`, `CHAT_SIGNED_RESERVE` | help chat | optional caps, defaults 12 per session, 40 per client address per day, 20 per signed-in wallet per day, 800 model calls per day overall, of which 200 are reserved for signed-in wallets. Client addresses are grouped by IPv6 /64. The per-client and per-wallet caps are checked first and are not keyed on the chat session, so a new session does not reset them. A turn refused by any limit gives back every charge it made, and refused turns do not count against the daily budgets. |
 
 Missing storage or secrets make the API answer 503; it never falls back to unsafe defaults.
 

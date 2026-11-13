@@ -34,6 +34,22 @@ export function text(v: unknown, max: number, min = 1) {
 export async function rate(store: Store, id: string, max: number, seconds: number) {
   if (await store.count(`rate:${id}`, seconds) > max) fail(429, 'You have reached the limit. Please try again later.');
 }
+export type Limit = { id: string; max: number; seconds: number };
+/**
+ * Charges each limit in order, narrowest first. If any limit is over, every charge made by
+ * this call is given back before the 429, so a refused request never uses up a shared budget.
+ */
+export async function rateAll(store: Store, limits: Limit[]) {
+  const charged: string[] = [];
+  for (const limit of limits) {
+    const n = await store.count(`rate:${limit.id}`, limit.seconds);
+    charged.push(`rate:${limit.id}`);
+    if (n > limit.max) {
+      for (const k of charged) await store.uncount(k);
+      fail(429, 'You have reached the limit. Please try again later.');
+    }
+  }
+}
 export function cookie(request: Request, name: string) { return request.headers.get('cookie')?.split(';').map(v => v.trim()).find(v => v.startsWith(`${name}=`))?.slice(name.length + 1) ?? ''; }
 export const SESSION_COOKIE = 'royltee_support';
 export const SESSION_COOKIE_HOST = '__Host-royltee_support';
