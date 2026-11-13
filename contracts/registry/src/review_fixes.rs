@@ -474,3 +474,43 @@ fn m2_void_work_moves_held_money_to_unallocated() {
     let acct = c.get_accounting();
     assert_eq!((acct.escrow_total.0, acct.unallocated_total.0), (0, 50_000));
 }
+
+// ---------- L5, L6 ----------
+
+/// L5: payer_confirmed ends when the payer role is revoked, and a payer
+/// account cannot also be an agent.
+#[test]
+fn l5_attestation_ends_with_the_payer_role() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = mint(&mut c, w, "bob.near", 10_000);
+    yocto(&registrar());
+    c.grant_payer_role(acc("payer.near"), h('1'));
+    call(&acc("payer.near"), NearToken::from_millinear(10));
+    c.attest_share(t.clone(), h('f'));
+    assert_eq!(c.get_evidence_tier(t.clone()), "payer_confirmed");
+    yocto(&registrar());
+    c.revoke_payer_role(acc("payer.near"), h('2'));
+    assert_eq!(c.get_evidence_tier(t), "self_asserted");
+    yocto(&registrar());
+    c.grant_payer_role(agent(), h('3'));
+    assert_panics("payer accounts cannot be agents", || {
+        grant(&mut c, 100, 100, 1)
+    });
+}
+
+/// L6: a holder suspended between registration and mint gets no NFT; the
+/// share fails and its bps are released.
+#[test]
+fn l6_suspended_holder_is_not_minted() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = register_as(&mut c, "alice.near", w, "carol.near", 5000, None);
+    yocto(&registrar());
+    c.suspend_credential(acc("carol.near"), h('9'));
+    assert!(!finish_mint(&mut c, &t));
+    assert_eq!(c.owner_of(&t), None);
+    assert_eq!(c.get_share(t).unwrap().status, ShareStatus::Failed);
+    let g = group_of(&c, w);
+    assert_eq!((g.active_bps, g.reserved_bps), (0, 0));
+}

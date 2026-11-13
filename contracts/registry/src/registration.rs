@@ -371,6 +371,12 @@ impl Registry {
         }
         let share = self.share(&token_id).clone();
         let holder = share.holder_at_mint.clone();
+        // The holder must still be an active member at mint (review L6).
+        // The vault exists and stays keyless; no NFT is minted.
+        if !self.is_active(&holder) {
+            self.fail_share(&token_id, "holder no longer has an active credential");
+            return false;
+        }
         let metadata = TokenMetadata {
             title: Some(format!(
                 "Rights share {} of work {}",

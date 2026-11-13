@@ -207,7 +207,13 @@ impl Registry {
     }
 
     pub(crate) fn evidence_tier(&self, share: &Share) -> &'static str {
-        if share.payer_attestation.is_some() {
+        // Counts only while the attesting account still has the payer
+        // role (review L5).
+        if share
+            .payer_attestation
+            .as_ref()
+            .is_some_and(|a| self.payers.contains(&a.payer))
+        {
             return "payer_confirmed";
         }
         let others = self.counterpart_owners(share);

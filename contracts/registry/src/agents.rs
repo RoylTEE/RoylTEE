@@ -61,6 +61,10 @@ impl Registry {
             self.credentials.get(&agent).is_none(),
             "accounts with a credential cannot be agents"
         );
+        require!(
+            !self.payers.contains(&agent),
+            "payer accounts cannot be agents"
+        );
         require!(!methods.is_empty(), "methods must not be empty");
         require!(
             per_tx_limit.0 > 0 && per_tx_limit.0 <= daily_limit.0,
