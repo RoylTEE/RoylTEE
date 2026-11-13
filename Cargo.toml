@@ -4,6 +4,8 @@ members = [
     "contracts/vault",
     "contracts/mock-usdc",
     "contracts/registry",
+    "contracts/test-receiver",
+    "contracts/tests",
 ]
 
 [workspace.package]
