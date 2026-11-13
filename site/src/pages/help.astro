@@ -16,7 +16,7 @@ import { PROJECT_NAME } from '../consts';
           <textarea id="chat-input" name="message" maxlength="1500" rows="3" placeholder="For example: what happens to unclaimed money when a share is sold?" required></textarea>
           <div class="row"><button class="btn no-chip dark" type="submit">Ask</button><span class="muted small" data-chat-status></span></div>
         </form>
-        <p class="muted small">Use demo details only. Chat text is not stored by this site. Answers can be wrong; the design docs are the source of truth.</p>
+        <p class="muted small">Use demo details only. Chat text is not stored by this site. Answers can be wrong; the design docs are the source of truth. A TEE label appears only on replies where NEAR AI Cloud reports signature_kind provider_tee. Attestation is not verified by this app.</p>
       </div>
       <div class="panel" id="support" data-support data-state="out">
         <h2>Contact support</h2>
@@ -54,6 +54,7 @@ import { PROJECT_NAME } from '../consts';
   .turn { padding: .75rem 1rem; border-radius: 12px; background: var(--bg); }
   .turn.user { background: #fff4dd; }
   .turn .who { font-family: var(--mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; }
+  .turn .tee { margin: .4rem 0 0; font-size: .78rem; }
   .turn a, .reply a { text-decoration: underline; }
   .small { font-size: .85rem; }
   .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

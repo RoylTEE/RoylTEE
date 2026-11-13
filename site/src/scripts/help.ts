@@ -1,5 +1,5 @@
 import { api, el, signIn, signOut } from './wallet';
-type Turn = { role: 'user' | 'assistant'; text: string; index?: number; signature?: string };
+type Turn = { role: 'user' | 'assistant'; text: string; index?: number; signature?: string; tee?: boolean };
 const allowed = new Set(['/', '/#how', '/#agents', '/#lifecycle', '/#trust', '/#notice', '/#problem', '/dashboard/', '/whitepaper', '/help', '/help#chat', '/help#support']);
 function render(text: string) {
   const p = el('p'); let last = 0;
@@ -15,7 +15,11 @@ const form = document.querySelector<HTMLFormElement>('[data-chat-form]')!;
 const input = form.querySelector<HTMLTextAreaElement>('textarea')!;
 const status = document.querySelector<HTMLElement>('[data-chat-status]')!;
 let sessionId = ''; let history: Turn[] = [];
-function show(turn: Turn) { log.append(el('div', { className: `turn ${turn.role}` }, el('span', { className: 'who', textContent: turn.role === 'user' ? 'You' : 'Guide' }), render(turn.text))); log.scrollTop = log.scrollHeight; }
+function show(turn: Turn) {
+  const node = el('div', { className: `turn ${turn.role}` }, el('span', { className: 'who', textContent: turn.role === 'user' ? 'You' : 'Guide' }), render(turn.text));
+  if (turn.role === 'assistant' && turn.tee === true) node.append(el('p', { className: 'tee muted small', textContent: 'Inference ran in a TEE (reported by NEAR AI Cloud)' }));
+  log.append(node); log.scrollTop = log.scrollHeight;
+}
 document.querySelector('[data-chat-reset]')?.addEventListener('click', () => { sessionId = ''; history = []; log.replaceChildren(); status.textContent = 'New conversation.'; });
 form.addEventListener('submit', async e => {
   e.preventDefault(); const message = input.value.trim(); if (!message) return;

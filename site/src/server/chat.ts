@@ -3,10 +3,12 @@ import type { Store } from './store';
 import { digest, equal, fail, mac, rate, text } from './security';
 import { SYSTEM_PROMPT } from './prompt';
 import { sensitive } from './sensitive';
-export type Turn = { role: 'user' | 'assistant'; text: string; index?: number; signature?: string };
+export type Turn = { role: 'user' | 'assistant'; text: string; index?: number; signature?: string; tee?: boolean };
 export type ChatState = { count: number; digest: string; busy: boolean };
-export type Model = (turns: Turn[]) => Promise<string>;
+export type ModelResult = { text: string; tee: boolean };
+export type Model = (turns: Turn[]) => Promise<string | ModelResult>;
 export const VERSION = 'royltee-chat-v1';
+export const TEE_LABEL = 'Inference ran in a TEE (reported by NEAR AI Cloud)';
 const emptyState = (): ChatState => ({ count: 0, digest: digest([]), busy: false });
 export async function startChat(store: Store, id: string) { await store.put(`chat:${id}`, emptyState(), 3600); }
 export const signTurn = (secret: string, id: string, index: number, value: string) => mac(secret, [VERSION, id, index, value]);
@@ -28,15 +30,33 @@ export function cleanAnswer(value: string): string | null {
     .replace(/https?:\/\/[^\s)]+/g, '(external link removed)')
     .replace(/[\u2013\u2014]/g, ',');
 }
+/** True only when NEAR AI Cloud reports signature_kind as the exact string provider_tee. Never inferred. */
+export function reportedProviderTee(value: unknown): boolean {
+  return !!value && typeof value === 'object' && !Array.isArray(value) && (value as { signature_kind?: unknown }).signature_kind === 'provider_tee';
+}
+export function modelResult(value: string | ModelResult): ModelResult {
+  return typeof value === 'string' ? { text: value, tee: false } : { text: value.text, tee: value.tee === true };
+}
+async function readSignature(fetcher: typeof fetch, url: string, key: string): Promise<unknown> {
+  try {
+    const r = await fetcher(url, { headers: { Accept: 'application/json', Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
 export function nearAiModel(config: Config, fetcher = fetch): Model {
   return async turns => {
     if (!config.nearAiKey) fail(503, 'Chat is not configured yet. You can still read the guide or contact support.');
-    const r = await fetcher(`${config.nearAiBaseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.nearAiKey}` }, body: JSON.stringify({ model: config.nearAiModel, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...turns.map(t => ({ role: t.role, content: t.text }))], max_tokens: 650, stream: false, chat_template_kwargs: { enable_thinking: false } }), signal: AbortSignal.timeout(45000) });
+    const r = await fetcher(`${config.nearAiBaseUrl}/chat/completions`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.nearAiKey}` }, body: JSON.stringify({ model: config.nearAiModel, messages: [{ role: 'system', content: SYSTEM_PROMPT }, ...turns.map(t => ({ role: t.role, content: t.text }))], max_tokens: 650, stream: false, chat_template_kwargs: { enable_thinking: false }, reasoning_effort: 'low' }), signal: AbortSignal.timeout(45000) });
     if (!r.ok) fail(503, 'Chat is taking a break. Please try again shortly.');
     const j = await r.json();
     const answer = j.choices?.[0]?.message?.content;
     if (typeof answer !== 'string' || !answer.trim()) fail(503, 'Chat could not finish that answer. Please try again.');
-    return answer.trim();
+    const id = typeof j.id === 'string' && j.id ? j.id : '';
+    const signature = id ? await readSignature(fetcher, `${config.nearAiBaseUrl}/signature/${encodeURIComponent(id)}?signing_algo=ecdsa`, config.nearAiKey) : null;
+    return { text: answer.trim(), tee: reportedProviderTee(signature) };
   };
 }
 export async function chat(store: Store, config: Config, id: string, input: Record<string, unknown>, ip: string, model: Model) {
@@ -63,12 +83,14 @@ export async function chat(store: Store, config: Config, id: string, input: Reco
   try {
     const user: Turn = { role: 'user', text: question };
     const blocked = refusal(question);
-    const answer = blocked ?? await model([...history, user]);
-    const output = cleanAnswer(answer) ?? 'I could not give a safe answer to that one. Could you ask about a specific part of RoylTEE? [Contact support](/help#support) is there too.';
+    const modelOut = blocked ? { text: blocked, tee: false } : modelResult(await model([...history, user]));
+    const cleaned = cleanAnswer(modelOut.text);
+    const output = cleaned ?? 'I could not give a safe answer to that one. Could you ask about a specific part of RoylTEE? [Contact support](/help#support) is there too.';
+    const tee = cleaned !== null && modelOut.tee;
     const assistant: Turn = { role: 'assistant', text: output, index: state.count, signature: signTurn(config.chatSecret, id, state.count, output) };
     const all = [...history, user, assistant];
     await store.put(`chat:${id}`, { count: state.count + 1, digest: digest(all), busy: false }, 3600);
-    return { sessionId: id, version: VERSION, assistant };
+    return { sessionId: id, version: VERSION, assistant: { ...assistant, tee }, tee };
   } catch (e) {
     await store.cas(`chat:${id}`, busy, state, 3600);
     throw e;

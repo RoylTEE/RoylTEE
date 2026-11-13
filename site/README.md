@@ -24,7 +24,7 @@ Names only; values live in the host's environment settings, never in the repo.
 |---|---|---|
 | `NEARAI_API_KEY` | help chat | NEAR AI Cloud API key |
 | `NEARAI_BASE_URL` | help chat | optional, default `https://cloud-api.near.ai/v1` |
-| `NEARAI_MODEL` | help chat | optional, default `Qwen/Qwen3.6-35B-A3B-FP8` |
+| `NEARAI_MODEL` | help chat | optional, default `z-ai/glm-5.3-flash` |
 | `CHAT_HMAC_SECRET` | help chat | 32+ random characters; signs assistant turns |
 | `SESSION_SECRET` | support | 32+ random characters; signs the sign in cookie and keys hashed client addresses |
 | `ALLOWED_ORIGINS` | both | comma separated exact origins of the deployed site |
@@ -40,7 +40,8 @@ Missing storage or secrets make the API answer 503; it never falls back to unsaf
 ## Help chat
 
 - Grounding: `src/content/help-notes.md`, written from the repository docs and the public testnet state. The chat answers only from it and says when something is not built.
-- Model: NEAR AI Cloud chat completions, OpenAI compatible. Base URL `https://cloud-api.near.ai/v1` (docs.near.ai quickstart and OpenAI compatibility guide). Default model `Qwen/Qwen3.6-35B-A3B-FP8`, listed by `GET /v1/models` with owner `nearai` and attestation supported. Reasoning is turned off with `chat_template_kwargs.enable_thinking: false` (docs.near.ai reasoning models page). Checked 2026-11-13. This app does not verify attestation or response signatures.
+- Model: NEAR AI Cloud chat completions, OpenAI compatible. Base URL `https://cloud-api.near.ai/v1` (docs.near.ai quickstart, models, and OpenAI compatibility guide). Default model `z-ai/glm-5.3-flash`, overridable with `NEARAI_MODEL`. Live `GET /v1/model/list` on 2026-11-13 listed it with `ownedBy` nearai, `providerType` vllm (documented as TEE-enabled), and `attestationSupported` true. The JavaScript inference SDK page uses the same id as a supported NEAR TEE model. GLM-5.3 Flash reasons by default, so requests send `reasoning_effort: low` and `chat_template_kwargs.enable_thinking: false` (docs.near.ai reasoning models page). Checked 2026-11-13.
+- TEE reporting: the chat completion body has no provider_tee field (OpenAPI ChatCompletionResponse, confirmed on live replies). After each completion the server reads `GET /v1/signature/{id}` and sets `tee` to true only when `signature_kind` is the exact string `provider_tee` (documented as a model-serving TEE). Missing, false, gateway, or malformed values yield `tee` false. The help page shows the label "Inference ran in a TEE (reported by NEAR AI Cloud)" only on those replies. Attestation is not verified by this app, and the contracts still use no TEE.
 - Every assistant turn carries an HMAC SHA-256 over (version label, session id, turn index, text). The server also keeps a digest of the whole accepted history per session, so a tampered, unsigned, reordered or replayed history gets a 400 before any model call. Comparison uses `timingSafeEqual`.
 - Limits: messages per session, per client per day and per day overall. Origin allowlist and JSON content type are checked on every POST.
 - Jailbreak, off topic and personal data messages get a short polite refusal without a model call. Replies that echo the prompt or secret names are withheld, and links outside the app are removed.

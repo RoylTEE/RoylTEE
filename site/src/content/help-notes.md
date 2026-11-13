@@ -59,7 +59,7 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 
 ## Not built
 
-- TEE: the registry build does not use a trusted execution environment. TEE attestation of statements is roadmap.
+- TEE: the registry build does not use a trusted execution environment. TEE attestation of statements is roadmap. The help chat can report a provider TEE flag from NEAR AI Cloud when a reply's signature has signature_kind provider_tee. Attestation is not verified by this app.
 - TEE auction: not built. A sealed bid share auction may come later as a TEE version, only after the core is done.
 - Licenses: not built in the current code. Sync licenses were planned and cut first.
 - The amend_split method is not built; a split only changes through a dispute ruling.
@@ -67,7 +67,7 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 
 ## This help chat and support
 
-- The help chat answers from these notes only. When a NEAR AI Cloud key is set, questions go to NEAR AI Cloud (an OpenAI compatible API). The site does not store chat text.
+- The help chat answers from these notes only. When a NEAR AI Cloud key is set, questions go to NEAR AI Cloud (an OpenAI compatible API). A TEE label is shown only when NEAR AI Cloud reports signature_kind provider_tee for that reply. Attestation is not verified by this app. The site does not store chat text.
 - Support tickets: sign in with a NEAR testnet wallet by signing a NEP-413 message. No email and no personal data. Tickets hold a subject, a message, a status (open, answered or closed) and the owner's reply. They live in private server storage tied only to the wallet account id, never on chain and never in logs. Closed tickets are deleted 30 days after they close. A sign in lasts 15 minutes.
 - Please never put a seed phrase, private key, email address, phone number or card number in a ticket. The form refuses things that look like them.
 

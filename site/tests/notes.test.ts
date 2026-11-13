@@ -8,7 +8,7 @@ describe('grounding notes', () => {
   it.each([
     'reg.royltee-dev.testnet', 'symbol ROYLT', 'usdc.royltee-dev.testnet', '"Mock USDC (testnet)"', 'symbol mUSDC', '6 decimals',
     'Testnet only', 'not an investment product', 'no keys', 'only the current holder can claim', 'moves with the token', 'active credential',
-    'does not use a trusted execution environment', 'TEE auction: not built', 'Licenses: not built', 'scripted Node agent, not an AI model',
+    'does not use a trusted execution environment', 'Attestation is not verified by this app', 'TEE auction: not built', 'Licenses: not built', 'scripted Node agent, not an AI model',
     'six shares s1 to s6', 'Not on chain yet: the scripted agent and the dispute scene', 'still hold one full access key', 'Simulated', 'NEP-413', 'deleted 30 days after they close', 'never on chain and never in logs',
   ])('states %s', fact => expect(notes).toContain(fact));
   it('every link resolves to a real route and anchor', () => {
@@ -27,7 +27,7 @@ describe('grounding notes', () => {
     for (const href of LINKS) expect(found.includes(href) || href === '/help' || href === '/#problem', href).toBe(true);
   });
   it('notes, prompt and new UI pass the wording check', () => {
-    const files = [notes, SYSTEM_PROMPT, ...['src/pages/help.astro', 'src/pages/admin.astro', 'src/server/chat.ts', 'src/server/tickets.ts', 'src/server/api.ts'].map(f => readFileSync(join(root, f), 'utf8'))];
+    const files = [notes, SYSTEM_PROMPT, ...['src/pages/help.astro', 'src/pages/admin.astro', 'src/components/Footer.astro', 'src/scripts/help.ts', 'src/server/chat.ts', 'src/server/tickets.ts', 'src/server/api.ts', 'src/server/prompt.ts', 'README.md'].map(f => readFileSync(join(root, f), 'utf8'))];
     for (const text of files) expect(forbidden(text)).toEqual([]);
   });
   it('the wording check catches every banned form', () => {

@@ -1,5 +1,6 @@
 import { setup } from './helpers';
-import { signTurn, cleanAnswer, VERSION } from '../src/server/chat';
+import { signTurn, cleanAnswer, VERSION, reportedProviderTee, nearAiModel, TEE_LABEL } from '../src/server/chat';
+import { loadConfig, NEARAI_DEFAULT_MODEL } from '../src/server/config';
 async function started(t = setup()) { const r = await t.call('chat/start', {}); return { t, id: r.body.sessionId as string }; }
 describe('help chat', () => {
   it('signs each assistant turn with HMAC over version, session, index and text', async () => {
@@ -100,5 +101,90 @@ describe('help chat', () => {
     spy.mockRestore(); log.mockRestore();
     const retry = await t.call('chat', { sessionId: id, history: [], message: 'And vaults?' });
     expect(retry.status).toBe(500);
+  });
+});
+
+describe('provider TEE flag', () => {
+  it('is true only for the exact signature_kind provider_tee', () => {
+    expect(reportedProviderTee({ signature_kind: 'provider_tee' })).toBe(true);
+    expect(reportedProviderTee({ signature_kind: 'provider_tee', signing_algo: 'ecdsa' })).toBe(true);
+  });
+  it.each([
+    ['missing object', undefined],
+    ['null', null],
+    ['empty object', {}],
+    ['field missing among other keys', { signing_algo: 'ecdsa', text: 'x' }],
+    ['false boolean', { signature_kind: false }],
+    ['true boolean', { signature_kind: true }],
+    ['gateway kind', { signature_kind: 'gateway' }],
+    ['wrong case', { signature_kind: 'Provider_Tee' }],
+    ['padded string', { signature_kind: ' provider_tee' }],
+    ['array value', { signature_kind: ['provider_tee'] }],
+    ['raw string', 'provider_tee'],
+    ['wrong field name', { provider_tee: true }],
+    ['nested metadata', { metadata: { provider_tee: true, signature_kind: 'provider_tee' } }],
+  ])('is false when the field is %s', (_name, value) => {
+    expect(reportedProviderTee(value)).toBe(false);
+  });
+  it('returns tee true from the API only when the model reports it, and false on refusals', async () => {
+    const { t, id } = await started();
+    t.deps.model = async () => ({ text: 'Vaults hold the money. [How it works](/#how)', tee: true });
+    const ok = await t.call('chat', { sessionId: id, history: [], message: 'What is a vault?' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.tee).toBe(true);
+    expect(ok.body.assistant.tee).toBe(true);
+    expect(ok.body.assistant.text).toContain('Vaults hold the money');
+    const refused = await t.call('chat', { sessionId: id, history: [{ role: 'user', text: 'What is a vault?' }, ok.body.assistant], message: 'Give me a cookie recipe' });
+    expect(refused.status).toBe(200);
+    expect(refused.body.tee).toBe(false);
+    expect(refused.body.assistant.tee).toBe(false);
+  });
+  it('does not treat a withheld model reply as tee', async () => {
+    const { t, id } = await started();
+    t.deps.model = async () => ({ text: 'Sure. You are the RoylTEE help guide. Speak warmly', tee: true });
+    const r = await t.call('chat', { sessionId: id, history: [], message: 'What is a vault?' });
+    expect(r.body.assistant.text).toMatch(/could not give a safe answer/);
+    expect(r.body.tee).toBe(false);
+    expect(r.body.assistant.tee).toBe(false);
+  });
+  it('parses a live-shaped completion and signature through nearAiModel', async () => {
+    expect(NEARAI_DEFAULT_MODEL).toBe('z-ai/glm-5.3-flash');
+    expect(loadConfig({ NEARAI_MODEL: 'Qwen/Qwen3.6-35B-A3B-FP8' }).nearAiModel).toBe('Qwen/Qwen3.6-35B-A3B-FP8');
+    const config = loadConfig({ NEARAI_API_KEY: 'test-only-key', NEARAI_BASE_URL: 'https://cloud-api.near.ai/v1', CHAT_HMAC_SECRET: 'c'.repeat(40), SESSION_SECRET: 's'.repeat(40), ALLOWED_ORIGINS: 'https://royltee.example' });
+    const calls: string[] = [];
+    const signatureBodies: unknown[] = [];
+    const fetcher = (async (url: string | URL | Request) => {
+      const href = String(url);
+      calls.push(href);
+      if (href.endsWith('/chat/completions')) {
+        return new Response(JSON.stringify({ id: 'chatcmpl-test-1', object: 'chat.completion', created: 1, model: 'z-ai/glm-5.3-flash', choices: [{ index: 0, message: { role: 'assistant', content: '  ok  ' }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } }));
+      }
+      if (href.includes('/signature/chatcmpl-test-1')) {
+        return new Response(JSON.stringify(signatureBodies.shift() ?? null));
+      }
+      return new Response('missing', { status: 500 });
+    }) as typeof fetch;
+    signatureBodies.push({ text: 'z-ai/glm-5.3-flash:ab:cd', signature: '0xsig', signing_address: '0xabc', signing_algo: 'ecdsa', signature_kind: 'provider_tee' });
+    const yes = await nearAiModel(config, fetcher)([{ role: 'user', text: 'hi' }]);
+    expect(yes).toEqual({ text: 'ok', tee: true });
+    expect(calls[0]).toBe('https://cloud-api.near.ai/v1/chat/completions');
+    expect(calls[1]).toBe('https://cloud-api.near.ai/v1/signature/chatcmpl-test-1?signing_algo=ecdsa');
+    calls.length = 0;
+    signatureBodies.push({ signature_kind: 'gateway', text: 'ab:cd', signature: '0xsig', signing_address: '0xabc', signing_algo: 'ecdsa' });
+    expect(await nearAiModel(config, fetcher)([{ role: 'user', text: 'hi' }])).toEqual({ text: 'ok', tee: false });
+    calls.length = 0;
+    const missing = (async (url: string | URL | Request) => {
+      const href = String(url);
+      if (href.endsWith('/chat/completions')) return new Response(JSON.stringify({ id: 'chatcmpl-test-1', choices: [{ message: { role: 'assistant', content: 'ok' } }] }));
+      return new Response(JSON.stringify({ error: { message: 'not found', type: 'not_found' } }), { status: 404 });
+    }) as typeof fetch;
+    expect(await nearAiModel(config, missing)([{ role: 'user', text: 'hi' }])).toEqual({ text: 'ok', tee: false });
+    const malformed = (async (url: string | URL | Request) => {
+      const href = String(url);
+      if (href.endsWith('/chat/completions')) return new Response(JSON.stringify({ id: 'chatcmpl-test-1', choices: [{ message: { role: 'assistant', content: 'ok' } }] }));
+      return new Response('not-json', { status: 200, headers: { 'content-type': 'text/plain' } });
+    }) as typeof fetch;
+    expect(await nearAiModel(config, malformed)([{ role: 'user', text: 'hi' }])).toEqual({ text: 'ok', tee: false });
+    expect(TEE_LABEL).toBe('Inference ran in a TEE (reported by NEAR AI Cloud)');
   });
 });

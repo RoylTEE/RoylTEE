@@ -1,7 +1,7 @@
 import { MemoryStore, RedisStore, type Store } from './store';
 export type Env = Record<string, string | undefined>;
 export const NEARAI_DEFAULT_BASE_URL = 'https://cloud-api.near.ai/v1';
-export const NEARAI_DEFAULT_MODEL = 'Qwen/Qwen3.6-35B-A3B-FP8';
+export const NEARAI_DEFAULT_MODEL = 'z-ai/glm-5.3-flash';
 export const TESTNET_DEFAULT_RPC = 'https://test.rpc.fastnear.com';
 export type Config = ReturnType<typeof loadConfig>;
 const int = (v: string | undefined, d: number) => { const n = Number(v); return Number.isInteger(n) && n > 0 ? n : d; };
