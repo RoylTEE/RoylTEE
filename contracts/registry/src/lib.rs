@@ -81,7 +81,7 @@ pub const GAS_MEMBER_CB: Gas = Gas::from_tgas(5);
 pub const GAS_WITHDRAW: Gas = Gas::from_tgas(20);
 pub const GAS_CLAIM_CB: Gas = Gas::from_tgas(10);
 pub const GAS_FT_TRANSFER: Gas = Gas::from_tgas(8);
-/// Measured use about 2.1 Tgas (sandbox); raised from 5 for margin.
+/// Measured use about 2.2 Tgas (2.151 in sandbox test r03); raised from 5 for margin.
 pub const GAS_FORWARD_CB: Gas = Gas::from_tgas(10);
 pub const GAS_FT_BALANCE: Gas = Gas::from_tgas(5);
 pub const GAS_SYNC_CB: Gas = Gas::from_tgas(5);

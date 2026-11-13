@@ -512,6 +512,65 @@ async fn t13_allowance_work_payment_splits_exactly() -> anyhow::Result<()> {
     e.assert_solvent().await
 }
 
+/// Review 03a L4: the largest group an agent can pay with 100 Tgas, the
+/// gas the deploy plan attaches to agent calls (a 0.25 NEAR function-call
+/// allowance does not cover 300 Tgas). Each forward reserves 18 Tgas.
+/// A group one share larger is refused before any debit.
+#[tokio::test]
+async fn t13b_agent_group_size_at_100_tgas() -> anyhow::Result<()> {
+    let e = setup().await?;
+    let agent = create_agent(&e, &e.writer_a).await?;
+    grant_role(&e, &e.writer_a, &agent, 100 * MUSDC, 300 * MUSDC, 50).await?;
+    fund(&e, &e.writer_a, &agent, 100 * MUSDC).await?;
+    let pay_100 = |w: u64, line: String| {
+        let a = agent.scoped.clone();
+        let reg = e.reg.id().clone();
+        async move {
+            a.call(&reg, "pay_from_allowance")
+                .args_json(json!({
+                    "target": work(w), "amount": "1000000", "statement_line_id": line,
+                    "period": "2026-Q3", "statement_hash": hash('f'),
+                }))
+                .gas(near_workspaces::types::Gas::from_tgas(100))
+                .transact()
+                .await
+        }
+    };
+    let mut largest = 0;
+    for n in 1..=6u16 {
+        let w = e.register_work(&format!("USRC1260010{n}")).await?;
+        for i in 0..n {
+            let bps = if i == 0 {
+                10_000 - (n - 1) * (10_000 / n)
+            } else {
+                10_000 / n
+            };
+            e.mint(w, e.writer_b.id(), bps).await?;
+        }
+        let before = num(&role(&e, &agent).await?["allowance"]);
+        let r = pay_100(w, format!("gas-{n}")).await;
+        let ok_pay = matches!(&r, Ok(x) if x.is_success() && x.receipt_failures().is_empty());
+        println!(
+            "agent at 100 Tgas, group of {n}: {}",
+            if ok_pay { "paid" } else { "refused" }
+        );
+        if ok_pay {
+            largest = n;
+        } else {
+            assert!(refused_with(r, "not enough gas"));
+            assert_eq!(
+                num(&role(&e, &agent).await?["allowance"]),
+                before,
+                "no debit"
+            );
+            break;
+        }
+    }
+    println!("largest group an agent pays at 100 Tgas: {largest}");
+    assert_eq!(largest, 4);
+    e.assert_solvent().await
+}
+
 /// Test 15 (T23, T28): a suspended member keeps its share and accrues
 /// money but cannot receive transfers, and its agent is stopped.
 #[tokio::test]

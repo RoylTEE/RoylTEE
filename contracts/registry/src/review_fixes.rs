@@ -706,3 +706,49 @@ fn l2_tail_counts_within_the_same_hour_and_for_tx_counts() {
     assert!(try_pay(&mut c, target(w), 50_000, "d", 35 * HOUR));
     assert!(!try_pay(&mut c, target(w), 50_000, "e", 35 * HOUR + 1));
 }
+
+// ---------- Review 03a ----------
+
+/// Review 03a L5: approving a pending share before any payment releases
+/// nothing, sends no transfer and leaves no forward counted in flight.
+#[test]
+fn r03a_l5_approve_before_any_payment_sends_nothing() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001"); // registered by alice
+    let t = register_as(&mut c, "carol.near", w, "carol.near", 4000, None);
+    assert!(finish_mint(&mut c, &t));
+    assert_eq!(c.get_share_approval(t.clone()), "pending");
+    // Very little gas: approve must not need the forward reservation.
+    testing_env!(ctx(&acc("alice.near"), NearToken::from_yoctonear(1))
+        .prepaid_gas(Gas::from_tgas(15))
+        .build());
+    c.approve_share(t.clone(), None);
+    assert_eq!(c.get_share_approval(t.clone()), "approved");
+    assert!(
+        near_sdk::test_utils::get_created_receipts().is_empty(),
+        "no ft_transfer for a zero amount"
+    );
+    let l = ledger(&c, &t);
+    assert_eq!((l.escrowed.0, l.inbound_pending), (0, 0));
+    assert_eq!(c.get_accounting().forwards_in_flight_total.0, 0);
+    assert!(get_logs().join("\n").contains("\"released\":\"0\""));
+}
+
+/// Review 03a L4: each forward reserves GAS_FT_TRANSFER + GAS_FORWARD_CB
+/// (8 + 10 Tgas) plus 10 Tgas once. With 100 Tgas prepaid (the agent
+/// calls in the deploy plan) at most 5 forwards fit before any gas is
+/// used, so 4 in practice; with 300 Tgas, the 16-share maximum fits.
+#[test]
+fn r03a_l4_forward_gas_reservation_per_share() {
+    let per = GAS_FT_TRANSFER.as_gas() + GAS_FORWARD_CB.as_gas();
+    assert_eq!(per, Gas::from_tgas(18).as_gas());
+    testing_env!(ctx(&acc("x.near"), NearToken::from_yoctonear(0))
+        .prepaid_gas(Gas::from_tgas(100))
+        .build());
+    assert!(Registry::has_gas_for_forwards(4));
+    assert!(!Registry::has_gas_for_forwards(6));
+    testing_env!(ctx(&acc("x.near"), NearToken::from_yoctonear(0))
+        .prepaid_gas(Gas::from_tgas(300))
+        .build());
+    assert!(Registry::has_gas_for_forwards(MAX_SHARES_PER_GROUP));
+}

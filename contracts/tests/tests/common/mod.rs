@@ -62,6 +62,12 @@ pub fn check(r: ExecutionFinalResult) {
 }
 
 pub async fn setup() -> anyhow::Result<Env> {
+    setup_with_registry(&wasm("registry")).await
+}
+
+/// Same as `setup`, with the given registry wasm (the upgrade test starts
+/// from the registry wasm deployed on testnet).
+pub async fn setup_with_registry(registry_wasm: &[u8]) -> anyhow::Result<Env> {
     let worker = near_workspaces::sandbox().await?;
     let root = worker.root_account()?;
     let dev = sub(&root, "demo", 200).await?;
@@ -82,7 +88,7 @@ pub async fn setup() -> anyhow::Result<Env> {
     );
 
     let reg_acc = sub(&root, "reg", 50).await?;
-    let reg = reg_acc.deploy(&wasm("registry")).await?.into_result()?;
+    let reg = reg_acc.deploy(registry_wasm).await?.into_result()?;
     let cfg = project_config();
     check(
         reg.call("new")
