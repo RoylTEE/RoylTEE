@@ -1,6 +1,6 @@
 # Testnet deploy plan (block 5)
 
-Status: steps 1 to 5 and 7 to 13 were run on testnet on 2026-11-13 (UTC). Accounts, public keys, wasm hashes and transaction ids are in `deployments/testnet.json`. Step 6 (delete the full-access keys of the registry and mock USDC) is parked until the owner says go, so those keys are still present and in-place upgrades remain possible. Every remaining step that creates an account, deploys, calls a change method, deletes a key or moves NEAR still needs the owner's explicit yes first (BUILD_PROMPT block 5). Testnet only. No mainnet, no real money.
+Status: steps 1 to 5 and 7 to 13 were run on testnet on 2026-11-13 (UTC). Accounts, public keys, wasm hashes and transaction ids are in `deployments/testnet.json`. Step 6 (delete the full-access keys of the registry and mock USDC) is parked until the owner says go, so those keys are still present and in-place upgrades remain possible. Steps 15 and 16 (redeploy with the contract review fixes, and the split sheet demo) are drafts, NOT run. Every remaining step that creates an account, deploys, calls a change method, deletes a key or moves NEAR still needs the owner's explicit yes first (BUILD_PROMPT block 5). Testnet only. No mainnet, no real money.
 
 ## Key handling rules
 
@@ -24,8 +24,8 @@ Status: steps 1 to 5 and 7 to 13 were run on testnet on 2026-11-13 (UTC). Accoun
 | `ROOT` | `royltee-dev.testnet` | faucet account, parent and funder of every project account |
 | `FUND1` | `royltee-fund-1.testnet` | faucet account, only forwards its NEAR to `ROOT` |
 | `FUND2` | `royltee-fund-2.testnet` | faucet account, only forwards its NEAR to `ROOT` |
-| `REG` | `reg.royltee-dev.testnet` | registry contract, keys deleted after init |
-| `USDC` | `usdc.royltee-dev.testnet` | mock USDC (testnet), keys deleted after init |
+| `REG` | `reg.royltee-dev.testnet` | registry contract; key deletion (step 6) parked, full-access key still present |
+| `USDC` | `usdc.royltee-dev.testnet` | mock USDC (testnet); key deletion (step 6) parked, full-access key still present |
 | `REGISTRAR` | `registrar.royltee-dev.testnet` | registrar |
 | `WA` | `writer-a.royltee-dev.testnet` | member, writer |
 | `WB` | `writer-b.royltee-dev.testnet` | member, writer, dispute claimant |
@@ -304,6 +304,45 @@ Proves: T11, T24, T38 live (only the contested fraction is frozen; the registrar
 ### Step 14. Record (no transaction)
 
 Write `deployments/testnet.json` with: account ids, public keys only, local sha256 of each wasm, on-chain code hashes, deploy and step transaction ids, CLI version, protocol version, commit hash, UTC timestamps. Add the NEAR spent to SPEND_LOG.md. Commit locally. This step was written on 2026-11-13 (UTC); see that file for the record.
+
+### Step 15. Redeploy the registry in place with the contract review fixes (DRAFT, not run, needs the owner's yes)
+
+Possible only while step 6 is parked (the registry's full-access key is still present). No migration and no init call: every review fix keeps the stored layout and keeps new data in its own storage slots (DESIGN.md section 19). Existing shares count as approved. Vaults are not touched (they cannot be); only vaults created after this step get the new vault code with `ft_on_transfer`.
+
+```bash
+bash scripts/build-wasm.sh                                    # prints sha256 of contracts/res/registry.wasm and vault.wasm
+near account view-account-summary $REG $NET now              # balance must cover the larger code (about 0.39 NEAR more storage, UNVERIFIED)
+near contract deploy $REG use-file contracts/res/registry.wasm without-init-call $NET $SIGN
+near account view-account-summary $REG $NET now              # SHA-256 equals the local build
+near contract call-function as-read-only $REG get_vault_code_hash json-args '{}' $NET now   # new vault hash
+near contract call-function as-read-only $REG get_accounting json-args '{}' $NET now        # unchanged by the deploy
+near contract call-function as-read-only $REG nft_tokens json-args '{"from_index":"0","limit":10}' $NET now  # s1 to s7 unchanged, "approval":"approved"
+near contract call-function as-read-only $REG get_share_approval json-args '{"token_id":"s1"}' $NET now     # "approved"
+```
+
+Proves: the deployed state reads back unchanged under the new code. Record the new registry and vault sha256 in `deployments/testnet.json` next to the old vault hash (the 7 existing vaults keep it). Note: share `s7` (voided by `uphold_existing` in step 13) stays in its group's list, because the old code did not prune it; it is inert (never paid) and counts toward that group's 32-entry cap only.
+
+### Step 16. Split sheet demo (DRAFT, not run, needs the owner's yes; about 7 transactions)
+
+```bash
+near contract call-function as-transaction $REG register_work \
+  json-args "{\"code_type\":\"isrc\",\"code\":\"ZZRYL2600004\",\"title_hash\":\"$H_D\",\"provenance\":\"human\",\"metadata_uri\":\"\"}" \
+  prepaid-gas '30 Tgas' attached-deposit '0.05 NEAR' sign-as $WA $NET $SIGN          # expected work 3 (read the result), registered by WA
+share 3 $WA 5000                                                                     # by WA: approved
+near contract call-function as-transaction $REG register_share \
+  json-args "{\"work_id\":3,\"right_type\":\"publishing\",\"territory\":\"WW\",\"percent_bps\":5000,\"basis\":\"copyright\",\"holder\":\"$WB\",\"evidence_hash\":\"$H_E\"}" \
+  prepaid-gas '300 Tgas' attached-deposit '0.5 NEAR' sign-as $WB $NET $SIGN          # by WB: "approval":"pending"; read TOKEN from share_registered
+near contract call-function as-transaction $USDC ft_transfer_call \
+  json-args "{\"receiver_id\":\"$REG\",\"amount\":\"1000000\",\"msg\":\"{\\\"pay_work\\\":{\\\"work_id\\\":3,\\\"right_type\\\":\\\"publishing\\\",\\\"territory\\\":\\\"WW\\\",\\\"period\\\":\\\"2026-Q4\\\",\\\"statement_hash\\\":\\\"$H_F\\\",\\\"statement_line_id\\\":\\\"line-4\\\"}}\"}" \
+  prepaid-gas '300 Tgas' attached-deposit '1 yoctoNEAR' sign-as $PAYER $NET $SIGN    # WA's half forwarded; WB's half escrowed, reason awaiting_approval
+near contract call-function as-read-only $REG get_ledger json-args "{\"token_id\":\"$TOKEN\"}" $NET now   # escrowed 500000
+near contract call-function as-transaction $REG approve_share \
+  json-args "{\"token_id\":\"$TOKEN\"}" \
+  prepaid-gas '100 Tgas' attached-deposit '1 yoctoNEAR' sign-as $WA $NET $SIGN       # share_approved, 500000 released to the vault
+near tokens $TOKEN.$REG view-ft-balance $USDC $NET now                          # 0.5 mock USDC
+```
+
+Proves: T39 live. A share registered by someone other than the work registrant is held until the registrant signs; the signature is an on-chain event. The reject path (`reject_share`, held money to the group's unallocated escrow) is shown by unit and sandbox tests only.
 
 ## Transaction count
 
