@@ -4,7 +4,7 @@
 
 The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.
 
-RoylTEE is a permissioned, business to business registry of music rights shares on NEAR testnet. Each rights share is an NEP-171 NFT. Each share NFT controls its own NEAR sub-account (a "vault") that receives that share's royalty money. The vault has zero access keys. Only the registry contract can move money out of it, and only to whoever holds the NFT at that moment.
+RoylTEE is a permissioned, business to business registry of music rights shares on NEAR testnet. Each rights share is an NEP-171 NFT. Each share NFT controls its own NEAR sub-account (a "vault") that receives that share's royalty money. The vault has zero access keys. Only the registry contract can move money out of it, and only to whoever holds the NFT at that moment, with one registrar exception for rejected shares (branch code; see [Who can hold a token](#who-can-hold-a-token)). On testnet today the registry account itself still holds one full access key (deletion is planned, see [Live testnet deployment](#live-testnet-deployment)), so whoever holds that key could replace the registry code and with it these rules; the guarantee is only as strong as that key until it is deleted.
 
 - Built at NEAR HACKATHON, track "NFTs That Do Something" (track id `nfts`).
 - Testnet only. No mainnet contract, no real money. Payments use **Mock USDC (testnet)** (symbol `mUSDC`, 6 decimals), a mock token with no value, not Circle USDC.
@@ -45,10 +45,10 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 
 | # | Do | See |
 |---|---|---|
-| 1 | `git clone <this repository> royltee && cd royltee` | The files listed under [Repository layout](#repository-layout). |
-| 2 | `npm run verify:testnet` (read only, about one minute, no install needed) | One `PASS` line per check and `ALL CHECKS PASSED` at the end: 7 share vaults `s1` to `s7` with `0 access keys`, every code hash equal to `deployments/testnet.json`, token `s2` owned by `buyer-pub.royltee-dev.testnet` (the catalog sale), the registry and mock USDC each with `1 access key(s), 1 full access, as recorded`, and the solvency line. |
-| 3 | `npm run test:unit` | Rust unit tests: `test result: ok. 4 passed` (mock USDC), `100 passed` (registry), `5 passed` (vault). 109 in total. No wasm build is needed: the registry embeds the vault wasm only when it is compiled to wasm. |
-| 4 | `npm test` | Builds all contracts to wasm, prints the size and sha256 of each file in `contracts/res/`, then runs every unit test and the near-workspaces sandbox tests: `9 passed` (agents), `4 passed` (disputes), `3 passed` (limits), `4 passed` (review), `11 passed` (sandbox), `1 passed` (upgrade). 32 sandbox tests, 141 in total. Takes a few minutes. |
+| 1 | `git clone https://github.com/RoylTEE/RoylTEE.git royltee && cd royltee && git checkout <submission revision>` (pre-submission item: the submission revision is the merged `main` commit, to be written here once the branches are merged; until then the default branch does not yet contain every part described here) | The files listed under [Repository layout](#repository-layout). |
+| 2 | `npm run verify:testnet` (read only, about one minute, no install needed) | One `PASS` line per check and `ALL CHECKS PASSED` at the end: 7 share vaults `s1` to `s7` with `0 access keys`, every code hash equal to `deployments/testnet.json`, token `s2` owned by `buyer-pub.royltee-dev.testnet` (the catalog sale), the registry and mock USDC keys equal to the record (`access keys match the record: full_access`), the payment agent's single function call key scoped to the registry with `pay_from_allowance` and `report`, `nft_tokens read to the end: 7 token(s)`, and the solvency line, which needs all five accounting counters. `npm run test:verify` runs the checker's own 8 tests against a local fake RPC (no network). |
+| 3 | `npm run test:unit` | Rust unit tests: `test result: ok. 4 passed` (mock USDC), `101 passed` (registry), `5 passed` (vault). 110 in total. No wasm build is needed: the registry embeds the vault wasm only when it is compiled to wasm. |
+| 4 | `npm test` | Builds all contracts to wasm, prints the size and sha256 of each file in `contracts/res/`, then runs every unit test and the near-workspaces sandbox tests: `9 passed` (agents), `4 passed` (disputes), `3 passed` (limits), `4 passed` (review), `11 passed` (sandbox), `1 passed` (upgrade). 32 sandbox tests, 142 in total. Takes a few minutes. |
 | 5 | Optional: `npm run lint` | `cargo fmt --check`, then `cargo clippy -D warnings` for the host and wasm targets; ends with `Finished` and exit code 0. |
 | 6 | Open the explorer links under [Live testnet deployment](#live-testnet-deployment) | The same accounts, the catalog sale transfer of `s2`, the refused outsider claim, the agent payment and the dispute, on NEAR testnet. |
 | 7 | Site (in `site/`, present once the site branches are merged, see the note below): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest: all tests pass (count UNVERIFIED until rerun on the merged tree); `astro check`: `0 errors`; a build in `site/.vercel/output`. |
@@ -204,13 +204,15 @@ All accounts, public keys, wasm hashes and transaction ids: [deployments/testnet
 | H2 contests | No `contests` list means every active share of the group is contested, so a 1 bps claim freezes the whole group | `contests` is mandatory and minimal; own shares cannot be named; dead entries are pruned |
 | H3 registrar credential | The registrar account can be granted a credential | Refused |
 | M1 stuck mints | No `release_stale_mint`; a mint whose callbacks never commit blocks its bps; forward callback gas 5 Tgas | `release_stale_mint` after 20 minutes; late callbacks mint nothing; 10 Tgas |
-| M2 split sheet | Anyone with a credential can register a share on someone else's work and be paid at once | Held until the work registrant (or the registrar) approves it |
+| M2 split sheet | Anyone with a credential can register a share on someone else's work and be paid at once | Held until the work registrant (or the registrar) approves it. A rejected share's plain deposits can be sent by the registrar to any account except itself (`recover_rejected_vault`, a trusted registrar power) |
 | L2 agent window | The rolling limit can be spent twice about 23 hours apart | Covers a full 24 hours |
 | L4 (Security Suite F-04) sync epochs | A sync in flight across a dispute open or `nft_transfer_call` can land | Discarded |
 | L5 payer attestation | `payer_confirmed` stays after the payer role is revoked | Counts only while the role holds |
 | L6 mint to a suspended holder | Minted | The share fails, no NFT |
 | L8 share payment minimum | A share payment of 1 base unit is accepted | Same minimum as a group payment |
 | L9 void work escrow | Unallocated escrow of a void work is stranded | Registrar `refund_unallocated` |
+
+Every row above is open on testnet until step 15 runs. The full per finding inventory, with the tests for each, is in [docs/reviews/03a-status.md](docs/reviews/03a-status.md) and the review rows of [THREAT_MODEL.md](THREAT_MODEL.md).
 
 The live demo below ran on the deployed build.
 
@@ -286,7 +288,7 @@ Mock USDC (testnet) is used instead of Circle USDC because a Circle USDC address
 
 ## What the token legally is
 
-A share NFT is a verified record of a signed assignment plus a binding payment instruction among members. It is evidence and a payout address, not legal title. Legal effect in production would come from a participation agreement: paying the registered share account discharges the payer, claimants indemnify payers, and disputes follow the registry process. That agreement is **roadmap**; it does not exist today. Nothing here is legal advice.
+A share NFT records an assignment as declared by members, with document hashes of the evidence (in this demo the identity checks and evidence are Simulated), plus the payment instruction it routes. The registry does not check that a signed legal assignment exists: that verification, and any binding legal effect, are UNVERIFIED and planned. It is evidence and a payout address, not legal title. Legal effect in production would come from a participation agreement: paying the registered share account discharges the payer, claimants indemnify payers, and disputes follow the registry process. That agreement is **roadmap**; it does not exist today. Nothing here is legal advice.
 
 ## Roadmap
 
