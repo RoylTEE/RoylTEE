@@ -1,0 +1,56 @@
+---
+import Base from '../layouts/Base.astro';
+import RegistryHeader from '../components/RegistryHeader.astro';
+import { PROJECT_NAME } from '../consts';
+/* Rendered per request so the wallet selector gets a fresh CSP nonce (src/middleware.ts). */
+export const prerender = false;
+---
+<Base title={`Your shares . ${PROJECT_NAME}`} description="Claim what your shares earned, approve split sheets and draft new shares with a NEAR testnet wallet." current="member">
+  <RegistryHeader tab="member" title="Your shares" intro="Claim what your shares earned, sign split sheets for works you registered, and draft new shares. Look up any account without a wallet." />
+  <div class="container reg-body" data-member data-state="out">
+    <section class="panel" aria-labelledby="who-h">
+      <div class="panel-head"><h2 id="who-h">Account</h2><span class="end" data-who-badge><span class="badge plain">Not chosen</span></span></div>
+      <div class="panel-body who-grid">
+        <form class="field" data-lookup>
+          <label for="acct-in">Look up an account, read only</label>
+          <div class="inline"><input id="acct-in" name="account" autocomplete="off" spellcheck="false" placeholder="writer-a.royltee-dev.testnet" /><button class="btn" type="submit">Look up</button></div>
+          <p class="hint">Try writer-a.royltee-dev.testnet or buyer-pub.royltee-dev.testnet.</p>
+        </form>
+        <div class="field">
+          <span class="label">Or act as yourself</span>
+          <div class="actions"><button class="btn primary" type="button" data-connect>Connect a testnet wallet</button><button class="btn quiet" type="button" data-disconnect hidden>Disconnect</button></div>
+          <p class="hint">Your wallet signs each transaction. This site never sees a key.</p>
+        </div>
+      </div>
+      <p class="panel-foot" data-status aria-live="polite">Choose an account to begin.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="claim-h">
+      <div class="panel-head"><h2 id="claim-h">Shares held</h2><span class="caption">Statement since mint, in mUSDC</span></div>
+      <div data-held><div class="panel-body"><div class="empty"><p>Look up an account or connect a wallet to see the shares it holds and what each one can claim.</p></div></div></div>
+    </section>
+
+    <section class="panel" aria-labelledby="ap-h">
+      <div class="panel-head"><h2 id="ap-h">Split sheets to approve</h2><span class="caption">Shares other members registered on works this account registered</span></div>
+      <div data-approvals><div class="panel-body"><div class="empty"><p>Choose an account first. Shares that wait for its signature show up here.</p></div></div></div>
+    </section>
+
+    <section class="panel" aria-labelledby="draft-h">
+      <div class="panel-head"><h2 id="draft-h">Draft a split sheet</h2><span class="end"><span class="badge unv">UNVERIFIED</span></span></div>
+      <div class="panel-body" data-draft><p class="loading">Reading works</p></div>
+      <p class="panel-foot">Sending from this page has not been run on testnet yet. Each row becomes one register_share call from your wallet with 0.2 NEAR attached for the share account and storage; the contract refunds what it does not use.</p>
+    </section>
+  </div>
+</Base>
+<script>import '../scripts/member.ts';</script>
+<style is:global>
+  .who-grid { grid-template-columns: 1.3fr 1fr; align-items: start; }
+  .inline { display: flex; gap: var(--s2); }
+  .inline input { flex: 1; min-width: 0; }
+  .review { border: 2px solid var(--ink); border-radius: var(--r-card); padding: var(--s5); display: grid; gap: var(--s4); background: var(--surface-2); }
+  .draft-rows td { padding-top: .4rem; padding-bottom: .4rem; }
+  .draft-rows input, .draft-rows select { min-width: 8rem; }
+  .draft-rows input[type="number"] { min-width: 6rem; text-align: right; font-family: var(--mono); }
+  .draft-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s4); }
+  @media (max-width: 767px) { .who-grid, .draft-meta { grid-template-columns: 1fr; } .inline { flex-direction: column; } }
+</style>

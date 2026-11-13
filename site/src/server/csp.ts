@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 /**
  * One source for both Content Security Policies.
  * Every page gets the strict policy from vercel.json (script-src 'self', no inline script).
- * Only the wallet sign in pages (WALLET_ROUTES) get a per request nonce instead, because the wallet
+ * Only the wallet pages (WALLET_ROUTES: sign in, and the Your shares page that asks a wallet to sign transactions) get a per request nonce instead, because the wallet
  * selector runs each wallet in a sandboxed srcdoc iframe with inline scripts, and that iframe inherits
  * the page policy. The selector takes the nonce through its cspNonce option.
  */
@@ -23,7 +23,7 @@ function render(extra: Record<string, string>) {
   return ORDER.map(k => `${k} ${all.get(k)}`).join('; ');
 }
 /** Pages that open the wallet selector. Keep in sync with the vercel.json CSP source pattern. */
-export const WALLET_ROUTES = ['/admin', '/help'] as const;
+export const WALLET_ROUTES = ['/admin', '/help', '/member'] as const;
 export const isWalletRoute = (pathname: string) => (WALLET_ROUTES as readonly string[]).includes(pathname.replace(/\/+$/, '') || '/');
 /** The policy every non wallet page gets from vercel.json. */
 export const strictPolicy = () => render({ 'script-src': "'self'", 'font-src': "'self'" });

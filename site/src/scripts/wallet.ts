@@ -17,6 +17,26 @@ export async function signIn(): Promise<{ accountId: string; admin: boolean; exp
   const signed = await wallet.signMessage({ message: challenge.message, recipient: challenge.recipient, nonce: fromBase64(challenge.nonce), network: 'testnet' });
   return api('/api/auth/verify', { method: 'POST', body: { accountId: signed.accountId, publicKey: signed.publicKey, signature: signed.signature, nonce: challenge.nonce } });
 }
+/** Wallet for registry transactions (Your shares page). The user's wallet signs and sends; this site never holds a key. */
+let txConnector: NearConnector | undefined;
+async function walletForTx() {
+  if (!txConnector) { const { NearConnector } = await import('@hot-labs/near-connect'); txConnector = new NearConnector({ network: 'testnet', features: { signAndSendTransaction: true }, cspNonce: cspNonce() }); }
+  return txConnector.connect();
+}
+export async function connectWallet(): Promise<string> {
+  const wallet = await walletForTx();
+  const [account] = await wallet.getAccounts();
+  if (!account) throw new Error('The wallet did not share an account.');
+  return account.accountId;
+}
+export type RegistryCall = { method: string; args: Record<string, unknown>; deposit: string; gas: string };
+/** One transaction per call, all to the registry contract. Each owner method needs at least 1 yoctoNEAR. */
+export async function sendCalls(receiverId: string, calls: RegistryCall[]) {
+  const wallet = await walletForTx();
+  const transactions = calls.map((c) => ({ receiverId, actions: [{ type: 'FunctionCall' as const, params: { methodName: c.method, args: c.args, gas: c.gas, deposit: c.deposit } }] }));
+  return transactions.length === 1 ? [await wallet.signAndSendTransaction({ network: 'testnet', ...transactions[0] })] : wallet.signAndSendTransactions({ network: 'testnet', transactions });
+}
+export async function disconnectWallet() { if (txConnector) await txConnector.disconnect().catch(() => undefined); }
 export async function signOut() { await api('/api/auth/logout', { method: 'POST', body: {} }).catch(() => undefined); if (connector) await connector.disconnect().catch(() => undefined); }
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, props: Record<string, unknown> = {}, ...children: (Node | string)[]) {
   const node = Object.assign(document.createElement(tag), props); node.append(...children); return node;

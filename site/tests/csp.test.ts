@@ -20,8 +20,8 @@ describe('CSP per route', () => {
 
   it('the strict policy covers every path except the wallet sign in pages', () => {
     const source = cspBlocks[0].source;
-    for (const p of ['/', '/dashboard', '/dashboard/', '/whitepaper', '/api/auth/challenge', '/api/chat', '/administer', '/helpdesk', '/admin/x', '/nope']) expect(matches(source, p), p).toBe(true);
-    for (const p of ['/admin', '/admin/', '/help', '/help/']) expect(matches(source, p), p).toBe(false);
+    for (const p of ['/', '/dashboard', '/dashboard/', '/whitepaper', '/api/auth/challenge', '/api/chat', '/administer', '/helpdesk', '/admin/x', '/nope', '/members', '/member/x', '/share', '/agents', '/disputes']) expect(matches(source, p), p).toBe(true);
+    for (const p of ['/admin', '/admin/', '/help', '/help/', '/member', '/member/']) expect(matches(source, p), p).toBe(false);
     for (const r of WALLET_ROUTES) expect(isWalletRoute(r) && isWalletRoute(r + '/')).toBe(true);
     expect(isWalletRoute('/')).toBe(false);
     expect(isWalletRoute('/administer')).toBe(false);
@@ -69,7 +69,7 @@ describe('CSP per route', () => {
   });
 
   it('every page that opens the wallet selector is a wallet route rendered per request', () => {
-    const signInScripts = readdirSync(new URL('../src/scripts/', import.meta.url)).filter(f => /import \{[^}]*\bsignIn\b[^}]*\} from '\.\/wallet'/.test(src(`scripts/${f}`)));
+    const signInScripts = readdirSync(new URL('../src/scripts/', import.meta.url)).filter(f => /import \{[^}]*\b(?:signIn|connectWallet)\b[^}]*\} from '\.\/wallet'/.test(src(`scripts/${f}`)));
     expect(signInScripts.length).toBeGreaterThan(0);
     const pages = readdirSync(new URL('../src/pages/', import.meta.url)).filter(f => f.endsWith('.astro'));
     const walletPages = pages.filter(f => signInScripts.some(s => src(`pages/${f}`).includes(`../scripts/${s}`)));

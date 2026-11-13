@@ -12,7 +12,7 @@
       ]
     },
     {
-      "source": "/((?!(?:admin|help)/?$).*)",
+      "source": "/((?!(?:admin|help|member)/?$).*)",
       "headers": [
         {
           "key": "Content-Security-Policy",
