@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { storeFor, type Config } from './config';
 import type { Store } from './store';
-import { ACCOUNT_ID, ED25519_KEY, HttpError, body, clientKey, cookieSecure, digest, equal, fail, json, originCheck, randomId, rate, sessionCookie, sessionSetCookie } from './security';
+import { ACCOUNT_ID, ED25519_KEY, HttpError, body, challengeCookie, challengeSetCookie, clientKey, cookieSecure, digest, equal, fail, json, originCheck, randomId, rate, sessionCookie, sessionSetCookie } from './security';
 import { fullAccessKey, readSession, recordWallet, sessionToken, verifySignature, type Challenge, type Session } from './auth';
 import { chat, startChat, type Model } from './chat';
 import { adminUpdate, assertOpenSlot, createTicket, listTickets, sweep, ticketText, LIMITS } from './tickets';
@@ -71,26 +71,28 @@ export async function handle(request: Request, route: string, deps: Deps): Promi
     if (route === 'auth/challenge' && method === 'POST') {
       await rate(store, `challenge:${ip}`, 30, 600);
       const recipient = new URL(request.headers.get('origin')!).host;
-      const challenge: Challenge = { message: SIGN_IN_MESSAGE, recipient, nonce: randomBytes(32).toString('base64'), expires: now + 300000, binding: ip };
+      const binding = randomId();
+      const challenge: Challenge = { message: SIGN_IN_MESSAGE, recipient, nonce: randomBytes(32).toString('base64'), expires: now + 300000, binding };
       await store.put(`challenge:${Buffer.from(challenge.nonce, 'base64').toString('hex')}`, challenge, 300);
-      return json({ message: challenge.message, recipient, nonce: challenge.nonce, expiresAt: challenge.expires });
+      return json({ message: challenge.message, recipient, nonce: challenge.nonce, expiresAt: challenge.expires }, 200, { 'set-cookie': challengeSetCookie(binding, 300, secure) });
     }
     if (route === 'auth/verify' && method === 'POST') {
       await rate(store, `verify:${ip}`, 20, 600);
       const input = await body(request);
       const { accountId, publicKey, signature, nonce } = input;
       if (typeof accountId !== 'string' || !ACCOUNT_ID.test(accountId) || typeof publicKey !== 'string' || typeof signature !== 'string' || typeof nonce !== 'string' || !/^[A-Za-z0-9+/]{43}=$/.test(nonce)) fail(400, 'Sign in data is not valid.');
+      const binding = challengeCookie(request);
       const key = `challenge:${Buffer.from(nonce as string, 'base64').toString('hex')}`;
       const held = await store.get<Challenge>(key);
-      if (!held || held.expires <= now || held.nonce !== nonce || held.binding !== ip || held.recipient !== new URL(request.headers.get('origin')!).host) fail(400, 'That sign in request was used or expired. Please try again.');
+      if (!held || held.expires <= now || held.nonce !== nonce || !sessionId.test(binding) || held.binding !== binding || held.recipient !== new URL(request.headers.get('origin')!).host) fail(400, 'That sign in request was used or expired. Please try again.');
       const challenge = await store.take<Challenge>(key);
-      if (!challenge || challenge.expires <= now || challenge.nonce !== nonce || challenge.binding !== ip || challenge.recipient !== new URL(request.headers.get('origin')!).host) fail(400, 'That sign in request was used or expired. Please try again.');
+      if (!challenge || challenge.expires <= now || challenge.nonce !== nonce || challenge.binding !== binding || challenge.recipient !== new URL(request.headers.get('origin')!).host) fail(400, 'That sign in request was used or expired. Please try again.');
       if (!verifySignature(challenge!, publicKey as string, signature as string)) fail(401, 'The wallet signature did not check out.');
       if (!await fullAccessKey(config.rpcUrl, accountId as string, publicKey as string, deps.fetcher)) fail(401, 'That key is not a full access key for this account.');
       if (accountId === config.adminWallet && pinnedAdminKey(config) && publicKey !== pinnedAdminKey(config)) fail(401, 'That key is not the pinned admin key.');
       const session: Session = { sid: randomId(), wallet: accountId as string, exp: now + SESSION_SECONDS * 1000, publicKey: publicKey as string };
       await store.put(`session:${session.sid}`, { wallet: session.wallet, publicKey: session.publicKey }, SESSION_SECONDS);
-      return json({ accountId, expiresAt: session.exp, admin: isAdmin(config, session.wallet, session.publicKey) }, 200, { 'set-cookie': sessionSetCookie(sessionToken(config.sessionSecret, session), SESSION_SECONDS, secure) });
+      return json({ accountId, expiresAt: session.exp, admin: isAdmin(config, session.wallet, session.publicKey) }, 200, { 'set-cookie': [sessionSetCookie(sessionToken(config.sessionSecret, session), SESSION_SECONDS, secure), challengeSetCookie('', 0, secure)] });
     }
     const session = readSession(config.sessionSecret, sessionCookie(request), now);
     const stored = await storedSession(store, session);

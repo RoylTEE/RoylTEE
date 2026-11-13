@@ -10,8 +10,13 @@ export function equal(a: string, b: string) {
   if (!/^[a-f0-9]{64}$/.test(a) || !/^[a-f0-9]{64}$/.test(b)) return false;
   return timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
 }
-export function json(value: unknown, status = 200, headers: Record<string, string> = {}) {
-  return new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...headers } });
+export function json(value: unknown, status = 200, headers: Record<string, string | string[]> = {}) {
+  const h = new Headers({ 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+  for (const [k, v] of Object.entries(headers)) {
+    if (Array.isArray(v)) for (const item of v) h.append(k, item);
+    else h.set(k, v);
+  }
+  return new Response(JSON.stringify(value), { status, headers: h });
 }
 export function originCheck(request: Request, allowed: string[], mutating = true) {
   const origin = request.headers.get('origin');
@@ -68,6 +73,14 @@ export function setCookie(name: string, value: string, seconds: number, secure: 
 }
 export function sessionSetCookie(value: string, seconds: number, secure: boolean) {
   return setCookie(sessionCookieName(secure), value, seconds, secure);
+}
+export const CHALLENGE_COOKIE = 'royltee_challenge';
+export const CHALLENGE_COOKIE_HOST = '__Host-royltee_challenge';
+export function challengeCookieName(secure: boolean) { return secure ? CHALLENGE_COOKIE_HOST : CHALLENGE_COOKIE; }
+/** Prefer the __Host- cookie; fall back to the plain name so a mid-deploy request still works. */
+export function challengeCookie(request: Request) { return cookie(request, CHALLENGE_COOKIE_HOST) || cookie(request, CHALLENGE_COOKIE); }
+export function challengeSetCookie(value: string, seconds: number, secure: boolean) {
+  return setCookie(challengeCookieName(secure), value, seconds, secure);
 }
 /** Expand a valid IPv6 address to 8 hextets, or null. */
 export function expandIPv6(address: string): string[] | null {
