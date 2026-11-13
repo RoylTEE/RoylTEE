@@ -1,6 +1,6 @@
 # Transfer threat model
 
-Status: written on 2026-11-13, BEFORE any contract code existed in this repo. Block 2 code landed later the same day; rows covered by passing tests say so under "Block 2 status" at the end. Owner decisions 3, 4 and 10 (2026-11-13) changed T23 and T25 and added T34 and T35; those edits are marked.
+Status: written on 2026-11-13, BEFORE any contract code existed in this repo. Block 2 code landed later the same day; rows covered by passing tests say so under "Block 2 status" at the end. Owner decisions 3, 4 and 10 (2026-11-13) changed T23 and T25 and added T34 and T35; those edits are marked. Block 3 added T36 and T37 and a "Block 3 status" section.
 
 Scope: every way a seller, a buyer, an agent, a payer, an outside attacker or a privileged role could keep money or access, move money to the wrong place, or lose money, around a rights-share NFT and its vault. Testnet only. Mock USDC only.
 
@@ -150,7 +150,7 @@ Terms used below (full detail in DESIGN.md):
 ### T19. Callback failure or gas exhaustion leaves a lock stuck
 - Attack or fault: `on_claim` or `nft_resolve_transfer` runs out of gas or panics, so `payout_in_flight` or `transfer_pending` is never cleared; the share is frozen forever, or a griefer forces this by attaching just enough gas.
 - Impact: share cannot be claimed or transferred; funds stuck.
-- Mitigation: (a) methods that schedule a callback assert enough prepaid gas up front and reserve a fixed amount for the callback; (b) callbacks are small, bounded, do no loops over user-sized data, and never panic (they use `#[callback_result]` and a size-checked result read); (c) each lock stores the block height it was set; after `STALE_LOCK_BLOCKS` anyone may call `release_stale_lock(token_id)`, which clears the lock WITHOUT rolling back any debit and bumps the ledger epoch, then a `sync` reconciles the known balance with the real vault balance. Clearing without rollback can never pay twice: if the withdraw happened the money is gone and the debit is right; if it did not, `sync` finds it again. `STALE_LOCK_BLOCKS` value: to be set in block 2; whether it is long enough under congestion is UNVERIFIED.
+- Mitigation: (a) methods that schedule a callback assert enough prepaid gas up front and reserve a fixed amount for the callback; (b) callbacks are small, bounded, do no loops over user-sized data, and never panic (they use `#[callback_result]` and a size-checked result read); (c) each lock stores the block height it was set; after `STALE_LOCK_BLOCKS` anyone may call `release_stale_lock(token_id)`, which clears the lock WITHOUT rolling back any debit and bumps the ledger epoch, then a `sync` reconciles the known balance with the real vault balance. Clearing without rollback can never pay twice: if the withdraw happened the money is gone and the debit is right; if it did not, `sync` finds it again. `STALE_LOCK_BLOCKS` is 1200 (block 3); whether it is long enough under congestion is UNVERIFIED.
 - Test: test 20 (unit: callbacks given a failed promise result do not panic; claim with too little gas fails before any state change; stale lock release before the timeout fails, after it succeeds; sync then restores the correct balance).
 
 ### T20. Vault account deleted, redeployed or keyed later
@@ -198,7 +198,7 @@ Terms used below (full detail in DESIGN.md):
 ### T27. Agent storage spam
 - Attack: an agent submits many tiny payments with fresh statement line ids, growing the idempotency set paid for by `REG`.
 - Impact: registry storage balance drained.
-- Mitigation: `max_tx_per_day` in the role; minimum group payment `MIN_GROUP_PAYMENT`; statement line ids at most 64 bytes and stored as a 32-byte hash; organisation pays a storage deposit at `grant_role` sized for its daily cap (sizing measured in block 3).
+- Mitigation: `max_tx_per_day` in the role; minimum group payment `MIN_GROUP_PAYMENT`; statement line ids at most 64 bytes and stored as a 32-byte hash; organisation prepays statement-line storage at `grant_role` (100 bytes per line) and each paid line uses one credit; with no credits left the agent cannot pay (block 3).
 - Test: test 28 (call over `max_tx_per_day` fails; payment below minimum fails).
 
 ### T28. Role and allowance namespace abuse
@@ -249,6 +249,18 @@ Terms used below (full detail in DESIGN.md):
 - Mitigation: `registrar_transfer` works only while the current holder's credential is suspended, needs an active receiver, respects both locks, needs 1 yoctoNEAR and a document hash and emits an event. `release_unallocated` can only pay an active share of the same work, right and territory, never more than that group's escrow, and emits an event with the document hash. The registrar still cannot claim or send money to itself. Multisig with a time delay is roadmap (T12).
 - Test: unit tests `registrar_cannot_move_active_holders_share`, `unallocated_release_must_stay_in_its_group`, and the registrar-only checks inside the decision 3 and 4 tests.
 
+### T36. Late callback after a stale lock release
+- Attack or fault: `release_stale_lock` clears a lock, then the original `on_claim` or `nft_resolve_transfer` finally runs; or a new lock was set in between.
+- Impact: a late claim rollback after a `sync` would count the same money twice; a late resolve could move a token that has since been sold, or clear a newer lock.
+- Mitigation: callbacks carry the lock they belong to (`since_block` plus amount or receiver). If the lock is gone or different, `on_claim` changes no balance and emits an `anomaly`; `nft_resolve_transfer` returns true and leaves owner and locks alone. Balances after a stale release come only from `sync`, which reads the vault.
+- Test: unit tests `stale_payout_lock_released_only_after_timeout_and_late_callback_is_safe`, `late_failed_claim_after_stale_release_changes_no_balance`, `late_resolve_after_stale_release_keeps_current_owner`.
+
+### T37. Agent pays a valid but wrong target
+- Attack or fault: a misled agent pays a real, registered work or share that the statement line does not belong to.
+- Impact: money reaches registered holders of the wrong song; there is no clawback.
+- Mitigation: the money can only reach registered vaults (T8); per-transaction, rolling daily and count limits cap the damage (T7, T27); every payment event carries the agent, statement line id, period and statement hash, so the organisation can reconcile and revoke at once (T14). Refunds between members are off chain. Residual risk, accepted for the demo.
+- Test: tests 9 and 10 (limits and revoke); test 11 (no payee outside the registry).
+
 ## Test mapping summary
 
 | Test | Covers |
@@ -297,3 +309,14 @@ Passing in the sandbox (`contracts/tests/tests/sandbox.rs`): test 1 (T1, T15), 2
 Test 6 uses a holder contract that sends `claim` and `nft_transfer` in one receipt, so the transfer lands while the payout is in flight; this ordering is deterministic in the single-shard sandbox and the test asserts which call won, so a change in ordering fails loudly.
 
 Not yet covered: tests 8 to 15, 17 to 31 except the unit-level parts above (blocks 3 and 4), and the `verify-keys` and `verify:testnet` scripts (block 5).
+
+## Block 3 status (2026-11-13)
+
+Passing in the sandbox (`contracts/tests/tests/agents.rs`), every test ending with the solvency check (T31):
+- test 8 (T6): an agent account with only function-call keys. A deposit from either key is rejected by the protocol (`DepositWithFunctionCall`); a key allowing any registry method, without a deposit, is refused by each method (`nft_transfer`, `claim`, `withdraw_allowance`, `revoke_role`, `register_share`, `grant_role`, `set_share_note`); the scoped key cannot name them (`MethodNameMismatch`); it cannot call the token at all.
+- test 9 (T7), test 10 (T14), test 11 (T8, T32: injection in the work metadata, in the share note and as extra payee arguments; outsider receives nothing), test 12 (T9, also across target forms), test 13 (T16 through the allowance, minimum payment), test 15 (T23, T28: suspended organisation's agent stopped, share accrues, cannot receive, resumes after reinstatement).
+- payer attestation sets `payer_confirmed`; `release_stale_lock` and `retry_forward` refuse when there is nothing to do.
+
+Unit tests cover the role checks (T28), limits and the rolling window, line credits (T27), failed allowance withdrawal, note rules, retry of an undelivered forward (T26), stale lock release only after the timeout (T19) and late callbacks (T36). A stuck lock and a failed forward cannot be produced in the sandbox, so those paths are unit-tested only.
+
+Not yet covered: tests 14, 17 to 31 beyond the unit-level parts (block 4), counterparty confirmation, licenses, and the live `verify-keys` and `verify:testnet` scripts (block 5).

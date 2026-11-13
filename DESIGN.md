@@ -1,6 +1,6 @@
 # Design
 
-Status: block 1 design, written 2026-11-13 before any contract code. Block 2 code landed the same day; where the code differs from the plan below, section 16 says so and DECISIONS_LOG.md records it. Read THREAT_MODEL.md alongside this file.
+Status: block 1 design, written 2026-11-13 before any contract code. Block 2 and block 3 code landed the same day; where the code differs from the plan below, sections 16 and 17 say so and DECISIONS_LOG.md records it. Read THREAT_MODEL.md alongside this file.
 
 Product in one line: the verified payout address for every share of every song, human or AI. The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.
 
@@ -595,3 +595,81 @@ What changed against the plan above, and why. Each item is also a row in DECISIO
 10. Build: `rust-toolchain.toml` pins Rust 1.99.1 with the wasm32 target; `scripts/build-wasm.sh` builds with `RUSTFLAGS="--cfg near"` (what cargo-near sets) and copies wasm files to `contracts/res/`. Rust 1.87 and newer emit bulk-memory opcodes, which need protocol 84 or newer (nearcore 2.12+). The sandbox used by near-workspaces 0.24.0 is nearcore 2.14.1. Testnet protocol version is UNVERIFIED until block 5. The registry wasm is 518782 bytes without wasm-opt (about 5.2 NEAR of storage on testnet). The sandbox tests need OpenSSL development headers, because near-workspaces pulls in native-tls through near-jsonrpc-client; openssl-sys finds them with pkg-config, or with `OPENSSL_LIB_DIR` and `OPENSSL_INCLUDE_DIR` set.
 
 Cut order if time gets tight, in addition to the brief's: decision 4 (unallocated escrow) is the first thing to cut back to "refuse unless exactly 10000 bps".
+
+## 17. Block 3 as built (2026-11-13)
+
+Agents, allowances, payer role, holder note, `retry_forward` and `release_stale_lock`. Each choice below is also a row in DECISIONS_LOG.md (rows 36 to 49).
+
+### Agent methods
+
+```rust
+#[payable] pub fn grant_role(&mut self, agent: AccountId, methods: Vec<AgentMethod>, per_tx_limit: U128,
+    daily_limit: U128, max_tx_per_day: u32, expires_at: U64);
+// Caller: active member. agent must be "<label>.<caller>" (one label, no dots) and hold no credential.
+// 0 < per_tx_limit <= daily_limit, 1 <= max_tx_per_day <= 1000, expires_at in the future (ns).
+// Deposit must cover the role record; the rest buys statement-line credits (100 bytes each,
+// 0.001 NEAR at the current byte cost), any part of a credit is refunded. Re-grant only after
+// revoke; it keeps the allowance, the credits and the rolling window. Emits role_granted, line_credits_added.
+#[payable] pub fn add_line_credits(&mut self, agent: AccountId);      // organisation only, at least one credit
+#[payable] pub fn revoke_role(&mut self, agent: AccountId);           // 1y, organisation or registrar, immediate
+#[payable] pub fn withdraw_allowance(&mut self, agent: AccountId, amount: U128) -> Promise;
+// 1y, organisation only, not while suspended. Debit, then ft_transfer to the organisation;
+// on_allowance_withdrawn restores the debit if the transfer failed.
+pub fn pay_from_allowance(&mut self, target: PayTarget, amount: U128, statement_line_id: String,
+    period: String, statement_hash: Hash32);
+// No deposit. target = {"work": {work_id, right_type, territory}} or {"share": {token_id}}. No payee
+// argument exists; unknown JSON fields are ignored. Check order: role exists, not revoked, not
+// expired, method allowed, organisation active, line id 1..64 bytes, amount > 0, line not used,
+// per-tx limit, rolling 24h sum, rolling 24h count, allowance, line credits. Then the same routing as a
+// direct payment (minimum group payment, exact bps split, unallocated escrow), then the debit.
+// Emits payment_in {source: "allowance", agent, ...} and allowance_spent.
+pub fn report(&mut self, statement_line_id: String, report_hash: Hash32);   // event agent_report only
+pub fn get_role(&self, agent: AccountId) -> Option<RoleView>;
+pub fn is_statement_line_used(&self, org: AccountId, statement_line_id: String) -> bool;
+```
+
+Funding: `ft_transfer_call` to `REG` with `msg: {"fund_allowance": "<agent>"}`. Credited only if the sender is the agent's organisation, the organisation is active and the role is neither revoked nor expired; otherwise the whole amount is refunded and a `payment_refused` event is emitted. Allowances count in `allowance_total` (part of the solvency sum).
+
+Idempotency key: `sha256(org || 0x00 || statement_line_id)`, stored in a set. It is per organisation, so two organisations may use the same line ids, while two agents of one organisation, or the same line sent to a work and then to a share, pay once.
+
+Rolling window: 24 hourly buckets of amount and count per agent. A payment leaves the window when its hour bucket is 24 hours old, so the window is between 23 and 24 hours long.
+
+Agent account setup (sandbox tests, and the block 5 script): create `pay-agent.<org>`, add one function-call key with receiver `REG` and methods `pay_from_allowance` and `report`, delete the full-access key. The protocol refuses any transaction from a function-call key that attaches a deposit (`DepositWithFunctionCall`), and every owner method needs a deposit, so the contract check is the second lock.
+
+### Payer role and holder note
+
+```rust
+#[payable] pub fn grant_payer_role(&mut self, account: AccountId, doc_hash: Hash32);  // 1y, registrar
+#[payable] pub fn revoke_payer_role(&mut self, account: AccountId, doc_hash: Hash32); // 1y, registrar
+#[payable] pub fn attest_share(&mut self, token_id: TokenId, statement_hash: Hash32);
+// Payer role, share Active, deposit covers storage (rest refunded). Sets payer_attestation; the
+// evidence tier in nft_token extra becomes payer_confirmed. Emits share_attested.
+pub fn is_payer(&self, account_id: AccountId) -> bool;
+#[payable] pub fn set_share_note(&mut self, token_id: TokenId, note: String);
+// Holder power. Holder only, not suspended, no transfer pending, at most 280 bytes, empty clears.
+// Deposit of at least 1 yoctoNEAR that covers storage, rest refunded. Payout logic never reads it.
+// Emits note_set {token_id, by, note_hash}.
+```
+
+`confirm_share` (counterparty_confirmed tier) and `amend_split` are not built; see DECISIONS_LOG rows 46 and 47.
+
+### Recovery methods
+
+```rust
+pub fn retry_forward(&mut self, token_id: TokenId);
+// Anyone. Re-sends the share's undelivered amount; debits undelivered before the forward, a second
+// failure puts it back. Emits forward_retried.
+pub fn release_stale_lock(&mut self, token_id: TokenId);
+// Anyone, once a lock is STALE_LOCK_BLOCKS (1200) blocks old. Clears it without rollback, bumps the
+// epoch, emits lock_released_stale (and anomaly for a payout lock). Then sync reconciles.
+```
+
+Callbacks now carry the lock they belong to. `on_claim` gets the lock's `since_block`; `nft_resolve_transfer` gets an extra `lock_block`. A callback whose lock is gone (released as stale) changes no balance and no owner: `on_claim` only emits an `anomaly` (`late_claim_callback`), `nft_resolve_transfer` returns true. See THREAT_MODEL T36.
+
+### Sizes
+
+The registry wasm is 613584 bytes after block 3 (518782 after block 2), about 6.1 NEAR of storage on testnet at 1e19 yoctoNEAR per byte. A role record plus the first credits: a 0.1 NEAR deposit gave 93 line credits in the sandbox, so the role record costs about 0.007 NEAR.
+
+### Toolchain note
+
+pkg-config is now installed on the build machine, so the sandbox tests find OpenSSL without `OPENSSL_LIB_DIR` and `OPENSSL_INCLUDE_DIR`. A fresh machine needs pkg-config and the OpenSSL development headers.
