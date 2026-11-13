@@ -549,7 +549,7 @@ Simulated, and labeled "Simulated" in the UI and README:
 
 ## 13. Project name constant
 
-The working name is a placeholder. It lives in exactly two places: `config/project.json` (`projectName`, plus the NFT symbol and event standard string) and the README title. Contracts contain no project name: the NFT contract name and symbol are passed to `new` by the deploy script from `config/project.json`, and the custom event standard string is name-neutral. Scripts and the frontend import `config/project.json`. A check script in block 7 will grep the repo to confirm the name appears only in those two places.
+The project name was chosen by the owner on 2026-11-13 (DECISIONS_LOG row 50). It lives in exactly two places: `config/project.json` (`projectName`, plus the NFT symbol and event standard string) and the README title. Contracts contain no project name: the NFT contract name and symbol are passed to `new` by the deploy script from `config/project.json`, and the custom event standard string is name-neutral. Scripts and the frontend import `config/project.json`. A check script in block 7 will grep the repo to confirm the name appears only in those two places.
 
 ## 14. Legal and product framing
 
