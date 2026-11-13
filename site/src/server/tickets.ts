@@ -12,6 +12,13 @@ export const LIMITS = { subject: 120, message: 2000, reply: 2000, page: PAGE_SIZ
 const wallet = (w: string) => `tickets:wallet:${w}`;
 /** Open and answered tickets for one wallet, scored by the last write, which also sets the record TTL. */
 const openIndex = (w: string) => `tickets:open:${w}`;
+/**
+ * Open and answered tickets of every wallet, member `wallet|id`, scored by the time the record TTL
+ * ends (last write + OPEN_SECONDS). The sweep uses it to drop the index entries of tickets that
+ * expired without being closed (audit F5).
+ */
+const EXPIRY = 'tickets:expiry';
+const expiryMember = (w: string, id: string) => `${w}|${id}`;
 export type TicketPage = { tickets: Ticket[]; cursor: string | null };
 export function encodeCursor(createdAt: number, id: string) { return `${createdAt}:${id}`; }
 export function decodeCursor(value: string | null): { createdAt: number; id: string } | null {
@@ -68,6 +75,7 @@ export async function createTicket(store: Store, owner: string, input: Record<st
     await store.add(wallet(owner), now, ticket.id);
     await store.add(openIndex(owner), now, ticket.id);
     await store.add('tickets:all', now, ticket.id);
+    await store.add(EXPIRY, now + OPEN_SECONDS * 1000, expiryMember(owner, ticket.id));
     // Audit F4: the slot reservation is a lease. If a submit outlives SLOT_LOCK_SECONDS, a second
     // submit can pass the count check too, so both could write and the wallet would hold
     // OPEN_PER_WALLET + 1 open tickets. Check again after the write and take this ticket back if the
@@ -87,6 +95,7 @@ async function dropTicket(store: Store, owner: string, id: string) {
   await store.remove(wallet(owner), id);
   await store.remove(openIndex(owner), id);
   await store.remove('tickets:all', id);
+  await store.remove(EXPIRY, expiryMember(owner, id));
 }
 export type BackfillReport = { scanned: number; indexed: number; ttlSet: number; expired: number; applied: boolean };
 /**
@@ -105,18 +114,14 @@ export async function backfillOpenTickets(store: Store, now: number, apply = fal
     const left = Math.floor((t.updatedAt + OPEN_SECONDS * 1000 - now) / 1000);
     if (left <= 0) {
       report.expired++;
-      if (apply) {
-        await store.del(`ticket:${id}`);
-        await store.remove('tickets:all', id);
-        await store.remove(wallet(t.wallet), id);
-        await store.remove(openIndex(t.wallet), id);
-      }
+      if (apply) await dropTicket(store, t.wallet, id);
       continue;
     }
     report.ttlSet++; report.indexed++;
     if (apply) {
       await store.put(`ticket:${id}`, t, left);
       await store.add(openIndex(t.wallet), t.updatedAt, id);
+      await store.add(EXPIRY, t.updatedAt + OPEN_SECONDS * 1000, expiryMember(t.wallet, id));
     }
   }
   return report;
@@ -161,13 +166,31 @@ export async function adminUpdate(store: Store, id: unknown, action: 'reply' | '
   if (!await store.cas(`ticket:${id}`, t, ticket, action === 'close' ? RETAIN_CLOSED_MS / 1000 : LIVE_SECONDS)) {
     fail(409, 'This ticket changed. Please refresh and try again.');
   }
-  if (action === 'close') await store.remove(openIndex(ticket.wallet), id);
-  else await store.add(openIndex(ticket.wallet), now, id);
+  if (action === 'close') {
+    await store.remove(openIndex(ticket.wallet), id);
+    await store.remove(EXPIRY, expiryMember(ticket.wallet, id));
+  } else {
+    await store.add(openIndex(ticket.wallet), now, id);
+    await store.add(EXPIRY, now + LIVE_SECONDS * 1000, expiryMember(ticket.wallet, id));
+  }
   return ticket;
 }
-/** Expiry is enforced by store TTL; the sweep removes due records and indexes. */
+/**
+ * Expiry is enforced by store TTL; the sweep removes due records and indexes. Closed tickets past
+ * RETAIN_CLOSED_MS go first. Then open or answered tickets whose TTL has ended (audit F5): their
+ * records are gone, so their entries leave `tickets:all`, the wallet index, the open index and the
+ * expiry index. Each pass handles at most 500 of each.
+ */
 export async function sweep(store: Store, now: number) {
   let removed = 0;
+  for (const member of await store.range(EXPIRY, now, 500)) {
+    const [owner, id] = member.split('|');
+    const t = await store.get<Ticket>(`ticket:${id}`);
+    if (t && t.status !== 'closed') { await store.add(EXPIRY, t.updatedAt + OPEN_SECONDS * 1000, member); continue; }
+    if (t) { await store.remove(EXPIRY, member); continue; }
+    await dropTicket(store, owner, id);
+    removed++;
+  }
   for (const member of await store.range('tickets:closed', now - RETAIN_CLOSED_MS, 500)) {
     const [owner, id] = member.split('|');
     const t = await store.get<Ticket>(`ticket:${id}`);

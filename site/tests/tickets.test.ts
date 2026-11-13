@@ -163,7 +163,7 @@ describe('support tickets', () => {
     t.clock.now += 2 * 86400_000;
     expect((await t.call('cron/sweep', undefined, { auth: 'Bearer wrong' })).status).toBe(401);
     const swept = await t.call('cron/sweep', undefined, { auth: `Bearer ${'k'.repeat(40)}` });
-    expect(swept.body.removed).toBe(1);
+    expect(swept.body.removed).toBe(2); // the closed ticket, and since audit F5 the expired open ticket's index entries
     expect(await t.store.get(`ticket:${closed}`)).toBeNull();
     expect(await t.store.get(`ticket:${openEarly}`)).toBeNull();
     a2 = await t.signIn(A);
