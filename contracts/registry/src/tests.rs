@@ -1056,7 +1056,7 @@ fn agent_pays_registered_shares_only_and_once_per_line() {
     assert!(try_pay(
         &mut c,
         PayTarget::Share { token_id: t2 },
-        1,
+        MIN_GROUP_PAYMENT,
         "L-2",
         0
     ));
@@ -1473,15 +1473,15 @@ fn over_allocation_opens_dispute_and_freezes_only_the_contested_fraction() {
     let msg =
         json!({ "pay_share": { "token_id": b, "period": "2026-Q3", "statement_hash": h('f') } });
     assert!(matches!(
-        c.ft_on_transfer(acc("payer.near"), U128(1000), msg.to_string()),
+        c.ft_on_transfer(acc("payer.near"), U128(10_000), msg.to_string()),
         PromiseOrValue::Value(U128(0))
     ));
-    assert_eq!(ledger(&c, &b).escrowed.0, 501_000);
+    assert_eq!(ledger(&c, &b).escrowed.0, 510_000);
     let msg =
         json!({ "pay_share": { "token_id": cl, "period": "2026-Q3", "statement_hash": h('f') } });
     assert!(matches!(
-        c.ft_on_transfer(acc("payer.near"), U128(1000), msg.to_string()),
-        PromiseOrValue::Value(U128(1000))
+        c.ft_on_transfer(acc("payer.near"), U128(10_000), msg.to_string()),
+        PromiseOrValue::Value(U128(10_000))
     ));
 
     // Frozen shares cannot move or sync; old money stays claimable.

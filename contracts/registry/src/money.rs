@@ -317,6 +317,84 @@ impl Registry {
         );
     }
 
+    /// Sends unallocated escrow of a voided work back out, for example to
+    /// the payer, once a duplicate-code dispute voided the work and no share
+    /// of it can ever be paid again (review L9). Registrar only, 1
+    /// yoctoNEAR, with a document hash. The escrow is debited before the
+    /// transfer and restored if the transfer fails.
+    #[payable]
+    pub fn refund_unallocated(
+        &mut self,
+        group: GroupKey,
+        receiver: AccountId,
+        amount: U128,
+        doc_hash: Hash32,
+    ) -> Promise {
+        near_sdk::assert_one_yocto();
+        self.assert_registrar();
+        require!(
+            logic::is_hash32(&doc_hash),
+            "doc_hash must be 64 lowercase hex characters"
+        );
+        require!(
+            matches!(
+                self.works.get(&group.work_id).map(|w| &w.status),
+                Some(WorkStatus::Void { .. })
+            ),
+            "work is not void: use release_unallocated"
+        );
+        require!(amount.0 > 0, "amount must be positive");
+        require!(Self::has_gas_for_forwards(1), "not enough gas to transfer");
+        let g = self
+            .groups
+            .get_mut(&group)
+            .unwrap_or_else(|| env::panic_str("unknown group"));
+        require!(
+            amount.0 <= g.unallocated.0,
+            "amount exceeds unallocated escrow"
+        );
+        g.unallocated = U128(g.unallocated.0 - amount.0);
+        self.unallocated_total -= amount.0;
+        self.forwards_in_flight_total += amount.0;
+        Promise::new(self.usdc.clone())
+            .function_call(
+                "ft_transfer".to_string(),
+                json_bytes(json!({ "receiver_id": receiver, "amount": amount })),
+                NearToken::from_yoctonear(1),
+                GAS_FT_TRANSFER,
+            )
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_FORWARD_CB)
+                    .on_unallocated_refunded(group, receiver, amount, doc_hash),
+            )
+    }
+
+    /// Settles a refund_unallocated. On failure the amount returns to the
+    /// group's unallocated escrow. Never panics.
+    #[private]
+    pub fn on_unallocated_refunded(
+        &mut self,
+        group: GroupKey,
+        receiver: AccountId,
+        amount: U128,
+        doc_hash: Hash32,
+    ) -> bool {
+        let ok = callback_result(64).is_some();
+        self.forwards_in_flight_total = self.forwards_in_flight_total.saturating_sub(amount.0);
+        if !ok {
+            if let Some(g) = self.groups.get_mut(&group) {
+                g.unallocated = U128(g.unallocated.0 + amount.0);
+            }
+            self.unallocated_total += amount.0;
+        }
+        emit(
+            "unallocated_refunded",
+            json!({ "group": group, "receiver": receiver, "amount": amount, "doc_hash": doc_hash, "ok": ok }),
+        );
+        ok
+    }
+
     /// NEP-141 receiver. Only the configured token is accepted (T18).
     /// `msg` is `{"pay_work": {...}}` or `{"pay_share": {...}}`. Anything
     /// refused returns the full amount, so the payer is refunded and no
@@ -505,8 +583,10 @@ impl Registry {
         line: Option<&String>,
     ) -> Result<(), &'static str> {
         Self::check_statement(&p.period, &p.statement_hash, line)?;
-        if amount == 0 {
-            return Err("zero amount");
+        // Same floor as a group payment, so share payments cannot be used
+        // to spam dust events and forwards (review L8).
+        if amount < MIN_GROUP_PAYMENT {
+            return Err("below minimum share payment");
         }
         let share = self.shares.get(&p.token_id).ok_or("unknown share")?;
         if share.status != ShareStatus::Active {

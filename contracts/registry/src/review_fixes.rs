@@ -315,10 +315,10 @@ fn m2_share_by_non_registrant_is_held_until_approved() {
     let msg =
         json!({ "pay_share": { "token_id": t, "period": "2026-Q3", "statement_hash": h('f') } });
     assert!(matches!(
-        c.ft_on_transfer(acc("payer.near"), U128(5_000), msg.to_string()),
+        c.ft_on_transfer(acc("payer.near"), U128(MIN_GROUP_PAYMENT), msg.to_string()),
         PromiseOrValue::Value(U128(0))
     ));
-    assert_eq!(ledger(&c, &t).escrowed.0, 1_005_000);
+    assert_eq!(ledger(&c, &t).escrowed.0, 1_010_000);
     // Held: no claim, no transfer, no sync, no confirmations.
     yocto(&acc("carol.near"));
     assert_panics("nothing to claim", || drop(c.claim(t.clone())));
@@ -344,10 +344,10 @@ fn m2_share_by_non_registrant_is_held_until_approved() {
     assert!(get_logs().join("\n").contains("share_approved"));
     assert_eq!(c.get_share_approval(t.clone()), "approved");
     assert_eq!(c.get_accounting().escrow_total.0, 0);
-    settle(&mut c, &t, 1_005_000);
+    settle(&mut c, &t, 1_010_000);
     yocto(&acc("carol.near"));
     let _ = c.claim(t.clone());
-    assert_eq!(ledger(&c, &t).total_paid_out.0, 1_005_000);
+    assert_eq!(ledger(&c, &t).total_paid_out.0, 1_010_000);
     // Approved now: later payments flow straight to the vault.
     let _ = pay_work_msg(&mut c, w, 10_000);
     assert_eq!(ledger(&c, &t).inbound_pending, 1);
@@ -513,4 +513,80 @@ fn l6_suspended_holder_is_not_minted() {
     assert_eq!(c.get_share(t).unwrap().status, ShareStatus::Failed);
     let g = group_of(&c, w);
     assert_eq!((g.active_bps, g.reserved_bps), (0, 0));
+}
+
+// ---------- L8, L9 ----------
+
+/// L8: a share payment below the group minimum is refused (refunded).
+#[test]
+fn l8_share_payment_has_a_minimum() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let t = mint(&mut c, w, "bob.near", 10_000);
+    let msg =
+        json!({ "pay_share": { "token_id": t, "period": "2026-Q3", "statement_hash": h('f') } });
+    call(&usdc(), NearToken::from_yoctonear(0));
+    assert!(matches!(
+        c.ft_on_transfer(acc("payer.near"), U128(MIN_GROUP_PAYMENT - 1), msg.to_string()),
+        PromiseOrValue::Value(U128(v)) if v == MIN_GROUP_PAYMENT - 1
+    ));
+    assert!(get_logs()
+        .join("\n")
+        .contains("below minimum share payment"));
+    call(&usdc(), NearToken::from_yoctonear(0));
+    assert!(matches!(
+        c.ft_on_transfer(acc("payer.near"), U128(MIN_GROUP_PAYMENT), msg.to_string()),
+        PromiseOrValue::Value(U128(0))
+    ));
+}
+
+/// L9: unallocated escrow of a voided work is no longer stranded: the
+/// registrar can send it back out, and a failed transfer restores it.
+#[test]
+fn l9_registrar_refunds_unallocated_of_a_void_work() {
+    let mut c = setup();
+    let w1 = work(&mut c, "USRC12600001");
+    let t1 = mint(&mut c, w1, "bob.near", 6000);
+    let _ = pay_work_msg(&mut c, w1, 1_000_000);
+    settle(&mut c, &t1, 600_000);
+    let key = GroupKey {
+        work_id: w1,
+        right_type: RightType::Publishing,
+        territory: "WW".into(),
+    };
+    yocto(&registrar());
+    assert_panics("work is not void", || {
+        drop(c.refund_unallocated(key.clone(), acc("payer.near"), U128(1), h('5')))
+    });
+    let w2 = work(&mut c, "USRC12600001");
+    let id = match c.get_work(w2).unwrap().status {
+        WorkStatus::DuplicateOpen { dispute_id, .. } => dispute_id,
+        s => panic!("{s:?}"),
+    };
+    resolve(&mut c, id, Outcome::SwapPayable);
+    yocto(&acc("alice.near"));
+    assert_panics("registrar only", || {
+        drop(c.refund_unallocated(key.clone(), acc("payer.near"), U128(1), h('5')))
+    });
+    yocto(&registrar());
+    assert_panics("exceeds unallocated", || {
+        drop(c.refund_unallocated(key.clone(), acc("payer.near"), U128(400_001), h('5')))
+    });
+    // A failed transfer restores the escrow.
+    yocto(&registrar());
+    let _ = c.refund_unallocated(key.clone(), acc("payer.near"), U128(400_000), h('5'));
+    assert_eq!(c.get_accounting().forwards_in_flight_total.0, 400_000);
+    callback(PromiseResult::Failed);
+    assert!(!c.on_unallocated_refunded(key.clone(), acc("payer.near"), U128(400_000), h('5')));
+    assert_eq!(group_of(&c, w1).unallocated.0, 400_000);
+    yocto(&registrar());
+    let _ = c.refund_unallocated(key.clone(), acc("payer.near"), U128(400_000), h('5'));
+    callback(ok(b""));
+    assert!(c.on_unallocated_refunded(key, acc("payer.near"), U128(400_000), h('5')));
+    let acct = c.get_accounting();
+    assert_eq!(
+        (acct.unallocated_total.0, acct.forwards_in_flight_total.0),
+        (0, 0)
+    );
+    assert!(get_logs().join("\n").contains("unallocated_refunded"));
 }
