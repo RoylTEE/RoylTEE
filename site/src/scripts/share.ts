@@ -3,7 +3,8 @@ import { oneToken } from './chain';
 import { SCENES, MINTS, type Scene } from '../data/testnet';
 import { holderChain } from './holders';
 import { h, badge, tx, acct, stamp, fail } from './ui';
-import { short } from './chain';
+import { short, view } from './chain';
+import { walletFields } from './wallet-view';
 import { loadShare, shareParts } from './sharecard';
 
 const $ = (s: string) => document.querySelector(s)!;
@@ -21,6 +22,7 @@ async function load() {
     const d = await loadShare(token);
     const p = shareParts(d);
     renderHolders(holderChain(id, d.share.holder_at_mint, token.owner_id));
+    void renderWallet();
     $('[data-share-head]').replaceChildren(...p.head);
     $('[data-summary]').replaceChildren(p.summary);
     $('[data-statement]').replaceChildren(p.statement);
@@ -45,6 +47,21 @@ function renderHolders(c: ReturnType<typeof holderChain>) {
       ? h('span', {}, badge('Matches the chain', 'ok'), ' The owner on chain now is the last recorded holder.')
       : h('span', {}, badge('Changed after the record', 'warn'), ' The owner on chain now is ', acct(c.liveOwner), '. The newer move is in the share history on the explorer.')));
 }
+
+async function renderWallet() {
+  const target = $('[data-wallet]');
+  try {
+    const [raw, meta] = await Promise.all([view<Record<string, unknown>>('nft_token', { token_id: id }), view<Record<string, unknown>>('nft_metadata')]);
+    const f = walletFields(raw, meta);
+    const pretty = (o: unknown) => h('pre', { class: 'json', tabindex: '0' }, h('code', { text: JSON.stringify(o, null, 2) }));
+    target.replaceChildren(
+      h('dl', { class: 'kv' }, ...f.flatMap(([k, v, tone]) => [h('dt', { text: k }), h('dd', {}, tone ? badge(v, tone) : v)])),
+      h('h3', { class: 'h-sm', text: 'nft_token' }), pretty({ ...raw, metadata: { ...(raw.metadata as object), extra: parseExtra(raw) } }),
+      h('p', { class: 'caption', text: 'The extra field is a JSON string on chain; it is shown parsed here.' }),
+      h('h3', { class: 'h-sm', text: 'nft_metadata' }), pretty(meta));
+  } catch (err) { fail(target, err, () => void renderWallet()); }
+}
+const parseExtra = (raw: Record<string, unknown>) => { try { return JSON.parse(String((raw.metadata as { extra?: string }).extra)); } catch { return (raw.metadata as { extra?: unknown }).extra; } };
 
 const mint = MINTS[id];
 const rows = ((mint ? [{ step: 'Mint', what: `register_share minted ${id} and deployed its keyless share account`, shows: 'The vault is created with no keys', txs: [mint.tx], tokens: [id], result: 'ok', simulated: false, n: 0 }] : []) as (Scene & { n: number })[])

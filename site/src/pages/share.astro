@@ -10,6 +10,7 @@ import PowerTable from '../components/PowerTable.astro';
     <a href="#account" data-tab-link="account">Account and keys</a>
     <a href="#holders" data-tab-link="holders">Holders</a>
     <a href="#history" data-tab-link="history">History</a>
+    <a href="#wallet" data-tab-link="wallet">Wallet view</a>
   </nav>
   <section class="panel" id="summary" data-tab-panel aria-label="Summary">
     <div class="panel-body share-summary">
@@ -38,6 +39,13 @@ import PowerTable from '../components/PowerTable.astro';
     <div data-history></div>
     <div class="panel-foot">Events for every change are in each transaction's logs. <span data-vault-link></span></div>
   </section>
+  <section class="panel" id="wallet" data-tab-panel aria-label="Wallet view">
+    <div class="panel-head"><h2>Wallet view</h2><span class="end"><span class="badge warn">UNVERIFIED</span></span></div>
+    <div class="panel-body stack">
+      <p class="small">This is the standard NFT data a wallet reads for this share: nft_token and the contract's nft_metadata, exactly as the chain returns it. The share has no image, so a wallet has nothing to show but the title. How any given wallet displays it is UNVERIFIED; this site has not checked one.</p>
+      <div data-wallet><p class="loading">Reading testnet</p></div>
+    </div>
+  </section>
 </App>
 <script>import '../scripts/share.ts';</script>
 <style is:global>
@@ -48,6 +56,7 @@ import PowerTable from '../components/PowerTable.astro';
   .sub-tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--ink); }
   .share-summary { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); align-items: start; gap: var(--s6); }
   .h-sm { font-size: var(--fs-18) !important; }
+  .json { margin: 0; padding: var(--s4); background: var(--ink); color: #f3f1ea; border-radius: var(--r-ctl); overflow: auto; max-height: 28rem; font-family: var(--mono); font-size: var(--fs-12); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; }
   .stmt .ledger, [data-account] .ledger { border: 1px solid var(--rule); border-radius: var(--r-ctl); }
   .step-sim { margin-left: var(--s2); }
   .plain-list { margin: 0; padding-left: 1.1rem; display: grid; gap: var(--s2); font-size: var(--fs-14); }

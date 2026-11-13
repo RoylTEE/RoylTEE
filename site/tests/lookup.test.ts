@@ -32,3 +32,19 @@ describe('catalog lookup', () => {
     expect(q.map((x) => x.paid)).toEqual([false, false]);
   });
 });
+
+import { walletFields } from '../src/scripts/wallet-view';
+import { readFileSync } from 'node:fs';
+describe('wallet view', () => {
+  it('reports no media and disabled approvals straight from the views', () => {
+    const f = Object.fromEntries(walletFields({ owner_id: 'buyer-pub.royltee-dev.testnet', metadata: { title: 'Rights share s2 of work 0', media: null }, approved_account_ids: null }, { spec: 'nft-1.0.0', name: 'RoylTEE', symbol: 'ROYLT', icon: null }).map(([k, v]) => [k, v]));
+    expect(f.Image).toBe('No media');
+    expect(f['Marketplace approvals']).toBe('Disabled');
+    expect(f.Collection).toBe('RoylTEE (ROYLT)');
+  });
+  it('says plainly that wallet display is UNVERIFIED', () => {
+    const page = readFileSync(new URL('../src/pages/share.astro', import.meta.url), 'utf8');
+    expect(page).toMatch(/id="wallet" data-tab-panel/);
+    expect(page).toMatch(/How any given wallet displays it is UNVERIFIED/);
+  });
+});
