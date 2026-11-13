@@ -41,3 +41,16 @@ export const SCENES: Scene[] = [
   { step: 'Pay', what: 'Payer pays work 2, 1.0 mUSDC', shows: 's6 paid 0.3 as usual. The 0.7 for s5 held in dispute escrow', txs: ['C8H28Nx1MZ5Pjb13uzkvheAh7S6Jf5mdqqHqmM1n7Mu'], tokens: ['s5', 's6'], result: 'ok', simulated: true },
   { step: 'Resolve', what: 'Registrar resolves dispute 0, uphold existing, with a document hash', shows: 's7 void. The 0.7 in escrow released to s5 only', txs: ['7wvLcnuB5L6w3rh3tBL2Jgg7yTMErD9QduC1XLSAYUVi'], tokens: ['s5', 's7'], result: 'ok' },
 ];
+
+/** Activity filters for a recorded scene. A row can sit in more than one. */
+export function categoriesOf(s: Scene): string[] {
+  const c = new Set<string>();
+  if (s.step === 'Pay' || s.step === 'Deposit') c.add('payments');
+  if (s.step === 'Claim' || s.step === 'Refusal') c.add('claims');
+  if (s.step === 'Sale') c.add('sale');
+  if (s.step === 'Agent') c.add('agent');
+  if (s.step === 'Dispute' || s.step === 'Resolve' || /escrow/i.test(s.shows)) c.add('dispute');
+  if (s.result === 'refused') c.add('refused');
+  if (s.step === 'Resolve') c.add('registrar');
+  return [...c];
+}

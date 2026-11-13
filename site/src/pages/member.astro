@@ -1,13 +1,10 @@
 ---
-import Base from '../layouts/Base.astro';
-import RegistryHeader from '../components/RegistryHeader.astro';
-import { PROJECT_NAME } from '../consts';
+import App from '../layouts/App.astro';
 /* Rendered per request so the wallet selector gets a fresh CSP nonce (src/middleware.ts). */
 export const prerender = false;
 ---
-<Base title={`Your shares . ${PROJECT_NAME}`} description="Claim what your shares earned, approve split sheets and draft new shares with a NEAR testnet wallet." current="member">
-  <RegistryHeader tab="member" title="Your shares" intro="Claim what your shares earned, sign split sheets for works you registered, and draft new shares. Look up any account without a wallet." />
-  <div class="container reg-body" data-member data-state="out">
+<App area="member" tab="holdings" title="Your shares" intro="Claim what your shares earned, sign split sheets for works you registered, and draft new shares. Look up any account without a wallet." description="Claim, approve split sheets and draft new shares with a NEAR testnet wallet.">
+  <div class="member" data-member data-state="out">
     <section class="panel" aria-labelledby="who-h">
       <div class="panel-head"><h2 id="who-h">Account</h2><span class="end" data-who-badge><span class="badge plain">Not chosen</span></span></div>
       <div class="panel-body who-grid">
@@ -25,25 +22,27 @@ export const prerender = false;
       <p class="panel-foot" data-status aria-live="polite">Choose an account to begin.</p>
     </section>
 
-    <section class="panel" aria-labelledby="claim-h">
+    <section class="panel" id="holdings" data-tab-panel aria-labelledby="claim-h">
       <div class="panel-head"><h2 id="claim-h">Shares held</h2><span class="caption">Statement since mint, in mUSDC</span></div>
       <div data-held><div class="panel-body"><div class="empty"><p>Look up an account or connect a wallet to see the shares it holds and what each one can claim.</p></div></div></div>
     </section>
 
-    <section class="panel" aria-labelledby="ap-h">
+    <section class="panel" id="approvals" data-tab-panel aria-labelledby="ap-h">
       <div class="panel-head"><h2 id="ap-h">Split sheets to approve</h2><span class="caption">Shares other members registered on works this account registered</span></div>
       <div data-approvals><div class="panel-body"><div class="empty"><p>Choose an account first. Shares that wait for its signature show up here.</p></div></div></div>
     </section>
 
-    <section class="panel" aria-labelledby="draft-h">
+    <section class="panel" id="draft" data-tab-panel aria-labelledby="draft-h">
       <div class="panel-head"><h2 id="draft-h">Draft a split sheet</h2><span class="end"><span class="badge unv">UNVERIFIED</span></span></div>
       <div class="panel-body" data-draft><p class="loading">Reading works</p></div>
       <p class="panel-foot">Sending from this page has not been run on testnet yet. Each row becomes one register_share call from your wallet with 0.2 NEAR attached for the share account and storage; the contract refunds what it does not use.</p>
     </section>
   </div>
-</Base>
+</App>
 <script>import '../scripts/member.ts';</script>
 <style is:global>
+  .member { display: grid; gap: var(--s5); }
+  .member [data-tab-panel] { scroll-margin-top: 7rem; }
   .who-grid { grid-template-columns: 1.3fr 1fr; align-items: start; }
   .inline { display: flex; gap: var(--s2); }
   .inline input { flex: 1; min-width: 0; }
@@ -52,5 +51,14 @@ export const prerender = false;
   .draft-rows input, .draft-rows select { min-width: 8rem; }
   .draft-rows input[type="number"] { min-width: 6rem; text-align: right; font-family: var(--mono); }
   .draft-meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s4); }
-  @media (max-width: 767px) { .who-grid, .draft-meta { grid-template-columns: 1fr; } .inline { flex-direction: column; } }
+  @media (max-width: 767px) {
+    .who-grid, .draft-meta { grid-template-columns: 1fr; } .inline { flex-direction: column; }
+    .claim-cell .btn { min-height: 2.75rem; }
+    .draft-rows thead { display: none; }
+    .draft-rows, .draft-rows tbody { display: block; }
+    .draft-rows tr { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s2); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--rule); }
+    .draft-rows td { padding: 0 !important; border: 0 !important; height: auto; }
+    .draft-rows td:first-child { grid-column: 1 / -1; }
+    .draft-rows input, .draft-rows select { min-width: 0 !important; width: 100%; }
+  }
 </style>

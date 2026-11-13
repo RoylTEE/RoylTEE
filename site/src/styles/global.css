@@ -34,6 +34,7 @@ body {
   font-variant-numeric: tabular-nums; -webkit-font-smoothing: antialiased;
 }
 img, svg { display: block; max-width: 100%; }
+[hidden] { display: none !important; }
 a { color: inherit; }
 h1, h2, h3, h4, p { margin: 0; }
 h1 { font-size: var(--fs-52); font-weight: 600; line-height: 1.08; letter-spacing: -.025em; }
@@ -46,7 +47,7 @@ h4 { font-size: var(--fs-18); font-weight: 600; line-height: 1.35; }
 .container { width: 100%; max-width: var(--container); margin: 0 auto; padding-left: var(--gutter); padding-right: var(--gutter); }
 .section { padding-top: var(--s9); padding-bottom: var(--s9); }
 .section + .section { border-top: 1px solid var(--rule); }
-@media (max-width: 767px) { .section { padding-top: var(--s8); padding-bottom: var(--s8); } }
+@media (max-width: 767px) { .section { padding-top: var(--s7); padding-bottom: var(--s7); } }
 .stack { display: grid; gap: var(--s4); }
 .muted { color: var(--muted); }
 .dim { color: var(--dim); }
@@ -117,7 +118,7 @@ h4 { font-size: var(--fs-18); font-weight: 600; line-height: 1.35; }
 .kv dt { color: var(--muted); padding-right: var(--s4); }
 .kv dd { min-width: 0; overflow-wrap: anywhere; }
 .kv > :nth-last-child(-n+2) { border-bottom: 0; }
-@media (max-width: 479px) { .kv { grid-template-columns: 1fr; } .kv dt { border-bottom: 0; padding-bottom: 0; } .kv dd { padding-top: .1rem; } }
+@media (max-width: 479px) { .kv { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); } .kv dt, .kv dd { padding: .5rem 0; } .kv dt { padding-right: var(--s3); } }
 
 /* Figures: the ledger header row */
 .figures { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow-1); overflow: hidden; }
@@ -182,3 +183,48 @@ textarea { resize: vertical; }
 @media (max-width: 767px), (pointer: coarse) {
   :is(table, .kv, .figure, .notice, .panel-foot, .empty, .tabs, figcaption) :is(a, .row-btn), .acct-link { display: inline-block; padding-block: 13px; margin-block: -13px; }
 }
+
+/* Short labels: a figure or header can carry a long and a short label; narrow screens show the short one. */
+.l-short { display: none; }
+.nowrap { white-space: nowrap; }
+.only-narrow { display: none; }
+
+/* Stacked rows on narrow screens: table.rows-sm turns each row into a primary line and one meta line.
+   Cells: .p primary, .p-end primary at the right, .m meta, .x hidden on narrow screens. */
+@media (max-width: 767px) {
+  .l-long { display: none; } .l-short { display: inline; }
+  .only-wide { display: none !important; } .only-narrow { display: revert; }
+  table.rows-sm, table.rows-sm tbody, table.rows-sm tfoot { display: block; }
+  table.rows-sm thead { display: none; }
+  table.rows-sm tr { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--s3); row-gap: .2rem; padding: var(--s3) var(--s4); border-bottom: 1px solid var(--rule); min-height: 3.5rem; }
+  table.rows-sm tbody tr:last-child { border-bottom: 0; }
+  table.rows-sm tr::after { content: ''; flex-basis: 100%; height: 0; order: 1; }
+  table.rows-sm td { display: block; padding: 0; border: 0 !important; height: auto; white-space: nowrap; background: none !important; box-shadow: none !important; }
+  table.rows-sm td.p { order: 0; }
+  table.rows-sm td.p-wrap { order: 0; white-space: normal; flex: 1 1 10rem; min-width: 0; }
+  table.rows-sm td.p-end { order: 0; margin-left: auto; text-align: right; }
+  table.rows-sm td.m { order: 2; font-size: var(--fs-12); color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  table.rows-sm td.m ~ td.m::before { content: '\00b7'; margin-right: var(--s3); color: var(--dim); }
+  table.rows-sm td.x { display: none; }
+  table.rows-sm td.m.wrap { white-space: normal; }
+  table.rows-sm td.m .mono, table.rows-sm td.m.mono { font-size: var(--fs-12); }
+  table.rows-sm tr[aria-selected="true"] { background: var(--amber-tint); box-shadow: inset 3px 0 0 var(--amber); }
+  table.rows-sm tfoot tr { border-top: 2px solid var(--ink); font-weight: 600; }
+  .figures.kpi { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .figures.kpi .figure { padding: var(--s3) var(--s4); }
+  .figures.kpi .figure .value { font-size: var(--fs-22); }
+  .figures.kpi .figure .note:not(.keep) { display: none; }
+  .figures.kpi .figure.wide { grid-column: 1 / -1; }
+}
+
+/* Activity: filters set body[data-tab]; "All" shows the latest 5 until expanded. */
+body[data-tab="payments"] [data-cat]:not([data-cat~="payments"]),
+body[data-tab="claims"] [data-cat]:not([data-cat~="claims"]),
+body[data-tab="sale"] [data-cat]:not([data-cat~="sale"]),
+body[data-tab="agent"] [data-cat]:not([data-cat~="agent"]),
+body[data-tab="dispute"] [data-cat]:not([data-cat~="dispute"]),
+body[data-tab="refused"] [data-cat]:not([data-cat~="refused"]) { display: none; }
+body[data-tab="all"] [data-collapsible]:not([data-expanded]) > [data-cat]:nth-child(n+6) { display: none; }
+body:not([data-tab="all"]) .expand-row { display: none; }
+.expand-row { display: flex; justify-content: center; padding: var(--s3); border-top: 1px solid var(--rule); }
+.expand-row:has(> [hidden]) { display: none; }

@@ -3,6 +3,8 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { units, musdc, near, pct, utc, short } from '../src/scripts/chain';
 import { RPC_URLS, SCENES, REGISTRY, TOKEN, EXPLORER } from '../src/data/testnet';
 import { strictPolicy, walletPolicy } from '../src/server/csp';
+import { AREAS, GROUPS } from '../src/data/ia';
+import { existsSync } from 'node:fs';
 
 const src = (rel: string) => readFileSync(new URL(`../src/${rel}`, import.meta.url), 'utf8');
 const directive = (policy: string, name: string) => policy.split(';').map(s => s.trim()).find(s => s.startsWith(name + ' '))!.slice(name.length + 1).split(' ');
@@ -58,16 +60,55 @@ describe('registry pages: no new hosts, no secrets, honest data', () => {
     expect(src('pages/member.astro')).toMatch(/UNVERIFIED/);
     expect(src('components/Footer.astro')).toMatch(/Simulated/);
     expect(src('pages/index.astro')).toMatch(/Simulated/);
-    expect(src('pages/dashboard.astro')).toMatch(/Simulated payer/);
+    expect(src('components/ActivityTable.astro')).toMatch(/Simulated payer/);
+    expect(src('pages/dashboard.astro')).toMatch(/<ActivityTable/);
     expect(src('pages/index.astro')).not.toMatch(/deployment to NEAR testnet is planned/i);
   });
   it('the project name lives in one constants file', () => {
-    for (const f of ['pages/index.astro', 'pages/dashboard.astro', 'components/Nav.astro', 'components/Footer.astro', 'components/RegistryHeader.astro']) expect(src(f), f).not.toMatch(/RoylTEE/);
+    for (const f of ['pages/index.astro', 'pages/dashboard.astro', 'components/Nav.astro', 'components/Footer.astro', 'components/RegistryHeader.astro', 'layouts/App.astro', 'data/ia.ts']) expect(src(f), f).not.toMatch(/RoylTEE/);
   });
 });
 
 describe('registry pages: strict CSP holds after build', () => {
   it('Astro never inlines a script into the HTML', () => {
     expect(readFileSync(new URL('../astro.config.mjs', import.meta.url), 'utf8')).toMatch(/assetsInlineLimit: 0/);
+  });
+});
+
+describe('app shell: menu by purpose', () => {
+  const pageFor = (href: string) => {
+    const path = href.split('#')[0];
+    if (path === '/') return 'pages/index.astro';
+    if (path === '/dashboard/') return 'pages/dashboard.astro';
+    if (path.endsWith('/')) return existsSync(new URL(`../src/pages${path}index.astro`, import.meta.url)) ? `pages${path}index.astro` : `pages${path.slice(0, -1)}.astro`;
+    return `pages${path}.astro`;
+  };
+  it('every area and tab in the menu opens a real page, and hash tabs have a panel', () => {
+    for (const a of AREAS) {
+      expect(GROUPS as readonly string[]).toContain(a.group);
+      expect(existsSync(new URL(`../src/${pageFor(a.href)}`, import.meta.url)), a.href).toBe(true);
+      for (const t of a.tabs) {
+        const file = pageFor(t.href);
+        expect(existsSync(new URL(`../src/${file}`, import.meta.url)), t.href).toBe(true);
+        const hash = t.href.split('#')[1];
+        if (hash) expect(src(file), t.href).toMatch(new RegExp(`id="${hash}"[^>]*data-tab-panel|data-tab-panel[^>]*id="${hash}"|ActivityTable`));
+      }
+    }
+  });
+  it('every app page names a known area, and admin stays out of the menu', () => {
+    const keys = AREAS.map((a) => a.key);
+    for (const f of ['dashboard', 'catalog/index', 'catalog/splits', 'shares/index', 'shares/accounts', 'shares/claims', 'share', 'activity', 'agents', 'disputes', 'registrar', 'member', 'help', 'docs', 'whitepaper', 'admin']) {
+      const m = src(`pages/${f}.astro`).match(/<App area="([a-z]+)"/);
+      expect(m, f).not.toBeNull();
+      expect(keys, f).toContain(m![1]);
+    }
+    expect(AREAS.some((a) => a.href.includes('admin') || a.tabs.some((t) => t.href.includes('admin')))).toBe(false);
+  });
+  it('the shell runs from an external module and has no inline script but the wallet nonce carrier', () => {
+    const app = src('layouts/App.astro');
+    expect(app).toMatch(/<script>import '..\/scripts\/shell.ts';<\/script>/);
+    expect(app.match(/<script is:inline/g)?.length).toBe(1);
+    expect(app).toMatch(/\{cspNonce && <script is:inline nonce=\{cspNonce\} data-csp-nonce><\/script>\}/);
+    expect(src('scripts/shell.ts')).not.toMatch(/innerHTML|eval\(/);
   });
 });

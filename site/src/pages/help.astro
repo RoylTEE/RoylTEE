@@ -1,19 +1,10 @@
 ---
-import Base from '../layouts/Base.astro';
-import { PROJECT_NAME } from '../consts';
+import App from '../layouts/App.astro';
 /* Rendered per request so the wallet selector gets a fresh CSP nonce (src/middleware.ts). */
 export const prerender = false;
 ---
-<Base title={`Help . ${PROJECT_NAME}`} description="Ask the RoylTEE help guide or contact support with a NEAR testnet wallet." current="help">
-  <div class="page-head">
-    <div class="container stack">
-      <p class="eyebrow">Help</p>
-      <h1>Ask a question, or reach a person</h1>
-      <p class="lead">The guide answers from the project notes about shares, share accounts, payments and the testnet demo. For anything about your account, open a support ticket.</p>
-    </div>
-  </div>
-  <div class="container help-grid">
-    <section class="panel" id="chat" aria-labelledby="chat-h">
+<App area="help" tab="chat" title="Help" intro="Ask the guide about shares, share accounts, payments and the testnet demo. For anything about your account, open a support ticket." period={false} description="Ask the help guide or contact support with a NEAR testnet wallet.">
+    <section class="panel" id="chat" data-tab-panel aria-labelledby="chat-h">
       <div class="panel-head"><h2 id="chat-h">Help chat</h2><div class="end"><button type="button" class="btn sm" data-chat-reset>New chat</button></div></div>
       <div class="panel-body">
         <div class="chat-log" data-chat-log aria-live="polite"></div>
@@ -27,7 +18,7 @@ export const prerender = false;
       </div>
       <p class="panel-foot">Use demo details only. This site does not store chat text. Answers can be wrong; the repository docs are the source of truth. A reply shows a TEE label only when NEAR AI Cloud reports signature_kind provider_tee for it. Attestation is not verified by this app, and the contracts use no TEE.</p>
     </section>
-    <section class="panel" id="support" data-support data-state="out" aria-labelledby="sup-h">
+    <section class="panel" id="support" data-tab-panel data-support data-state="out" aria-labelledby="sup-h">
       <div class="panel-head"><h2 id="sup-h">Contact support</h2></div>
       <div class="panel-body">
         <p class="small">Sign in with a NEAR testnet wallet to open a ticket. No email and no personal data. Your wallet signs a message, never a transaction. A sign in lasts 15 minutes.</p>
@@ -47,13 +38,10 @@ export const prerender = false;
       </div>
       <p class="panel-foot">Tickets live in private server storage, tied only to your wallet account id. They are never on chain or in logs. Open tickets expire 30 days after the last update. Closed tickets are deleted 30 days after they close.</p>
     </section>
-  </div>
-</Base>
+</App>
 <script>import '../scripts/help.ts';</script>
 <style is:global>
-  .page-head { background: var(--surface); border-bottom: 1px solid var(--edge); padding: var(--s7) 0 var(--s6); margin-bottom: var(--s6); }
-  .page-head h1 { font-size: var(--fs-36); }
-  .help-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: var(--s5); align-items: start; }
+  #chat, #support { max-width: 56rem; }
   .chat-log { display: grid; gap: var(--s3); max-height: 30rem; overflow: auto; }
   .chat-log:empty { display: none; }
   .turn { padding: var(--s3) var(--s4); border-radius: var(--r-ctl); border: 1px solid var(--rule); background: var(--surface-2); display: grid; gap: .25rem; }
@@ -68,6 +56,5 @@ export const prerender = false;
   .ticket-head { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); }
   .reply { border-left: 3px solid var(--amber); padding-left: var(--s3); }
   .ticket .row { display: flex; gap: var(--s2); flex-wrap: wrap; }
-  @media (max-width: 991px) { .help-grid { grid-template-columns: 1fr; } .turn.user { margin-left: 1rem; } }
-  @media (max-width: 767px) { .page-head { padding: var(--s5) 0; } }
+  @media (max-width: 991px) { .turn.user { margin-left: 1rem; } }
 </style>

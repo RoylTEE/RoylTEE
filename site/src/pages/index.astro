@@ -10,10 +10,10 @@ const sheet = [
 const sale = SCENES.filter((s) => s.tokens.includes('s2') || (s.step === 'Refusal'));
 const people = [
   { who: 'Songwriters and artists', job: 'Check the split on record, see what each share earned, claim it.', where: 'Your shares', href: '/member' },
-  { who: 'Publishers and labels', job: 'Hold shares, approve split sheets for works they registered, run a payment agent.', where: 'Your shares, Agents', href: '/member' },
-  { who: 'Catalog buyers', job: 'Confirm the share, the payout account, that the seller kept no key, and that unclaimed money came along.', where: 'Share page', href: '/share?id=s2' },
+  { who: 'Publishers and labels', job: 'Hold shares, approve split sheets for works they registered, run a payment agent.', where: 'Split sheets', href: '/catalog/splits/' },
+  { who: 'Catalog buyers', job: 'Confirm the share, the payout account, that the seller kept no key, and that unclaimed money came along.', where: 'Share accounts', href: '/shares/accounts/' },
   { who: 'Payers and their agents', job: 'Pay a work once, inside fixed limits, without ever choosing the payee.', where: 'Agents', href: '/agents' },
-  { who: 'Registrar', job: 'Admit members, resolve disputes with a document hash, answer support.', where: 'Disputes', href: '/disputes' },
+  { who: 'Registrar', job: 'Admit members, resolve disputes with a document hash, answer support.', where: 'Registrar', href: '/registrar' },
 ];
 const steps = [
   { t: 'Register the work and its shares', d: 'A member records the song by ISRC or ISWC, then one share per rightholder in basis points (100 basis points is 1 percent). Each share is minted as an NFT, and the registry opens a payout account for it with no access keys.', m: 'register_work, register_share' },
@@ -69,7 +69,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
                   <td><span class="holder">{r.name}</span><span class="acct dim">{r.holder.replace('.royltee-dev.testnet', '')}</span>{r.sold && <span class="badge info">Bought in catalog sale</span>}</td>
                   <td class="mono"><a class="link" href={`/share?id=${r.id}`}>{r.id}</a></td>
                   <td class="num">{(r.bps / 100).toFixed(2)}%</td>
-                  <td class="num">0</td>
+                  <td class="num x">0</td>
                 </tr>
               ))}
             </tbody>
@@ -90,9 +90,9 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
       </div>
       <div class="panel">
         <div class="table-wrap">
-          <table class="ledger people">
+          <table class="ledger people rows-sm">
             <thead><tr><th>Who</th><th>What they need to do</th><th>Where</th></tr></thead>
-            <tbody>{people.map((p) => <tr><td><strong>{p.who}</strong></td><td>{p.job}</td><td><a class="link" href={p.href}>{p.where}</a></td></tr>)}</tbody>
+            <tbody>{people.map((p) => <tr><td class="p"><strong>{p.who}</strong></td><td class="m wrap">{p.job}</td><td class="p-end"><a class="link" href={p.href}>{p.where}</a></td></tr>)}</tbody>
           </table>
         </div>
       </div>
@@ -126,15 +126,15 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
       </div>
       <div class="panel">
         <div class="table-wrap">
-          <table class="ledger">
+          <table class="ledger rows-sm">
             <thead><tr><th>Step</th><th>What happened</th><th>Result</th><th>Transaction</th></tr></thead>
             <tbody>
               {sale.map((s) => (
                 <tr>
-                  <td><strong>{s.step}</strong>{s.simulated && <span class="badge sim">Simulated payer</span>}</td>
-                  <td>{s.what}<br /><span class="small muted">{s.shows}</span></td>
-                  <td>{s.result === 'refused' ? <span class="badge bad">Refused</span> : <span class="badge ok">Done</span>}</td>
-                  <td>{s.txs.map((h) => <a class="acct-link" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td>
+                  <td class="p nowrap"><strong>{s.step}</strong>{s.simulated && <span class="badge sim">Simulated payer</span>}</td>
+                  <td class="p-wrap">{s.what}<span class="small muted only-wide"><br />{s.shows}</span></td>
+                  <td class="p-end">{s.result === 'refused' ? <span class="badge bad">Refused</span> : <span class="badge ok">Done</span>}</td>
+                  <td class="m">{s.txs.map((h) => <a class="acct-link" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td>
                 </tr>
               ))}
             </tbody>
@@ -168,9 +168,9 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
       </div>
       <div class="panel">
         <div class="table-wrap">
-          <table class="ledger">
+          <table class="ledger rows-sm trust">
             <thead><tr><th>Real, on NEAR testnet</th><th>Simulated</th></tr></thead>
-            <tbody>{real.map(([a, b]) => <tr><td>{a}</td><td>{b}</td></tr>)}</tbody>
+            <tbody>{real.map(([a, b]) => <tr><td class="p-wrap">{a}</td><td class="m wrap"><span class="only-narrow">Simulated: </span>{b}</td></tr>)}</tbody>
           </table>
         </div>
         <div class="panel-foot">The registrar is a trusted role: every registrar action carries a document hash and emits an event. The registry and token accounts still hold one full access key each, so the registry itself is not keyless yet. The contracts use no trusted execution environment.</div>

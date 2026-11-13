@@ -1,0 +1,11 @@
+---
+import App from '../../layouts/App.astro';
+---
+<App area="catalog" tab="works" title="Works and rights" intro="Every registered work and how its rights are split, composition against recording.">
+  <section class="panel" aria-labelledby="works-h">
+    <div class="panel-head"><h2 id="works-h">Rights matrix</h2><span class="caption">Composition rights are publishing, performance and mechanical. Recording rights are master.</span></div>
+    <div class="table-wrap" data-works><p class="loading panel-body">Reading works</p></div>
+    <p class="panel-foot">Open a work to see its split sheet: every share, its rightholder, role and percent, and the total.</p>
+  </section>
+</App>
+<script>import '../../scripts/catalog.ts';</script>

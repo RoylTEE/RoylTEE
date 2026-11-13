@@ -1,0 +1,57 @@
+---
+import App from '../layouts/App.astro';
+import { REGISTRY, TOKEN, REGISTRAR, AGENTS, PAYER, ROLE_OF, accountUrl } from '../data/testnet';
+const accounts: [string, string][] = [
+  [REGISTRY, 'Registry contract: works, share NFTs, ledger, roles, disputes'],
+  [TOKEN, 'Mock USDC (testnet), 6 decimals, no value'],
+  [REGISTRAR, 'Registrar, a trusted role'],
+  ...['writer-a', 'writer-b', 'buyer-pub'].map((a): [string, string] => [`${a}.royltee-dev.testnet`, `${ROLE_OF[`${a}.royltee-dev.testnet`]}, verified member`]),
+  [AGENTS[0], 'Payment agent, function call key only'],
+  [PAYER, 'Payer (Simulated)'],
+  ['s1.reg.royltee-dev.testnet to s7', 'One share account per share NFT, zero access keys'],
+];
+const views = ['get_config', 'nft_tokens', 'nft_token', 'get_work', 'get_share', 'get_ledger', 'get_accounting', 'list_disputes', 'get_role', 'get_credential', 'is_payer', 'ft_balance_of'];
+const holder = [['claim', 'Pay the share account balance to the current holder. 1 yoctoNEAR.'], ['nft_transfer', 'Move the share to another verified member. Unclaimed money goes with it.'], ['set_share_note', 'A short public note. Payouts and agents never read it.']];
+const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"s2.reg.royltee-dev.testnet"}}'`;
+---
+<App area="docs" tab="docs" title="Docs" intro="The accounts, the contract methods these pages read, and how to check the demo without a wallet." period={false}>
+  <section class="panel" aria-labelledby="acc-h">
+    <div class="panel-head"><h2 id="acc-h">Accounts on NEAR testnet</h2></div>
+    <div class="table-wrap"><table class="ledger rows-sm">
+      <thead><tr><th>Account</th><th>What it is</th></tr></thead>
+      <tbody>{accounts.map(([a, w]) => <tr><td class="p">{a.includes(' ') ? <span class="mono small">{a}</span> : <a class="acct-link" href={accountUrl(a)} target="_blank" rel="noopener">{a}</a>}</td><td class="m wrap">{w}</td></tr>)}</tbody>
+    </table></div>
+  </section>
+  <div class="docs-grid">
+    <section class="panel" aria-labelledby="v-h">
+      <div class="panel-head"><h2 id="v-h">View calls used by these pages</h2></div>
+      <div class="panel-body"><div class="method-list">{views.map((v) => <span class="method">{v}</span>)}</div>
+      <p class="small muted">Free and read only. The registry pages call them from your browser through the public testnet RPC.</p></div>
+    </section>
+    <section class="panel" aria-labelledby="h-h">
+      <div class="panel-head"><h2 id="h-h">What a holder signs</h2></div>
+      <div class="table-wrap"><table class="ledger rows-sm">
+        <thead><tr><th>Method</th><th>What it does</th></tr></thead>
+        <tbody>{holder.map(([m, w]) => <tr><td class="p mono small">{m}</td><td class="m wrap">{w}</td></tr>)}</tbody>
+      </table></div>
+      <p class="panel-foot">Split sheet approval (approve_share, reject_share) is in the contract code but not on the deployed build yet.</p>
+    </section>
+  </div>
+  <section class="panel" aria-labelledby="c-h">
+    <div class="panel-head"><h2 id="c-h">Check it yourself</h2><span class="caption">No wallet needed</span></div>
+    <div class="panel-body">
+      <p class="small">Ask a public testnet node for the access keys of the share account that was sold. The answer is an empty list.</p>
+      <pre class="code"><code>{curl}</code></pre>
+      <p class="small muted">From a clone of the repository, <code class="mono">npm run verify:testnet</code> checks all seven share accounts, the code hashes and the balances.</p>
+    </div>
+  </section>
+</App>
+<style is:global>
+  .docs-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s5); align-items: start; }
+  .method-list { display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .method { font-family: var(--mono); font-size: var(--fs-14); padding: .2rem .5rem; border-radius: var(--r-ctl); border: 1px solid var(--rule); background: var(--surface-2); }
+  .code { margin: 0; padding: var(--s4); background: var(--ink); color: #f3f1ea; border-radius: var(--r-ctl); overflow-x: auto; font-family: var(--mono); font-size: var(--fs-12); line-height: 1.6; }
+  @media (max-width: 767px) { table.rows-sm td.m.wrap { white-space: normal; } }
+  @media (max-width: 1199px) { .docs-grid { grid-template-columns: 1fr; } }
+</style>

@@ -1,24 +1,23 @@
 ---
-import { DASHBOARD_URL } from '../consts';
-import { REGISTRY, accountUrl } from '../data/testnet';
-interface Props { tab: 'catalog' | 'member' | 'agents' | 'disputes' | 'share'; title: string; intro: string }
-const { tab, title, intro } = Astro.props;
-/* Registry sections, named by the job a member comes to do. */
-const tabs = [
-  { key: 'catalog', t: 'Catalog', href: DASHBOARD_URL },
-  { key: 'member', t: 'Your shares', href: '/member' },
-  { key: 'agents', t: 'Agents', href: '/agents' },
-  { key: 'disputes', t: 'Disputes', href: '/disputes' },
-];
+/* Page header inside the app shell: breadcrumb, title, one period control, and the area tabs. */
+import type { Area } from '../data/ia';
+interface Props { area: Area; tab?: string; title: string; intro?: string; crumb?: string; period?: boolean }
+const { area, tab, title, intro, crumb, period = true } = Astro.props;
+const current = area.tabs.find((t) => t.key === tab);
+const trail = [area.group, area.label, ...(current && current.label !== title ? [current.label] : []), ...(crumb ? [crumb] : [])];
 ---
-<div class="reg-head">
-  <div class="container">
-    <div class="reg-title">
-      <div class="stack">
-        <p class="eyebrow">Registry <span aria-hidden="true">/</span> <a class="acct-link" href={accountUrl(REGISTRY)} target="_blank" rel="noopener">{REGISTRY}</a></p>
-        <h1>{title}</h1>
-        <p class="lead">{intro}</p>
-      </div>
+<div class={area.tabs.length ? "page-top" : "page-top solo"}>
+  <div class="page-title">
+    <div class="page-title-text">
+      <nav aria-label="Breadcrumb"><ol class="crumbs">
+        {trail.map((c, i) => (
+          <li>{i === 1 && trail.length > 2 ? <a href={area.href}>{c}</a> : i === trail.length - 1 ? <span aria-current="page">{c}</span> : <span>{c}</span>}</li>
+        ))}
+      </ol></nav>
+      <h1>{title}</h1>
+      {intro && <p class="page-intro">{intro}</p>}
+    </div>
+    {period && (
       <div class="period" role="group" aria-labelledby="period-l">
         <span class="label" id="period-l">Period</span>
         <div class="seg">
@@ -27,25 +26,48 @@ const tabs = [
         </div>
         <p class="caption" data-stamp>Not read yet</p>
       </div>
-    </div>
-    <nav class="reg-tabs" aria-label="Registry">
-      {tabs.map((t) => <a href={t.href} aria-current={tab === t.key || (tab === 'share' && t.key === 'catalog') ? 'page' : undefined}>{t.t}</a>)}
-    </nav>
+    )}
   </div>
 </div>
+  {area.tabs.length > 0 && (
+    <nav class="area-tabs" aria-label={`${area.label} sections`} data-area-tabs>
+      {area.tabs.map((t) => {
+        const hash = t.href.includes('#') ? t.href.split('#')[1] : undefined;
+        return <a href={t.href} data-tab-link={hash} aria-current={t.key === tab ? 'page' : undefined}>{t.label}</a>;
+      })}
+    </nav>
+  )}
 <style>
-  .reg-head { background: var(--surface); border-bottom: 1px solid var(--edge); }
-  .reg-title { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--s6); padding: var(--s6) 0 var(--s5); flex-wrap: wrap; }
-  .reg-title h1 { font-size: var(--fs-36); }
-  .period { display: grid; gap: .4rem; justify-items: start; }
+  .page-top { background: var(--surface); padding: var(--s5) var(--s6) 0; }
+  .page-title { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--s5); flex-wrap: wrap; padding-bottom: var(--s4); }
+  .page-title-text { display: grid; gap: var(--s2); min-width: 0; }
+  .crumbs { display: flex; flex-wrap: wrap; gap: .4rem; list-style: none; margin: 0; padding: 0; font-size: var(--fs-12); color: var(--dim); font-family: var(--mono); text-transform: uppercase; letter-spacing: .05em; }
+  .crumbs li + li::before { content: '/'; margin-right: .4rem; color: var(--edge); }
+  .crumbs a { color: var(--muted); text-decoration: underline; text-decoration-color: var(--edge); text-underline-offset: 3px; display: inline-block; padding-block: 13px; margin-block: -13px; }
+  .crumbs [aria-current] { color: var(--text); }
+  h1 { font-size: var(--fs-36); }
+  .page-intro { color: var(--muted); max-width: 46rem; }
+  .period { display: grid; gap: .3rem; justify-items: start; }
+  .period .label { font-size: var(--fs-12); font-weight: 600; color: var(--muted); }
   .seg { display: inline-flex; border: 1px solid var(--edge); border-radius: var(--r-ctl); overflow: hidden; }
-  .seg button { min-height: 2.5rem; padding: 0 .9rem; border: 0; background: var(--surface); font: inherit; font-size: var(--fs-14); font-weight: 600; color: var(--muted); cursor: pointer; }
+  .seg button { min-height: 2.75rem; padding: 0 .9rem; border: 0; background: var(--surface); font: inherit; font-size: var(--fs-14); font-weight: 600; color: var(--muted); cursor: pointer; white-space: nowrap; }
   .seg button + button { border-left: 1px solid var(--edge); }
   .seg button[aria-pressed="true"] { background: var(--ink); color: #fff; }
   .seg button:disabled { cursor: not-allowed; color: var(--dim); background: var(--surface-2); }
-  .reg-tabs { display: flex; gap: var(--s1); overflow-x: auto; margin-bottom: -1px; }
-  .reg-tabs a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 var(--s4); text-decoration: none; font-size: var(--fs-14); font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
-  .reg-tabs a:hover { color: var(--text); }
-  .reg-tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--ink); }
-  @media (max-width: 767px) { .reg-title { padding: var(--s5) 0 var(--s4); gap: var(--s4); } .seg button { min-height: 2.75rem; } }
+  .page-top.solo { border-bottom: 1px solid var(--edge); padding-bottom: var(--s1); }
+  .area-tabs { position: sticky; top: var(--top); z-index: 30; display: flex; gap: var(--s1); overflow-x: auto; scrollbar-width: none; padding: 0 calc(var(--s6) - var(--s3)); background: var(--surface); border-bottom: 1px solid var(--edge); }
+  .area-tabs::-webkit-scrollbar { display: none; }
+  .area-tabs a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 var(--s3); text-decoration: none; font-size: var(--fs-14); font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+  .area-tabs a:hover { color: var(--text); }
+  .area-tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--ink); }
+  @media (max-width: 991px) {
+    .page-top { padding: var(--s4) var(--gutter) 0; }
+    h1 { font-size: var(--fs-28); }
+    .page-intro { font-size: var(--fs-14); }
+    .page-title { gap: var(--s3); padding-bottom: var(--s3); }
+    .period { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem var(--s3); }
+    .period .label { display: none; }
+    .seg button { padding: 0 .7rem; }
+    .area-tabs { padding: 0 calc(var(--gutter) - var(--s2)); }
+  }
 </style>

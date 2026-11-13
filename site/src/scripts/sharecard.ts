@@ -54,31 +54,40 @@ export function keysBlock(d: ShareData) {
     : h('p', { class: 'notice bad' }, badge(`${d.keys} access keys`, 'bad'), ` Unexpected: ${d.keyList.join(', ')}`);
 }
 
-export function renderShare(target: Element, d: ShareData, opts: { compact?: boolean } = {}) {
+const nodes = (list: (Node | null)[]) => list.filter((n): n is Node => !!n);
+
+/** The parts of one share, so the inspector can stack them and the share page can put them in tabs. */
+export function shareParts(d: ShareData) {
   const t = d.token, e = t.extra, st = shareState(t, d.approval);
   const approvalBadge = d.approval === 'not deployed' ? badge('Not on the deployed build', 'plain') : badge(d.approval === 'approved' ? 'Approved' : d.approval === 'pending' ? 'Waiting for approval' : 'Rejected', d.approval === 'approved' ? 'ok' : d.approval === 'pending' ? 'warn' : 'bad');
-  target.replaceChildren(...(<(Node | null)[]>[
+  const head = nodes([
     h('div', { class: 'insp-head' },
-      h('div', {}, h('p', { class: 'eyebrow', text: `Share NFT ${t.token_id}` }), h('h3', { text: d.work ? `Work ${d.work.id}, ${rightLabel[e.right_type] ?? e.right_type} ${pct(e.percent_bps)}` : t.token_id }), d.work ? h('p', { class: 'mono small dim', text: `${d.work.code_type.toUpperCase()} ${d.work.code}` }) : null),
+      h('div', {}, h('p', { class: 'eyebrow', text: `Share NFT ${t.token_id}` }), h('h3', { class: 'nowrap-words', text: d.work ? `Work ${d.work.id}, ${rightLabel[e.right_type] ?? e.right_type} ${pct(e.percent_bps)}` : t.token_id }), d.work ? h('p', { class: 'mono small dim', text: `${d.work.code_type.toUpperCase()} ${d.work.code}` }) : null),
       badge(st.text, st.tone)),
-    st.why ? h('p', { class: 'small muted', text: st.why }) : null,
-    kv([
-      ['Rightholder', acct(t.owner_id)],
-      ['Role', `${rightLabel[e.right_type] ?? e.right_type} (${side(e.right_type)})`],
-      ['Percent', `${pct(e.percent_bps)} (${e.percent_bps.toLocaleString('en-US')} basis points)`],
-      ['Territory', e.territory === 'WW' ? 'World' : e.territory],
-      ['Basis', e.basis],
-      ['Provenance', provLabel[e.provenance] ?? e.provenance],
-      ['Evidence', tierLabel[e.evidence_tier] ?? e.evidence_tier],
-      ['Split sheet', approvalBadge],
-      ['First holder', short(d.share.holder_at_mint)],
-      ['Last transfer effective', utc(d.share.last_effective_from)],
-    ]),
-    h('h4', { text: 'Statement' }), statement(d.ledger),
-    h('h4', { text: 'Share account' }), h('p', {}, acct(e.vault)), keysBlock(d), minBalance(d),
-    h('p', { class: 'caption', text: `Mock USDC (testnet) held by the account: ${musdc(d.vaultToken)} mUSDC.` }),
-    opts.compact ? h('a', { class: 'btn', href: `/share?id=${encodeURIComponent(t.token_id)}`, text: 'Open the full share page' }) : null,
-  ]).filter((n): n is Node => !!n));
+    st.why ? h('p', { class: 'small muted', text: st.why }) : null]);
+  const summary = kv([
+    ['Rightholder', acct(t.owner_id)],
+    ['Role', `${rightLabel[e.right_type] ?? e.right_type} (${side(e.right_type)})`],
+    ['Percent', `${pct(e.percent_bps)} (${e.percent_bps.toLocaleString('en-US')} basis points)`],
+    ['Territory', e.territory === 'WW' ? 'World' : e.territory],
+    ['Basis', e.basis],
+    ['Provenance', provLabel[e.provenance] ?? e.provenance],
+    ['Evidence', tierLabel[e.evidence_tier] ?? e.evidence_tier],
+    ['Split sheet', approvalBadge],
+    ['First holder', short(d.share.holder_at_mint)],
+    ['Last transfer effective', utc(d.share.last_effective_from)],
+  ]);
+  const account = nodes([h('p', {}, acct(e.vault)), keysBlock(d), minBalance(d),
+    h('p', { class: 'caption', text: `Mock USDC (testnet) held by the account: ${musdc(d.vaultToken)} mUSDC.` })]);
+  return { head, summary, statement: statement(d.ledger), account };
+}
+
+export function renderShare(target: Element, d: ShareData, opts: { compact?: boolean } = {}) {
+  const p = shareParts(d), t = d.token;
+  target.replaceChildren(...nodes([...p.head, p.summary,
+    h('h4', { text: 'Statement' }), p.statement,
+    h('h4', { text: 'Share account' }), ...p.account,
+    opts.compact ? h('a', { class: 'btn', href: `/share?id=${encodeURIComponent(t.token_id)}`, text: 'Open the full share page' }) : null]));
 }
 
 export async function inspect(target: Element, token: Token, opts: { compact?: boolean } = {}) {

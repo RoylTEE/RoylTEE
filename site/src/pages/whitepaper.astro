@@ -1,20 +1,10 @@
 ---
-import Base from '../layouts/Base.astro';
-import { PROJECT_NAME } from '../consts';
+import App from '../layouts/App.astro';
 ---
-<Base title={`Whitepaper (placeholder) . ${PROJECT_NAME}`}>
-  <div class="page-head">
-    <div class="container stack">
-      <p class="eyebrow">Whitepaper</p>
-      <h1>Design whitepaper</h1>
-      <p class="lead">This page is a placeholder until the whitepaper is approved. It will cover the problem, the design goals, the share lifecycle, the NEAR and privacy design, the trust model and the path from testnet to mainnet.</p>
-    </div>
+<App area="docs" tab="whitepaper" title="Whitepaper" intro="The design whitepaper is a placeholder until it is approved." period={false}>
+  <div class="empty">
+    <span class="badge plain">Placeholder</span>
+    <p>It will cover the problem, the design goals, the share lifecycle, the NEAR and privacy design, the trust model and the path from testnet to mainnet. Until then, the registry pages show the live contracts, and the help chat answers from the project notes.</p>
+    <div class="actions"><a class="btn primary" href="/dashboard/">Open the registry</a><a class="btn" href="/help#chat">Ask the help chat</a></div>
   </div>
-  <div class="container">
-    <div class="empty"><span class="badge plain">Placeholder</span><p>Until then, the registry pages show the live contracts, and the help chat answers from the project notes.</p><div class="actions"><a class="btn primary" href="/dashboard/">Open the registry</a><a class="btn" href="/help#chat">Ask the help chat</a></div></div>
-  </div>
-</Base>
-<style>
-  .page-head { background: var(--surface); border-bottom: 1px solid var(--edge); padding: var(--s7) 0 var(--s6); margin-bottom: var(--s6); }
-  .page-head h1 { font-size: var(--fs-36); }
-</style>
+</App>

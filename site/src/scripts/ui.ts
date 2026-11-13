@@ -55,3 +55,11 @@ export function csvLink(name: string, rows: (string | number)[][]) {
   a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }));
   return a;
 }
+
+/** A figure with a long label for wide screens and a short one for narrow screens. */
+export const fig = (long: string, short: string, value: string, unit = '', note?: Node | string, opts: { wide?: boolean; keep?: boolean } = {}) =>
+  h('div', { class: opts.wide ? 'figure wide' : 'figure' },
+    h('span', { class: 'label' }, h('span', { class: 'l-long', text: long }), h('span', { class: 'l-short', text: short })),
+    h('span', { class: 'value' }, value, unit ? h('small', { text: unit }) : null),
+    note ? h('span', { class: opts.keep ? 'note keep' : 'note' }, note) : null);
+

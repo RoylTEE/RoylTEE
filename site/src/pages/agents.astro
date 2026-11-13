@@ -1,26 +1,13 @@
 ---
-import Base from '../layouts/Base.astro';
-import RegistryHeader from '../components/RegistryHeader.astro';
-import { PROJECT_NAME } from '../consts';
-import { SCENES, txUrl } from '../data/testnet';
-const rows = SCENES.filter((s) => s.step === 'Agent');
+import App from '../layouts/App.astro';
+import { SCENES, categoriesOf } from '../data/testnet';
+const n = SCENES.filter((s) => categoriesOf(s).includes('agent')).length;
 ---
-<Base title={`Agents . ${PROJECT_NAME}`} description="Payment agents, their limits and what their keys cannot do, read live from NEAR testnet." current="registry">
-  <RegistryHeader tab="agents" title="Agents" intro="Software that pays for music. Each agent spends from a capped allowance, names a work, and never picks the payee." />
-  <div class="container reg-body">
-    <div data-agents><p class="loading">Reading testnet</p></div>
-    <section class="panel" aria-labelledby="ag-act">
-      <div class="panel-head"><h2 id="ag-act">Recorded agent activity</h2><span class="caption">2026-11-13 (UTC). The agent is a scripted agent run by hand, not a model.</span></div>
-      <div class="table-wrap">
-        <table class="ledger">
-          <thead><tr><th>What happened</th><th>Result</th><th>Transaction</th></tr></thead>
-          <tbody>{rows.map((s) => <tr><td>{s.what}<br /><span class="small muted">{s.shows}</span></td><td>{s.result === 'refused' ? <span class="badge bad">Refused</span> : s.result === 'info' ? <span class="badge info">Recorded</span> : <span class="badge ok">Done</span>}</td><td>{s.txs.map((h) => <a class="acct-link" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td></tr>)}</tbody>
-        </table>
-      </div>
-      <div class="panel-foot">Also refused, with no transaction: the agent's claim on s4 with 1 yoctoNEAR. A function call key cannot attach a deposit, so the protocol stops it before it is sent.</div>
-    </section>
-  </div>
-</Base>
+<App area="agents" title="Agents" intro="Software that pays for music. Each agent spends from a capped allowance, names a work, and never picks the payee.">
+  <div data-agents><p class="loading">Reading testnet</p></div>
+  <a class="next-card" href="/activity#agent"><span><strong>Agent activity</strong><span class="small muted">{n} recorded steps, including the refused second submit of one statement line</span></span><span class="badge plain">Activity</span></a>
+  <p class="caption">Also refused, with no transaction: the agent claim on s4 with 1 yoctoNEAR. A function call key cannot attach a deposit, so the protocol stops it before it is sent.</p>
+</App>
 <script>import '../scripts/agents.ts';</script>
 <style is:global>
   .agent-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: var(--s5); align-items: start; }
@@ -31,5 +18,9 @@ const rows = SCENES.filter((s) => s.step === 'Agent');
   .method-list { display: flex; flex-wrap: wrap; gap: var(--s2); }
   .method { font-family: var(--mono); font-size: var(--fs-14); padding: .2rem .5rem; border-radius: var(--r-ctl); border: 1px solid var(--ok-line); background: var(--ok-bg); color: var(--ok); }
   .method.no { border-color: var(--bad-line); background: var(--bad-bg); color: var(--bad); text-decoration: line-through; }
-  @media (max-width: 991px) { .agent-grid { grid-template-columns: 1fr; } }
+  .next-card { display: flex; justify-content: space-between; align-items: center; gap: var(--s4); min-height: 3.5rem; padding: var(--s3) var(--s5); border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--surface); text-decoration: none; box-shadow: var(--shadow-1); }
+  .next-card > span:first-child { display: grid; }
+  .next-card:hover { background: var(--surface-2); }
+  @media (max-width: 1199px) { .agent-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 767px) { .agent-grid .kv { grid-template-columns: 1fr 1fr; } }
 </style>

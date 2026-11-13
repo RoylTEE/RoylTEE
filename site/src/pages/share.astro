@@ -1,39 +1,54 @@
 ---
-import Base from '../layouts/Base.astro';
-import RegistryHeader from '../components/RegistryHeader.astro';
-import { PROJECT_NAME } from '../consts';
+import App from '../layouts/App.astro';
 ---
-<Base title={`Share . ${PROJECT_NAME}`} description="One rights share: holder, share account, live key list, statement and history." current="registry">
-  <RegistryHeader tab="share" title="Share" intro="One rights share NFT: who holds it, the account it controls, and every recorded move." />
-  <div class="container reg-body">
-    <div class="share-grid">
-      <section class="panel" aria-label="Share details"><div class="panel-body" data-share><p class="loading">Reading testnet</p></div></section>
+<App area="shares" title="Share" crumb="Share" intro="One rights share NFT: who holds it, the account it controls, and every recorded move.">
+  <div class="share-head" data-share-head><p class="loading">Reading testnet</p></div>
+  <nav class="sub-tabs" aria-label="Share sections">
+    <a href="#summary" data-tab-link="summary" aria-current="page">Summary</a>
+    <a href="#statement" data-tab-link="statement">Statement</a>
+    <a href="#account" data-tab-link="account">Account and keys</a>
+    <a href="#history" data-tab-link="history">History</a>
+  </nav>
+  <section class="panel" id="summary" data-tab-panel aria-label="Summary">
+    <div class="panel-body share-summary">
+      <div data-summary><p class="loading">Reading testnet</p></div>
       <div class="stack">
-        <section class="panel" aria-labelledby="powers-h">
-          <div class="panel-head"><h2 id="powers-h">What the holder can do</h2></div>
-          <div class="panel-body">
-            <ul class="plain-list">
-              <li>Claim the balance of the share account. Only the current holder can, and the money goes to that holder.</li>
-              <li>Transfer the share to another verified member. Unclaimed money goes with it.</li>
-              <li>Set a short public note. Payouts and agents never read it.</li>
-            </ul>
-            <a class="btn primary" href="/member">Go to your shares to claim</a>
-          </div>
-        </section>
-        <section class="panel" aria-labelledby="hist-h">
-          <div class="panel-head"><h2 id="hist-h">History</h2><span class="caption">Recorded on 2026-11-13 (UTC)</span></div>
-          <div data-history></div>
-          <div class="panel-foot">Events for every change are in each transaction's logs. <span data-vault-link></span></div>
-        </section>
+        <h2 class="h-sm">What the holder can do</h2>
+        <ul class="plain-list">
+          <li>Claim the balance of the share account. Only the current holder can, and the money goes to that holder.</li>
+          <li>Transfer the share to another verified member. Unclaimed money goes with it.</li>
+          <li>Set a short public note. Payouts and agents never read it.</li>
+        </ul>
+        <div><a class="btn primary" href="/member#holdings">Claim in Your shares</a></div>
       </div>
     </div>
-  </div>
-</Base>
+  </section>
+  <section class="panel" id="statement" data-tab-panel aria-label="Statement">
+    <div class="panel-head"><h2>Statement, since mint</h2><span class="caption">Mock USDC (testnet)</span></div>
+    <div class="panel-body" data-statement><p class="loading">Reading testnet</p></div>
+  </section>
+  <section class="panel" id="account" data-tab-panel aria-label="Account and keys">
+    <div class="panel-head"><h2>Share account</h2><span class="caption">Live access key list, NEAR balance and storage minimum</span></div>
+    <div class="panel-body" data-account><p class="loading">Reading testnet</p></div>
+  </section>
+  <section class="panel" id="history" data-tab-panel aria-label="History">
+    <div class="panel-head"><h2>History</h2><span class="caption">Recorded on 2026-11-13 (UTC)</span></div>
+    <div data-history></div>
+    <div class="panel-foot">Events for every change are in each transaction's logs. <span data-vault-link></span></div>
+  </section>
+</App>
 <script>import '../scripts/share.ts';</script>
 <style is:global>
-  .share-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: var(--s5); align-items: start; }
-  .share-grid .panel-body h4 { margin-top: var(--s2); }
-  .share-grid .stmt .ledger, .share-grid .panel-body > .stack .ledger { border: 1px solid var(--rule); border-radius: var(--r-ctl); }
+  .share-head { display: grid; gap: var(--s2); }
+  .insp-head { display: flex; justify-content: space-between; gap: var(--s3); align-items: flex-start; }
+  .sub-tabs { display: flex; gap: var(--s1); overflow-x: auto; scrollbar-width: none; border-bottom: 1px solid var(--edge); }
+  .sub-tabs a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 var(--s3); font-size: var(--fs-14); font-weight: 600; color: var(--muted); text-decoration: none; border-bottom: 2px solid transparent; white-space: nowrap; margin-bottom: -1px; }
+  .sub-tabs a[aria-current="page"] { color: var(--text); border-bottom-color: var(--ink); }
+  .share-summary { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); align-items: start; gap: var(--s6); }
+  .h-sm { font-size: var(--fs-18) !important; }
+  .stmt .ledger, [data-account] .ledger { border: 1px solid var(--rule); border-radius: var(--r-ctl); }
+  .step-sim { margin-left: var(--s2); }
   .plain-list { margin: 0; padding-left: 1.1rem; display: grid; gap: var(--s2); font-size: var(--fs-14); }
-  @media (max-width: 991px) { .share-grid { grid-template-columns: 1fr; } }
+  [data-tab-panel] { scroll-margin-top: 7rem; }
+  @media (max-width: 991px) { .share-summary { grid-template-columns: 1fr; } }
 </style>

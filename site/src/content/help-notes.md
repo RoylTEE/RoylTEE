@@ -60,7 +60,7 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 
 ## The registry pages
 
-- The registry pages read live NEAR testnet values with view calls: Catalog (statement since mint, works and rights, every share with an inspector), Share (holder, share account, live access key list, NEAR balance against its storage minimum, statement, history), Agents (the live role and key of the payment agent), Disputes (live dispute list and escrow) and Your shares.
+- The registry is an app with a menu by purpose. Registry: Overview (statement since mint and what needs attention), Catalog (works and rights, split sheets), Shares (ledger, share accounts with their live keys and NEAR against the storage minimum, claims), Activity (the recorded demo, filterable). Oversight: Governance (agents, disputes, registrar). You: Your shares. Support: Help (chat, support, docs, whitepaper). All registry pages read live NEAR testnet values with view calls.
 - Your shares: look up any account read only, or connect a testnet wallet. A connected holder can claim, a work registrant can approve or reject a pending share, and a member can draft a split sheet with a review step before signing. Sending these from the site has not been run on testnet yet, so it is UNVERIFIED.
 - Statements on these pages use Opening balance, activity and Closing balance since mint. A view by statement period needs an event indexer, which is roadmap.
 
@@ -93,10 +93,18 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 - [Lifecycle and catalog sale](/#lifecycle)
 - [Trust and privacy](/#trust)
 - [Testnet notice](/#notice)
-- [Registry catalog](/dashboard/)
-- [Your shares](/member)
+- [Registry overview](/dashboard/)
+- [Works and rights](/catalog/)
+- [Split sheets](/catalog/splits/)
+- [Share ledger](/shares/)
+- [Share accounts and keys](/shares/accounts/)
+- [Claims](/shares/claims/)
+- [Recorded activity](/activity)
 - [Agents](/agents)
 - [Disputes](/disputes)
+- [Registrar](/registrar)
+- [Your shares](/member)
+- [Docs](/docs)
 - [Whitepaper placeholder](/whitepaper)
 - [Help chat](/help#chat)
 - [Contact support](/help#support)

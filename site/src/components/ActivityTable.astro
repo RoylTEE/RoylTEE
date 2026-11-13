@@ -1,0 +1,31 @@
+---
+/* Recorded on-chain activity, newest first. A ledger table on wide screens, stacked rows on narrow ones. */
+import { SCENES, txUrl, categoriesOf } from '../data/testnet';
+interface Props { id: string; limit?: number; collapsible?: boolean; only?: string }
+const { id, limit, collapsible = false, only } = Astro.props;
+const numbered = SCENES.map((s, i) => ({ ...s, n: i + 1, cats: categoriesOf(s) })).reverse();
+const rows = (only ? numbered.filter((s) => s.cats.includes(only)) : numbered).slice(0, limit ?? SCENES.length);
+---
+<div class="table-wrap">
+  <table class="ledger rows-sm activity">
+    <thead><tr><th class="num">No.</th><th>Step</th><th>What happened</th><th>Shares</th><th>Result</th><th>Transaction</th></tr></thead>
+    <tbody id={id} data-collapsible={collapsible ? '' : undefined}>
+      {rows.map((s) => (
+        <tr data-cat={collapsible ? s.cats.join(' ') : undefined}>
+          <td class="num x">{s.n}</td>
+          <td class="p nowrap"><strong>{s.step}</strong>{s.simulated && <span class="badge sim step-sim">Simulated payer</span>}</td>
+          <td class="p-wrap">{s.what}<span class="small muted shows only-wide"><br />{s.shows}</span></td>
+          <td class="m mono">{s.tokens.length ? s.tokens.map((t, i) => <>{i ? ', ' : ''}<a class="link" href={`/share?id=${t}`}>{t}</a></>) : <span class="dim">No share</span>}</td>
+          <td class="p-end">{s.result === 'refused' ? <span class="badge bad">Refused</span> : s.result === 'info' ? <span class="badge info">Recorded</span> : <span class="badge ok">Done</span>}</td>
+          <td class="m">{s.txs.map((h) => <a class="acct-link tx" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</div>
+{collapsible && rows.length > 5 && <div class="expand-row"><button class="btn sm" type="button" data-expand aria-controls={id} aria-expanded="false" hidden>Show all {rows.length}</button></div>}
+<style is:global>
+  .activity .step-sim { margin-left: var(--s2); }
+  .activity .acct-link.tx + .acct-link.tx { margin-left: .5rem; }
+  @media (max-width: 767px) { .activity td.p-end { order: 0; } }
+</style>

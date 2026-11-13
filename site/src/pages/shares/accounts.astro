@@ -1,0 +1,12 @@
+---
+import App from '../../layouts/App.astro';
+---
+<App area="shares" tab="accounts" title="Share accounts" intro="Each share controls its own payout account. None of them has an access key, and each must keep enough NEAR for its storage.">
+  <section class="figures kpi" data-acc-fig><p class="loading figure">Reading share accounts</p></section>
+  <section class="panel" aria-labelledby="acc-h">
+    <div class="panel-head"><h2 id="acc-h">Accounts and keys</h2><span class="caption">Read live: access key list, NEAR balance, storage use and Mock USDC held</span></div>
+    <div class="table-wrap" data-accounts><p class="loading panel-body">Reading share accounts</p></div>
+    <p class="panel-foot">Storage reserve is storage use in bytes times the storage price from the protocol config. Above the minimum is what is left after that reserve.</p>
+  </section>
+</App>
+<script>import '../../scripts/accounts.ts';</script>

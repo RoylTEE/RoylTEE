@@ -1,6 +1,5 @@
 ---
-import Base from '../layouts/Base.astro';
-import { PROJECT_NAME } from '../consts';
+import App from '../layouts/App.astro';
 import { loadConfig, storeFor } from '../server/config';
 import { readSession } from '../server/auth';
 import { sessionCookie } from '../server/security';
@@ -22,15 +21,8 @@ try {
 Astro.response.status = permitted ? 200 : 401;
 Astro.response.headers.set('Cache-Control', 'private, no-store');
 ---
-<Base title={`Support admin . ${PROJECT_NAME}`} description="Support owner page.">
-  <div class="page-head">
-    <div class="container stack">
-      <p class="eyebrow">Support</p>
-      <h1>Support admin</h1>
-      <p class="lead">Only the support owner wallet can read tickets here. The server checks the wallet on every request.</p>
-    </div>
-  </div>
-  <div class="container admin-wrap">
+<App area="help" title="Support admin" crumb="Support admin" intro="Only the support owner wallet can read tickets here. The server checks the wallet on every request." period={false} description="Support owner page.">
+  <div class="admin-wrap">
     <section class="panel" data-admin data-permitted={String(permitted)} data-state={permitted ? "in" : "out"} aria-labelledby="q-h">
       <div class="panel-head"><h2 id="q-h">Ticket queue</h2><div class="end"><span class="out-only"><button type="button" class="btn primary" data-sign-in>Sign in with NEAR wallet</button></span><span class="in-only"><button type="button" class="btn sm" data-sign-out>Sign out</button></span></div></div>
       <div class="panel-body">
@@ -39,11 +31,9 @@ Astro.response.headers.set('Cache-Control', 'private, no-store');
       </div>
     </section>
   </div>
-</Base>
+</App>
 <script>import '../scripts/admin.ts';</script>
 <style is:global>
-  .page-head { background: var(--surface); border-bottom: 1px solid var(--edge); padding: var(--s7) 0 var(--s6); margin-bottom: var(--s6); }
-  .page-head h1 { font-size: var(--fs-36); }
   .admin-wrap { max-width: 56rem; }
   [data-state="out"] .in-only, [data-state="in"] .out-only { display: none; }
   .tickets { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--s3); }

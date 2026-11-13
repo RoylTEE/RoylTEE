@@ -35,10 +35,10 @@ async function refresh() {
 
 function renderHeld(tokens: Token[], ledgers: Ledger[]) {
   const held = q('[data-held]');
-  if (!tokens.length) { held.replaceChildren(h('div', { class: 'panel-body' }, h('div', { class: 'empty' }, h('p', { text: `${viewing} holds no shares. A share arrives when a member registers one for this account, or when a holder transfers one to it.` }), h('a', { class: 'btn', href: '/dashboard/', text: 'See who holds what in the catalog' })))); return; }
+  if (!tokens.length) { held.replaceChildren(h('div', { class: 'panel-body' }, h('div', { class: 'empty' }, h('p', { text: `${viewing} holds no shares. A share arrives when a member registers one for this account, or when a holder transfers one to it.` }), h('a', { class: 'btn', href: '/shares/', text: 'See who holds what in the ledger' })))); return; }
   const total = tokens.reduce((a, t) => a + BigInt(t.extra.claimable), 0n);
   held.replaceChildren(
-    h('div', { class: 'table-wrap' }, h('table', { class: 'ledger' },
+    h('div', { class: 'table-wrap' }, h('table', { class: 'ledger rows-sm' },
       h('thead', {}, h('tr', {}, ...['Share', 'Work', 'Role', 'Percent', 'Status', 'Paid in', 'Claimed', 'Claimable', ''].map((t, i) => h('th', { class: i >= 3 && i <= 7 && i !== 4 ? 'num' : undefined, text: t })))),
       h('tbody', {}, ...tokens.map((t, i) => {
         const st = shareState(t); const l = ledgers[i];
@@ -46,13 +46,13 @@ function renderHeld(tokens: Token[], ledgers: Ledger[]) {
         const why = !signer ? 'Connect this account to claim' : BigInt(t.extra.claimable) === 0n ? 'Nothing to claim' : can ? '' : 'Not claimable right now';
         const btn = h('button', { class: can ? 'btn sm primary' : 'btn sm', type: 'button', text: 'Claim', disabled: !can, title: why || undefined, 'aria-label': `Claim share ${t.token_id}`, onclick: () => void claim(t) });
         return h('tr', {},
-          h('td', {}, h('a', { class: 'row-btn', href: `/share?id=${t.token_id}`, text: t.token_id })),
-          h('td', { text: `Work ${t.extra.work_id}` }), h('td', { text: rightLabel[t.extra.right_type] ?? t.extra.right_type }),
-          h('td', { class: 'num', text: pct(t.extra.percent_bps) }), h('td', {}, badge(st.text, st.tone)),
-          h('td', { class: 'num', text: musdc(BigInt(l.earned)) }), h('td', { class: 'num', text: musdc(l.total_paid_out) }), h('td', { class: 'num', text: musdc(t.extra.claimable) }),
-          h('td', {}, btn, why && !can ? h('div', { class: 'caption', text: why }) : null));
+          h('td', { class: 'p' }, h('a', { class: 'row-btn', href: `/share?id=${t.token_id}`, text: t.token_id })),
+          h('td', { class: 'm nowrap', text: `Work ${t.extra.work_id}` }), h('td', { class: 'x', text: rightLabel[t.extra.right_type] ?? t.extra.right_type }),
+          h('td', { class: 'num m', text: pct(t.extra.percent_bps) }), h('td', { class: 'm' }, badge(st.text, st.tone)),
+          h('td', { class: 'num x', text: musdc(BigInt(l.earned)) }), h('td', { class: 'num x', text: musdc(l.total_paid_out) }), h('td', { class: 'num p-end', text: musdc(t.extra.claimable) }),
+          h('td', { class: 'm claim-cell' }, btn, why && !can ? h('div', { class: 'caption only-wide', text: why }) : null));
       })),
-      h('tfoot', {}, h('tr', {}, h('td', { colspan: '7', text: 'Total claimable' }), h('td', { class: 'num', text: musdc(total) }), h('td'))))),
+      h('tfoot', {}, h('tr', {}, h('td', { class: 'p', colspan: '7', text: 'Total claimable' }), h('td', { class: 'num p-end', text: musdc(total) }), h('td', { class: 'x' }))))),
     h('div', { class: 'panel-body' }, h('details', {}, h('summary', { class: 'small', text: 'Statement for each share' }), ...tokens.map((t, i) => h('div', { class: 'stack' }, h('h4', { text: t.token_id }), statement(ledgers[i]))))));
 }
 
@@ -80,10 +80,10 @@ async function renderApprovals(all: Token[]) {
 }
 
 function sheetTable(rows: { holder: string; role: string; bps: number; state: Node }[], total: number) {
-  return h('div', { class: 'table-wrap' }, h('table', { class: 'ledger' },
+  return h('div', { class: 'table-wrap' }, h('table', { class: 'ledger rows-sm' },
     h('thead', {}, h('tr', {}, h('th', { text: 'Rightholder' }), h('th', { text: 'Role' }), h('th', { text: 'Status' }), h('th', { class: 'num', text: 'Percent' }))),
-    h('tbody', {}, ...rows.map((r) => h('tr', {}, h('td', { class: 'acct', text: short(r.holder) }), h('td', { text: r.role }), h('td', {}, r.state), h('td', { class: 'num', text: pct(r.bps) })))),
-    h('tfoot', {}, h('tr', {}, h('td', { colspan: '3' }, totalLine(total)), h('td', { class: 'num', text: pct(total) })))));
+    h('tbody', {}, ...rows.map((r) => h('tr', {}, h('td', { class: 'p acct', text: short(r.holder) }), h('td', { class: 'm', text: r.role }), h('td', { class: 'm' }, r.state), h('td', { class: 'num p-end', text: pct(r.bps) })))),
+    h('tfoot', {}, h('tr', {}, h('td', { class: 'p', colspan: '3' }, totalLine(total)), h('td', { class: 'num p-end', text: pct(total) })))));
 }
 const totalLine = (bps: number) => h('span', { class: 'total' }, 'Total', bps === 10000 ? badge('Equals 100%', 'ok') : bps > 10000 ? badge(`Over by ${pct(bps - 10000)}`, 'bad') : badge(`${pct(10000 - bps)} not assigned`, 'warn'));
 

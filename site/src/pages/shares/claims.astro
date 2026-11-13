@@ -1,0 +1,12 @@
+---
+import App from '../../layouts/App.astro';
+---
+<App area="shares" tab="claims" title="Claims" intro="Money waiting in share accounts for their holders. Only the current holder can claim, and the money goes to that holder.">
+  <section class="figures kpi" data-claim-fig><p class="loading figure">Reading claims</p></section>
+  <section class="panel" aria-labelledby="cl-h">
+    <div class="panel-head"><h2 id="cl-h">Ready to claim</h2></div>
+    <div class="table-wrap" data-claims><p class="loading panel-body">Reading claims</p></div>
+    <p class="panel-foot">A holder claims from Your shares with a connected wallet. Claims recorded on testnet are under Activity, Claims.</p>
+  </section>
+</App>
+<script>import '../../scripts/claims.ts';</script>

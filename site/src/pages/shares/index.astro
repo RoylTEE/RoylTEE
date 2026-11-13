@@ -1,0 +1,28 @@
+---
+import App from '../../layouts/App.astro';
+---
+<App area="shares" tab="ledger" title="Ledger" intro="Every share NFT with its holder, role, percent, workflow state and what it can claim.">
+  <section class="md" aria-label="Shares">
+    <div class="panel md-master">
+      <div class="panel-head"><h2 id="shares-h">Shares</h2><span class="caption l-long">Select a share to inspect it</span><span class="caption l-short">Open a share for its account, statement and history</span><div class="end" data-export></div></div>
+      <div class="table-wrap" data-shares><p class="loading panel-body">Reading shares</p></div>
+    </div>
+    <aside class="panel md-detail only-wide" aria-label="Share inspector" aria-live="polite">
+      <div class="panel-body" data-inspector>
+        <div class="empty"><p>Pick a share in the table to see its holder, its share account, the live key list and its statement.</p></div>
+      </div>
+    </aside>
+  </section>
+</App>
+<script>import '../../scripts/ledger.ts';</script>
+<style is:global>
+  .md { display: grid; grid-template-columns: minmax(0, 1fr) 22rem; gap: var(--s5); align-items: start; }
+  @media (min-width: 768px) { .md .ledger td, .md .ledger th { padding-left: var(--s3); padding-right: var(--s3); } }
+  .md-detail { position: sticky; top: 4.5rem; max-height: calc(100vh - 5.5rem); overflow: auto; }
+  .insp-head { display: flex; justify-content: space-between; gap: var(--s3); align-items: flex-start; }
+  .stmt { display: grid; gap: var(--s2); }
+  .stmt .ledger, .md-detail .ledger { border: 1px solid var(--rule); border-radius: var(--r-ctl); }
+  .md-detail h4 { margin-top: var(--s2); }
+  @media (max-width: 1365px) { .md { grid-template-columns: 1fr; } .md-detail { position: static; max-height: none; } }
+  @media (max-width: 767px) { .md { grid-template-columns: 1fr; } }
+</style>

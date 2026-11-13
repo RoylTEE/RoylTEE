@@ -1,0 +1,56 @@
+---
+import App from '../layouts/App.astro';
+import ActivityTable from '../components/ActivityTable.astro';
+import { REGISTRAR, accountUrl } from '../data/testnet';
+/* Registrar methods checked against the deployed contract code (exported wasm functions) on 2026-11-13. */
+const can = [
+  ['grant_credential, suspend_credential, reinstate_credential', 'Admit, pause and restore verified members. Credentials cannot be transferred.'],
+  ['resolve', 'Decide a dispute with a document hash. Only the contested money was held.'],
+  ['grant_payer_role, revoke_payer_role', 'Name which accounts may pay works through the registry.'],
+  ['release_unallocated', 'Release money that reached the registry for no share, within fixed rules.'],
+  ['registrar_transfer', 'Move the share of a suspended member, with a document hash.'],
+];
+const cannot = ['Hold a credential', 'Claim from any share account', "Move an active member's share", 'Sign for a share account (they have no keys)'];
+---
+<App area="registrar" title="Registrar log" intro="The registrar is a trusted role in this demo. Every registrar action is an event with a document hash.">
+  <div class="gov-grid">
+    <section class="panel" aria-labelledby="rg-h">
+      <div class="panel-head"><h2 id="rg-h">Role and keys</h2><span class="end" data-reg-badge></span></div>
+      <div class="panel-body" data-registrar>
+        <dl class="kv"><dt>Registrar account</dt><dd><a class="acct-link" href={accountUrl(REGISTRAR)} target="_blank" rel="noopener">{REGISTRAR}</a></dd></dl>
+        <p class="loading">Reading testnet</p>
+      </div>
+    </section>
+    <section class="panel" aria-labelledby="mem-h">
+      <div class="panel-head"><h2 id="mem-h">Verified members</h2><span class="caption">Credential status, read live. Identity checks behind them are Simulated.</span></div>
+      <div class="table-wrap" data-members><p class="loading panel-body">Reading testnet</p></div>
+    </section>
+  </div>
+  <section class="panel" aria-labelledby="log-h">
+    <div class="panel-head"><h2 id="log-h">Recorded registrar actions</h2><span class="caption">From the recorded demo. Credential grants at setup are in the registrar account history on the explorer.</span></div>
+    <ActivityTable id="reg-acts" only="registrar" />
+  </section>
+  <section class="panel" aria-labelledby="pw-h">
+    <div class="panel-head"><h2 id="pw-h">What the registrar can and cannot do</h2></div>
+    <div class="table-wrap">
+      <table class="ledger rows-sm">
+        <thead><tr><th>Contract methods</th><th>What it is for</th></tr></thead>
+        <tbody>{can.map(([m, w]) => <tr><td class="p mono small">{m}</td><td class="m wrap">{w}</td></tr>)}</tbody>
+      </table>
+    </div>
+    <div class="panel-body">
+      <p class="label">Cannot</p>
+      <div class="method-list">{cannot.map((c) => <span class="method no">{c}</span>)}</div>
+    </div>
+    <p class="panel-foot">Methods checked against the deployed contract code on 2026-11-13. A multisig council with a time delay is roadmap.</p>
+  </section>
+</App>
+<script>import '../scripts/registrar.ts';</script>
+<style is:global>
+  .gov-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr); gap: var(--s5); align-items: start; }
+  .method-list { display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .method { font-family: var(--mono); font-size: var(--fs-14); padding: .2rem .5rem; border-radius: var(--r-ctl); border: 1px solid var(--ok-line); background: var(--ok-bg); color: var(--ok); }
+  .method.no { border-color: var(--bad-line); background: var(--bad-bg); color: var(--bad); font-family: var(--sans); }
+  @media (max-width: 767px) { table.rows-sm td.m.wrap { white-space: normal; } }
+  @media (max-width: 1199px) { .gov-grid { grid-template-columns: 1fr; } }
+</style>
