@@ -29,15 +29,15 @@ Exact names are chosen at deploy time and recorded in `deployments/testnet.json`
 
 | Account | Role | Keys after setup |
 |---|---|---|
-| `REG` (for example `rightsreg-xxxx.testnet`) | Registry contract: NEP-171 + NEP-177 + NEP-181, factory for vaults, credentials, roles, allowances, ledger, locks, disputes, events. Holds allowance funds, dispute escrow and undelivered forwards in its own mock USDC balance. | None. Full-access keys deleted after deploy and init (owner's yes required, it is a delete). |
+| `REG` (for example `rightsreg-xxxx.testnet`) | Registry contract: NEP-171 + NEP-177 + NEP-181, factory for vaults, credentials, roles, allowances, ledger, locks, disputes, events. Holds allowance funds, dispute escrow and undelivered forwards in its own mock USDC balance. | Planned: none, full-access keys deleted after deploy and init (owner's yes required, it is a delete). Current testnet state: the full-access key is still present; deletion is parked (THREAT_MODEL T13). |
 | `s<N>.REG` | One vault per share token, `N` is a monotonic counter never reused. Created by `REG` at mint. Runs the vault contract. Storage-registered with mock USDC at mint. | None, ever. |
-| `usdc-mock.REG` | Mock NEP-141 token, name "Mock USDC (testnet)", 6 decimals, symbol placeholder `mUSDC`. Built on near-contract-standards `FungibleToken` + `StorageManagement`. `mint` restricted to one `minter` account set at init (the simulated payer). | Created by `REG` before its keys are deleted. Keys on the mock may be deleted too; it is not part of the trust argument, it is a test token. |
+| `usdc-mock.REG` | Mock NEP-141 token, name "Mock USDC (testnet)", 6 decimals, symbol placeholder `mUSDC`. Built on near-contract-standards `FungibleToken` + `StorageManagement`. `mint` restricted to one `minter` account set at init (the simulated payer). | Planned: keys deleted too. Current testnet state: its full-access key is still present (THREAT_MODEL T13). It is not part of the trust argument, it is a test token. |
 | `DEV` (for example `rrdemo-xxxx.testnet`) | Separate dev parent for demo members. Deliberately NOT under `REG`, so the registry cannot have created or controlled member accounts. | Normal dev keys. |
 | `registrar.DEV` | Registrar: grants and suspends credentials, grants payer role, resolves disputes, posts license prices. Single account in the demo; multisig with time delay is roadmap. | Full-access key (dev). |
 | `label.DEV`, `writer-a.DEV`, `writer-b.DEV`, `buyer-pub.DEV`, `ai-co.DEV` | Credentialed members. | Full-access key (dev). |
 | `outsider.DEV` | No credential. Used to show transfers to non-members fail. | Full-access key (dev). |
 | `payer.DEV` | Simulated payer, also the mock token `minter`. Holds the payer role for attestations. | Full-access key (dev). |
-| `pay-agent.label.DEV` | Scripted payment agent of `label.DEV`. | Only a function-call key: receiver `REG`, methods `pay_from_allowance`, `report`, `buy_license`, allowance unset (docs warn that an exhausted allowance locks a function-call-only account). Full-access key deleted after the function-call key is added (owner's yes). |
+| `pay-agent.label.DEV` | Scripted payment agent of `label.DEV`. | Only a function-call key: receiver `REG`, methods `pay_from_allowance` and `report` (licenses were cut, there is no `buy_license`), allowance unset (docs warn that an exhausted allowance locks a function-call-only account). Full-access key deleted after the function-call key is added (owner's yes). |
 | `license-agent.ai-co.DEV` (optional) | Scripted license agent of `ai-co.DEV`. | Same pattern. |
 
 ### Work-level account: decision
@@ -271,8 +271,8 @@ pub fn nft_tokens_for_owner(&self, account_id: AccountId, from_index: Option<U12
 // measured in block 2). Caller and holder: active members. Panics: bps 0 or > 10000; group
 // full; work Void; contests names a token outside the group.
 // Reserves bps. If active + reserved + percent_bps > 10000, the share becomes a Claimant
-// and an Overallocation dispute opens; `contests` (default: all active shares in the group)
-// become Contested.
+// and an Overallocation dispute opens; `contests` (named by the claimant, mandatory and minimal since
+// the review, section 19) become Contested.
 // Two-phase mint (T15): Pending -> create vault (CreateAccount, Transfer, DeployContract,
 // no AddKey) -> on_vault_created -> usdc.storage_deposit(vault) -> on_vault_ready -> mint
 // NFT to holder, status Active (or Claimant). Any failure: status Failed, reservation
@@ -305,7 +305,6 @@ pub fn ft_on_transfer(&mut self, sender_id: AccountId, amount: U128, msg: String
 //   {"pay_work": {"work_id", "right_type", "territory", "period", "statement_hash", "statement_line_id"?}}
 //   {"pay_share": {"token_id", "period", "statement_hash"}}
 //   {"fund_allowance": "<agent account>"}        (sender must be the agent's org)
-//   {"buy_license": {"work_id", "license_type"}} (sender must be an active member)
 // Unknown or malformed msg, refused group (T25), duplicate work, or failed check:
 // returns amount (full refund, no state change). On success returns 0 and schedules
 // forwards. Never panics after state changes.
@@ -326,7 +325,8 @@ pub fn retry_forward(&mut self, token_id: TokenId) -> Promise;  // anyone; debit
 // Clears payout_in_flight. Err: known_balance += amount, total_paid_out -= amount. Never panics.
 
 pub fn sync(&mut self, token_id: TokenId) -> Promise;
-// Anyone, no deposit. Panics if payout_in_flight, transfer_pending or inbound_pending > 0.
+// As built (review H1): current holder or registrar only, no deposit. Panics if payout_in_flight,
+// transfer_pending or inbound_pending > 0, if the share is in a dispute or awaits approval.
 // Calls usdc.ft_balance_of(vault) then on_sync with the current epoch.
 
 #[private] pub fn on_sync(&mut self, token_id: TokenId, epoch: u64);
@@ -364,7 +364,7 @@ pub fn pay_from_allowance(&mut self, target: PayTarget, amount: U128,
 // forward. Emits allowance_spent and payment_in.
 
 pub fn report(&mut self, statement_line_id: String, report_hash: Hash32);  // agent; event only, no state
-pub fn buy_license(&mut self, work_id: WorkId, license_type: LicenseType) -> Promise; // agent; from allowance (cut first)
+// buy_license: planned, cut, not built.
 ```
 
 ### Disputes and licenses
@@ -481,7 +481,7 @@ Dispute, DuplicateCode: no escrow. Payments to the duplicate work are refused (m
 - A function-call key cannot attach a deposit (docs.near.org, Access Keys). `ft_transfer` needs 1 yoctoNEAR. So an agent with only a function-call key cannot send USDC itself. The design does not work around this: the agent spends from an allowance held inside `REG`, and `REG` does the transfers.
 - Each agent is a named sub-account of its organisation, enforced in `grant_role`.
 - The organisation funds the allowance with one `ft_transfer_call` to `REG`, `msg: {"fund_allowance": "<agent>"}`.
-- Agent key: function-call only, receiver `REG`, methods `pay_from_allowance`, `report`, optionally `buy_license`. None of them take a deposit.
+- Agent key: function-call only, receiver `REG`, methods `pay_from_allowance` and `report`. Neither takes a deposit.
 - The contract decides payees; the agent supplies a target, amount, statement line id, period and statement hash.
 - Owner and admin methods (`nft_transfer`, `nft_transfer_call`, `claim`, `amend_split`, `grant_role`, `revoke_role`, `withdraw_allowance`, `set_share_note`, `confirm_share`, all registrar methods) need 1 yoctoNEAR. An agent key cannot call them even if a role check had a bug.
 - `revoke_role` is immediate. The organisation should also delete the agent's key.
@@ -511,11 +511,11 @@ Rust unit tests plus near-workspaces sandbox tests. `npm run test` runs all of t
 | 15 | Suspended member keeps share and accrues, cannot receive | 3 | T23 |
 | 15b | Failed vault registration leaves no NFT, refunds | 2 | T15 |
 | 16 | nft_approve panics; approval_id Some panics | 2 | T5 |
-| 17 | buy_license mints license NFT, splits fee, license non-transferable (cut first) | late | T33 |
+| 17 | buy_license mints license NFT, splits fee, license non-transferable (cut, not built) | late | T33 |
 | 18 | Claim to unregistered holder rolls back | 2 | T17 |
 | 19 | Fake token or direct ft_on_transfer credits nothing | 3 | T18 |
 | 20 | Callbacks survive failure; stale lock release; low gas fails early | 2 | T19 |
-| 21 | Parent cannot delete, redeploy or key an existing vault | 2 | T20 |
+| 21 | Parent cannot delete, redeploy or key an existing vault (sandbox `t21_parent_cannot_delete_redeploy_or_key_a_vault`, review) | review | T20 |
 | 22 | Sync race refused or discarded; earned exact | 2 | T21 |
 | 23 | effective_from bounds; payout ignores it | 2 | T22 |
 | 24 | Suspended edge cases | 3 | T23 |
@@ -527,7 +527,7 @@ Rust unit tests plus near-workspaces sandbox tests. `npm run test` runs all of t
 | 30 | System accounts cannot be credentialed or receive; registrar cannot claim others' shares | 3 | T12, T29 |
 | 31 | Oversize note and non-holder note fail | 2 | T32 |
 
-Scripts: `verify-keys` (T1, T13, T20), `npm run verify:testnet` (T1, T13, T31). Helper `assert_solvent` at the end of every sandbox test (T31). Also `cargo clippy -- -D warnings`, `cargo fmt --check`, frontend typecheck, and the audit checklist into AUDIT.md.
+Scripts planned, not written yet: `verify-keys` (T1, T13, T20), `npm run verify:testnet` (T1, T13, T31); `package.json` has no `verify:testnet` entry today. Helper `assert_solvent` at the end of every sandbox test (T31). Also `cargo clippy -- -D warnings`, `cargo fmt --check`, frontend typecheck, and the audit checklist into AUDIT.md.
 
 ## 12. What is SIMULATED
 
@@ -632,7 +632,7 @@ Funding: `ft_transfer_call` to `REG` with `msg: {"fund_allowance": "<agent>"}`. 
 
 Idempotency key: `sha256(org || 0x00 || statement_line_id)`, stored in a set. It is per organisation, so two organisations may use the same line ids, while two agents of one organisation, or the same line sent to a work and then to a share, pay once.
 
-Rolling window: 24 hourly buckets of amount and count per agent. A payment leaves the window when its hour bucket is 24 hours old, so the window is between 23 and 24 hours long.
+Rolling window: 24 hourly buckets of amount and count per agent. A payment leaves the window when its hour bucket is 24 hours old, so the window is between 23 and 24 hours long. Changed by the review (L2, section 19): the bucket of the hour 24 hours back is counted too, so the window is 24 to 25 hours.
 
 Agent account setup (sandbox tests, and the block 5 script): create `pay-agent.<org>`, add one function-call key with receiver `REG` and methods `pay_from_allowance` and `report`, delete the full-access key. The protocol refuses any transaction from a function-call key that attaches a deposit (`DepositWithFunctionCall`), and every owner method needs a deposit, so the contract check is the second lock.
 
@@ -683,8 +683,8 @@ Disputes, resolve, confirm_share. Each choice is also a row in DECISIONS_LOG.md 
     percent_bps: Bps, basis: Basis, holder: AccountId, evidence_hash: Hash32,
     contests: Option<Vec<TokenId>>) -> Promise;
 // If active + reserved + claimant bps + percent_bps > 10000: the new share is a claimant and an
-// Overallocation dispute opens now. contests (default: every active share of the group) must be
-// active, undisputed shares of the group whose bps cover the excess. Refused while shares of the
+// Overallocation dispute opens now. contests (block 4 default: every active share of the group;
+// review H2: now mandatory and minimal, see section 19) must be active, undisputed shares of the group whose bps cover the excess. Refused while shares of the
 // group are minting or while the group has an open dispute. contests is refused when not over.
 #[payable] pub fn resolve(&mut self, dispute_id: DisputeId, outcome: Outcome, doc_hash: Hash32);
 // 1y, registrar. Outcome: "uphold_existing" | {"uphold_claimant": {"new_bps": [{token_id, bps}]}}
@@ -707,3 +707,53 @@ Events added: `dispute_opened` (kind overallocation: group, claimant, contested)
 ### Wasm size and code storage
 
 The registry wasm is 674336 bytes after block 4 (614394 after block 3), about 6.7 NEAR of code storage at 1e19 yoctoNEAR per byte (UNVERIFIED on testnet). The audit fixes (AUDIT.md M1, L1) bring it to 674606 bytes, about 6.75 NEAR (UNVERIFIED on testnet). The mock USDC wasm is 181587 bytes, about 1.82 NEAR. Sizes are without wasm-opt; DEPLOY_PLAN.md budgets the measured values plus a margin.
+
+## 19. Contract review fixes as built (2026-11-13, branch `fix/contract-review`, not deployed)
+
+Every change keeps the stored layout of the root struct and of `Work`, `Share`, `Ledger`, `Group`, `Dispute` and `AgentRole` as it is on testnet. New per-record data lives in raw storage slots with ASCII prefixes, which cannot collide with the one-byte collection prefixes or the `STATE` key: `apv:<token_id>` (approval) and `l2t:<agent>` (window tail). A missing slot means the old behaviour (approved, no tail), so the registry can be redeployed in place without a migration.
+
+### Sync (review H1, L4, Security Suite F-04)
+
+`sync` is callable by the current holder or the registrar only. Opening an over-allocation dispute bumps the epoch of every contested share and of the claimant; `nft_transfer_call` bumps the epoch too. `on_sync` discards a read (`sync_discarded`) if the epoch changed, the share is in a dispute, `transfer_pending` is set or the share awaits approval.
+
+Vault: new vaults export `ft_on_transfer`, which returns `"0"` and does nothing else, so a token sent with `ft_transfer_call` stays in the vault instead of being refunded a block later. The vault wasm is 7478 bytes (7420 before). Vaults created before the fix keep the old code (no vault can be changed, T20); so two vault code hashes are valid: the old one recorded in `deployments/testnet.json` and the new one, to be recorded there when the registry is redeployed.
+
+### Contests (review H2)
+
+Above 10000 bps `contests` is mandatory. Each named share must be an active, approved, undisputed share of the group, not held by the claimant's holder or by the caller. The list must be minimal: the named bps cover the excess, and without the smallest named share they would not. Failed and Void shares are removed from `Group.shares`: in `fail_share`, for the claimant in `uphold_existing`, and for a share left with 0 bps by `uphold_claimant`. Share records, NFTs and history stay.
+
+### Registrar (review H3)
+
+`grant_credential` refuses the registrar account. The registrar is a trusted role; THREAT_MODEL T12 lists what it can do.
+
+### On-chain split sheet (review M2)
+
+```rust
+#[payable] pub fn approve_share(&mut self, token_id: TokenId, doc_hash: Option<Hash32>);
+// 1y. Work registrant (active), or the registrar with a doc_hash. Share must be pending and Active.
+// Held escrow is forwarded to the vault. Emits share_approved {token_id, by, doc_hash, released}.
+#[payable] pub fn reject_share(&mut self, token_id: TokenId, doc_hash: Option<Hash32>);
+// 1y. Same signers. Share becomes Void, its bps are freed, its held escrow moves to the group's
+// unallocated escrow, it leaves the group list. Emits share_rejected {token_id, by, doc_hash, to_unallocated}.
+#[payable] pub fn recover_rejected_vault(&mut self, token_id: TokenId, receiver: AccountId,
+    amount: U128, doc_hash: Hash32) -> Promise;
+// 1y, registrar. Rejected share with an empty ledger only. Sends plain deposits out of its vault.
+// Emits rejected_vault_recovered {token_id, receiver, amount, doc_hash, ok}.
+pub fn get_share_approval(&self, token_id: TokenId) -> String; // "approved" | "pending" | "rejected"
+```
+
+A share registered by anyone other than the work's `registered_by` is pending (claimants of a dispute excepted: the registrar's resolve decides them). Pending shares are minted and reserve their bps, but their credits are held in `Ledger.escrowed` (`escrowed` lines carry `reason: "awaiting_approval"`, dispute lines `reason: "dispute"`). Pending shares cannot be claimed (nothing known), synced, transferred, registrar-transferred, confirmed, attested, released to or contested. `share_registered` now carries `approval` and `registered_by`; the token's `extra` carries `approval`. Voiding a work moves pending shares' held money to unallocated and marks them rejected. Shares that existed before the fix have no slot and are approved.
+
+### Smaller fixes
+
+- L5: `payer_confirmed` counts only while the attesting account still has the payer role; `grant_role` refuses payer accounts.
+- L6: `on_vault_ready` fails the share (no NFT) if the holder no longer has an active credential.
+- L8: `pay_share` needs at least `MIN_GROUP_PAYMENT`, like a group payment.
+- L9: `refund_unallocated(group, receiver, amount, doc_hash)`, 1y, registrar, only for a Void work: sends unallocated escrow out (debit first, restored by `on_unallocated_refunded` if the transfer fails). Emits `unallocated_refunded`.
+- L2: the agent window also counts the bucket of the hour 24 hours back (`l2t:<agent>`), so it is 24 to 25 hours. `grant_role` writes the slot, so the organisation pays its storage.
+- M1: `release_stale_mint(token_id)`, anyone, once a share has been Pending for `STALE_MINT_NS` (20 minutes): fails the share and frees its bps; `on_vault_created` and `on_vault_ready` do nothing (emit `anomaly` `late_mint_callback`) when the share is no longer Pending. `GAS_FORWARD_CB` is 10 Tgas (was 5); measured use about 2.2 Tgas, and a 16-share payment still fits. A lost `on_forward` is not recoverable by a method (THREAT_MODEL T19).
+
+### Sizes
+
+Registry wasm 713164 bytes after the review fixes (674606 before), about 7.13 NEAR of code storage (UNVERIFIED on testnet). Vault wasm 7478 bytes.
+
