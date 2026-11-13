@@ -641,3 +641,60 @@ fn m1_stale_mint_is_released_and_late_callbacks_mint_nothing() {
     let _b = mint(&mut c, w, "carol.near", 5000);
     assert_eq!(group_of(&c, w).active_bps, 10_000);
 }
+
+// ---------- L2 ----------
+
+/// L2: the daily limit covers at least 24 full hours. The PoC spent the
+/// limit twice 23 hours and 1 minute apart; now the second payment waits
+/// until the first payment's hour is more than 24 hours back.
+#[test]
+fn l2_rolling_limit_covers_a_full_24_hours() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let _ = mint(&mut c, w, "bob.near", 10_000);
+    grant(&mut c, 100_000, 100_000, 10);
+    let _ = fund(&mut c, "alice.near", 1_000_000);
+    let minute = 60_000_000_000u64;
+    let first = 10 * HOUR + 59 * minute;
+    assert!(try_pay(&mut c, target(w), 100_000, "a", first));
+    assert!(!try_pay(
+        &mut c,
+        target(w),
+        MIN_GROUP_PAYMENT,
+        "b",
+        34 * HOUR
+    ));
+    assert!(!try_pay(
+        &mut c,
+        target(w),
+        MIN_GROUP_PAYMENT,
+        "c",
+        34 * HOUR + 59 * minute
+    ));
+    at(
+        &acc("x.near"),
+        NearToken::from_yoctonear(0),
+        34 * HOUR + minute,
+        1,
+    );
+    assert_eq!(c.get_role(agent()).unwrap().spent_last_24h.0, 100_000);
+    assert!(try_pay(&mut c, target(w), 100_000, "d", 35 * HOUR));
+}
+
+/// L2: the tail survives a second payment in the same hour, and the count
+/// limit uses the same window.
+#[test]
+fn l2_tail_counts_within_the_same_hour_and_for_tx_counts() {
+    let mut c = setup();
+    let w = work(&mut c, "USRC12600001");
+    let _ = mint(&mut c, w, "bob.near", 10_000);
+    grant(&mut c, 100_000, 1_000_000, 2);
+    let _ = fund(&mut c, "alice.near", 1_000_000);
+    assert!(try_pay(&mut c, target(w), 50_000, "a", 10 * HOUR));
+    assert!(try_pay(&mut c, target(w), 50_000, "b", 20 * HOUR));
+    // Hour 34: hour 10 is the tail, hour 20 is in the window: 2 tx.
+    assert!(!try_pay(&mut c, target(w), 50_000, "c", 34 * HOUR));
+    // Hour 35: only hour 20 left.
+    assert!(try_pay(&mut c, target(w), 50_000, "d", 35 * HOUR));
+    assert!(!try_pay(&mut c, target(w), 50_000, "e", 35 * HOUR + 1));
+}

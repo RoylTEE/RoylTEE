@@ -1083,8 +1083,10 @@ fn per_tx_daily_and_count_limits_with_rolling_window() {
         !try_pay(&mut c, target(w), 10_000, "f", t0 + 3 * HOUR),
         "daily or count"
     );
-    // 24 hours after the first payment its hour drops out of the window.
-    assert!(try_pay(&mut c, target(w), 100_000, "g", t0 + 24 * HOUR));
+    // The window covers 24 to 25 hours (review L2): 24 hours after the
+    // first payment its hour is still counted, 25 hours after it is not.
+    assert!(!try_pay(&mut c, target(w), 100_000, "g", t0 + 24 * HOUR));
+    assert!(try_pay(&mut c, target(w), 100_000, "g", t0 + 25 * HOUR));
     let r = c.get_role(agent()).unwrap();
     assert_eq!((r.spent_last_24h.0, r.tx_last_24h), (250_000, 3));
     assert_eq!(r.allowance.0, 650_000);
