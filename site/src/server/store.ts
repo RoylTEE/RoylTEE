@@ -16,6 +16,10 @@ export interface Store {
   removeBelow(index: string, max: number): Promise<void>;
 }
 const key = (k: string) => `royltee:v1:${k}`;
+/** Redis side of Store.count. Exported for the conformance test that runs it in a Lua engine. */
+export const COUNT_SCRIPT = "local e=redis.call('EXISTS',KEYS[1]); local n=redis.call('INCR',KEYS[1]); if e==0 and tonumber(ARGV[1])>0 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return n";
+/** Redis side of Store.uncount. */
+export const UNCOUNT_SCRIPT = "local v=redis.call('GET',KEYS[1]); if v and tonumber(v)>0 then redis.call('DECR',KEYS[1]) end; return 0";
 export class MemoryStore implements Store {
   private values = new Map<string, { text: string; expires: number }>();
   private indexes = new Map<string, Map<string, number>>();
@@ -74,8 +78,12 @@ export class RedisStore implements Store {
   async cas(k: string, before: unknown, after: unknown, s: number) {
     return (await this.command<number>('EVAL', "if redis.call('GET',KEYS[1]) == ARGV[1] then if tonumber(ARGV[3])>0 then redis.call('SET',KEYS[1],ARGV[2],'EX',ARGV[3]) else redis.call('SET',KEYS[1],ARGV[2]) end; return 1 else return 0 end", 1, key(k), JSON.stringify(before), JSON.stringify(after), s)) === 1;
   }
-  async count(k: string, s: number) { return this.command<number>('EVAL', "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return n", 1, key(k), s); }
-  async uncount(k: string) { await this.command('EVAL', "local v=redis.call('GET',KEYS[1]); if v and tonumber(v)>0 then redis.call('DECR',KEYS[1]) end; return 0", 1, key(k)); }
+  /**
+   * Same rule as MemoryStore (audit F6): the expiry is set only when the counter is created, and only
+   * when seconds is above zero; a counter brought back to 0 by uncount keeps its first expiry.
+   */
+  async count(k: string, s: number) { return this.command<number>('EVAL', COUNT_SCRIPT, 1, key(k), s); }
+  async uncount(k: string) { await this.command('EVAL', UNCOUNT_SCRIPT, 1, key(k)); }
   async add(i: string, score: number, m: string) { await this.command('ZADD', key(i), score, m); }
   async range(i: string, max = Number.MAX_SAFE_INTEGER, limit = 100) { return this.command<string[]>('ZRANGEBYSCORE', key(i), '-inf', max, 'LIMIT', 0, limit); }
   async rangeNewest(i: string, max = Number.MAX_SAFE_INTEGER, limit = 100) { return this.command<string[]>('ZREVRANGEBYSCORE', key(i), max, '-inf', 'LIMIT', 0, limit); }
