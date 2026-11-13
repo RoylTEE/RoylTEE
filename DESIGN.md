@@ -10,9 +10,9 @@ This is a permissioned, business-to-business record among verified industry memb
 
 | Item | Value | Source | Status |
 |---|---|---|---|
-| near-sdk (Rust) | 5.30.1 (latest stable) | crates.io API, read 2026-11-13 | Verified |
-| near-contract-standards (NEP-171, NEP-177, NEP-181, NEP-141, NEP-145 helpers) | 5.30.1 | crates.io API and docs.rs, read 2026-11-13. Modules `non_fungible_token::{core, enumeration, metadata, approval, events}`, `fungible_token`, `storage_management` present. `NonFungibleToken` exposes `internal_transfer`, `internal_mint`, `nft_resolve_transfer`. | Verified |
-| near-workspaces (sandbox tests) | 0.24.0 | crates.io API, read 2026-11-13 | Verified |
+| near-sdk (Rust) | 5.30.1 (latest stable) | crates.io API, read 2026-11-12 | Verified |
+| near-contract-standards (NEP-171, NEP-177, NEP-181, NEP-141, NEP-145 helpers) | 5.30.1 | crates.io API and docs.rs, read 2026-11-12. Modules `non_fungible_token::{core, enumeration, metadata, approval, events}`, `fungible_token`, `storage_management` present. `NonFungibleToken` exposes `internal_transfer`, `internal_mint`, `nft_resolve_transfer`. | Verified |
+| near-workspaces (sandbox tests) | 0.24.0 | crates.io API, read 2026-11-12 | Verified |
 | `near_sdk::assert_one_yocto` | exists in 5.30.1 | docs.rs | Verified |
 | `env::promise_result_checked` (size-capped promise result read) | exists in 5.30.1 | docs.rs env module | Verified |
 | `Promise::use_global_contract` and `deploy_global_contract` | exist in 5.30.1 | docs.rs Promise page | Verified (availability in sandbox and testnet UNVERIFIED) |

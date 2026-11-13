@@ -19,12 +19,12 @@ Terms used below (full detail in DESIGN.md):
 
 | Fact | Source | Status |
 |---|---|---|
-| A function-call key can only call one contract (optionally a list of methods) and cannot attach NEAR to the call. | docs.near.org, Access Keys page, section "Function-Call Keys" | Verified 2026-11-13 |
-| Requiring exactly 1 yoctoNEAR on a method means a function-call key cannot call it; ownership checks are still needed. | docs.near.org, Security, "Require one yoctoNEAR" | Verified 2026-11-13 |
-| An account with all keys removed is locked: only its own contract can move assets, create sub-accounts or change its code. A locked account can still add keys if its contract has a method for it. | docs.near.org, Access Keys page, "Locked Accounts" | Verified 2026-11-13 |
-| A callback always runs but can still fail (gas, panic, limits). Only the callback's own changes revert; it is not retried. Withdrawals should debit before the call. | docs.near.org, Security, "Callbacks can fail" | Verified 2026-11-13 |
-| `ft_on_transfer` must check that the predecessor is the expected token contract and return the full amount otherwise. | docs.near.org, Security, "Fungible Token Implementation" | Verified 2026-11-13 |
-| `nft_transfer` and `nft_transfer_call` require 1 yoctoNEAR; `nft_resolve_transfer` settles the call path. | NEP-171 text in the near/NEPs repo | Verified 2026-11-13 |
+| A function-call key can only call one contract (optionally a list of methods) and cannot attach NEAR to the call. | docs.near.org, Access Keys page, section "Function-Call Keys" | Verified 2026-11-12 |
+| Requiring exactly 1 yoctoNEAR on a method means a function-call key cannot call it; ownership checks are still needed. | docs.near.org, Security, "Require one yoctoNEAR" | Verified 2026-11-12 |
+| An account with all keys removed is locked: only its own contract can move assets, create sub-accounts or change its code. A locked account can still add keys if its contract has a method for it. | docs.near.org, Access Keys page, "Locked Accounts" | Verified 2026-11-12 |
+| A callback always runs but can still fail (gas, panic, limits). Only the callback's own changes revert; it is not retried. Withdrawals should debit before the call. | docs.near.org, Security, "Callbacks can fail" | Verified 2026-11-12 |
+| `ft_on_transfer` must check that the predecessor is the expected token contract and return the full amount otherwise. | docs.near.org, Security, "Fungible Token Implementation" | Verified 2026-11-12 |
+| `nft_transfer` and `nft_transfer_call` require 1 yoctoNEAR; `nft_resolve_transfer` settles the call path. | NEP-171 text in the near/NEPs repo | Verified 2026-11-12 |
 | A sub-account `x.REG` can only be created by `REG`. | Sharded NFT items draft (houseofstake/tla-contracts, docs/sharded-nft-items.md), "Naming" paragraph | Verified as stated in that draft |
 | Once a sub-account exists, its parent cannot delete it, redeploy its code or add keys to it (only the account itself can). | NEAR runtime behaviour | UNVERIFIED in docs read so far. Proven or disproven by test 21 before we rely on it. |
 
