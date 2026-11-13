@@ -60,8 +60,9 @@ async fn resolve(e: &Env, id: u64, outcome: Value) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn sync(e: &Env, token_id: &str) -> anyhow::Result<bool> {
-    Ok(e.outsider
+/// Sync as the share's holder (only the holder or the registrar may sync).
+async fn sync(e: &Env, holder: &near_workspaces::Account, token_id: &str) -> anyhow::Result<bool> {
+    Ok(holder
         .call(e.reg.id(), "sync")
         .args_json(json!({ "token_id": token_id }))
         .max_gas()
@@ -138,7 +139,10 @@ async fn t14_over_allocation_dispute_freezes_only_contested_fraction() -> anyhow
         .is_failure());
     // Plain deposit straight into the contested vault: held, sync refused.
     plain_transfer(&e, &e.vault(&b), 70_000).await?;
-    assert!(!sync(&e, &b).await?, "sync refused while disputed");
+    assert!(
+        !sync(&e, &e.writer_b, &b).await?,
+        "sync refused while disputed"
+    );
     check(e.claim(&e.writer_b, &b).await?);
     assert_eq!(
         e.balance(e.writer_b.id()).await?,
@@ -160,7 +164,7 @@ async fn t14_over_allocation_dispute_freezes_only_contested_fraction() -> anyhow
     assert_eq!(e.balance(&e.vault(&c)).await?, 250_000);
     assert_eq!(e.balance(e.reg.id()).await?, 0);
     // After resolve the held deposit is picked up and claimable.
-    assert!(sync(&e, &b).await?);
+    assert!(sync(&e, &e.writer_b, &b).await?);
     check(e.claim(&e.writer_b, &b).await?);
     assert_eq!(e.balance(e.writer_b.id()).await?, 100_000 + 320_000);
     check(e.claim(&e.buyer, &c).await?);

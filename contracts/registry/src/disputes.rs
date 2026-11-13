@@ -198,6 +198,11 @@ impl Registry {
             if let Some(s) = self.shares.get_mut(t) {
                 s.dispute = Some(id);
             }
+            // A sync read that started before the freeze must not land
+            // after it (review L4, Security Suite F-04).
+            if let Some(l) = self.ledgers.get_mut(t) {
+                l.epoch += 1;
+            }
         }
         for t in &contested {
             let snapshot = self.ledgers.get(t).map_or(0, |l| l.known_balance);

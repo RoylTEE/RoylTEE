@@ -76,9 +76,18 @@ async fn t02_plain_transfer_then_sync_updates_earned() -> anyhow::Result<()> {
         0,
         "not seen before sync"
     );
-    // Anyone can sync.
+    // An outsider cannot sync someone else's share (review H1).
+    assert!(e
+        .outsider
+        .call(e.reg.id(), "sync")
+        .args_json(json!({ "token_id": t }))
+        .max_gas()
+        .transact()
+        .await?
+        .is_failure());
+    // The holder can.
     check(
-        e.outsider
+        e.writer_a
             .call(e.reg.id(), "sync")
             .args_json(json!({ "token_id": t }))
             .max_gas()

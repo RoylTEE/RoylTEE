@@ -70,7 +70,10 @@ impl Registry {
             approval_id,
             effective_from,
         );
-        self.ledger_mut(&token_id).transfer_pending = Some(Self::lock_here(receiver_id.clone(), 0));
+        let ledger = self.ledger_mut(&token_id);
+        ledger.transfer_pending = Some(Self::lock_here(receiver_id.clone(), 0));
+        // A sync read that started before the call must not land during it.
+        ledger.epoch += 1;
         self.move_token(&sender, &receiver_id, &token_id, memo, eff, true);
         Promise::new(receiver_id.clone())
             .function_call_weight(

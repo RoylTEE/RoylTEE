@@ -169,8 +169,15 @@ impl Registry {
 
     /// Reads the vault's real token balance and records it, so plain
     /// `ft_transfer` payments straight into a vault count as earned.
-    /// Anyone may call it. Refused while any lock or forward is open (T21).
+    /// Only the current holder or the registrar may call it, so nobody can
+    /// time a read against someone else's vault (review H1). Refused while
+    /// any lock or forward is open (T21).
     pub fn sync(&mut self, token_id: TokenId) -> Promise {
+        let caller = env::predecessor_account_id();
+        require!(
+            caller == self.registrar || self.owner_of(&token_id).as_ref() == Some(&caller),
+            "only the holder or the registrar can sync"
+        );
         let share = self.share(&token_id);
         let vault = share.vault.clone();
         require!(
@@ -202,11 +209,16 @@ impl Registry {
             )
     }
 
-    /// Discards the reading if the ledger changed since the read began.
-    /// Never panics. Returns the earned total after the sync.
+    /// Discards the reading if the ledger changed since the read began, or
+    /// if the share entered a dispute or a transfer_call meanwhile (review
+    /// L4). Never panics. Returns the earned total after the sync.
     #[private]
     pub fn on_sync(&mut self, token_id: TokenId, epoch: U64) -> Option<U128> {
         let observed = callback_result(64).and_then(|v| serde_json::from_slice::<U128>(&v).ok());
+        let held = self
+            .shares
+            .get(&token_id)
+            .is_none_or(|s| s.dispute.is_some());
         let ledger = self.ledgers.get_mut(&token_id)?;
         let Some(observed) = observed else {
             emit(
@@ -215,8 +227,10 @@ impl Registry {
             );
             return None;
         };
-        if ledger.epoch != epoch.0
+        if held
+            || ledger.epoch != epoch.0
             || ledger.payout_in_flight.is_some()
+            || ledger.transfer_pending.is_some()
             || ledger.inbound_pending > 0
         {
             emit(

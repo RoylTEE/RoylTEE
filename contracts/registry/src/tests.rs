@@ -695,7 +695,7 @@ fn sync_records_plain_transfers_and_discards_stale_reads() {
     let mut c = setup();
     let w = work(&mut c, "USRC12600001");
     let t = mint(&mut c, w, "alice.near", 10_000);
-    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    call(&acc("alice.near"), NearToken::from_yoctonear(0));
     let _ = c.sync(t.clone());
     let epoch = ledger(&c, &t).epoch;
     callback(ok(b"\"250000\""));
@@ -720,7 +720,7 @@ fn sync_refused_during_forward() {
     let msg =
         json!({ "pay_share": { "token_id": t, "period": "2026-Q3", "statement_hash": h('f') } });
     let _ = c.ft_on_transfer(acc("payer.near"), U128(50_000), msg.to_string());
-    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    call(&acc("alice.near"), NearToken::from_yoctonear(0));
     let _ = c.sync(t);
 }
 
@@ -1396,7 +1396,7 @@ fn late_failed_claim_after_stale_release_changes_no_balance() {
     let l = ledger(&c, &t);
     assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
     // sync reads the real vault balance and makes it claimable again.
-    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    call(&acc("bob.near"), NearToken::from_yoctonear(0));
     let _ = c.sync(t.clone());
     let epoch = c.ledgers.get(&t).unwrap().epoch;
     callback(ok(b"\"700000\""));
@@ -1501,7 +1501,7 @@ fn over_allocation_opens_dispute_and_freezes_only_the_contested_fraction() {
         None,
         None
     )));
-    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    call(&acc("carol.near"), NearToken::from_yoctonear(0));
     assert!(panics(|| drop(c.sync(b.clone()))));
     yocto(&acc("carol.near"));
     let _ = c.claim(b.clone());
@@ -1865,7 +1865,7 @@ fn confirm_share_reaches_counterparty_tier_and_drops_on_sale() {
 fn void_share_keeps_claim_and_sync() {
     let (mut c, _w, _a, _b, cl, id) = contested_setup();
     resolve(&mut c, id, Outcome::UpholdExisting);
-    call(&acc("anyone.near"), NearToken::from_yoctonear(0));
+    call(&acc("alice.near"), NearToken::from_yoctonear(0));
     let _ = c.sync(cl.clone());
     let epoch = c.ledgers.get(&cl).unwrap().epoch;
     callback(ok(b"\"9000\""));
@@ -1934,3 +1934,6 @@ fn only_the_registry_account_itself_can_initialise() {
     });
     assert!(r.is_err(), "init from another account must fail");
 }
+
+#[path = "review_fixes.rs"]
+mod review_fixes;
