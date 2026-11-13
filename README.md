@@ -48,10 +48,10 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 | 2 | `npm run verify:testnet` (read only, about one minute, no install needed) | One `PASS` line per check and `ALL CHECKS PASSED` at the end: 7 share vaults `s1` to `s7` with `0 access keys`, every code hash equal to `deployments/testnet.json`, token `s2` owned by `buyer-pub.royltee-dev.testnet` (the catalog sale), the registry and mock USDC each with `1 access key(s), 1 full access, as recorded`, and the solvency line. |
 | 3 | `npm run test:unit` | Rust unit tests: `test result: ok. 4 passed` (mock USDC), `98 passed` (registry), `5 passed` (vault). 107 in total. |
 | 4 | `npm test` | Builds all contracts to wasm, prints the size and sha256 of each file in `contracts/res/`, then runs every unit test and the near-workspaces sandbox tests: `8 passed` (agents), `4 passed` (disputes), `3 passed` (limits), `4 passed` (review), `11 passed` (sandbox). 30 sandbox tests, 137 in total. Takes a few minutes. |
-| 5 | Optional: `npm run lint` | `cargo fmt --check` and `cargo clippy -D warnings` for the host and wasm targets, no output on success. |
+| 5 | Optional: `npm run lint` | `cargo fmt --check`, then `cargo clippy -D warnings` for the host and wasm targets; ends with `Finished` and exit code 0. |
 | 6 | Open the explorer links under [Live testnet deployment](#live-testnet-deployment) | The same accounts, the catalog sale transfer of `s2`, the refused outsider claim, the agent payment and the dispute, on NEAR testnet. |
-| 7 | Site (in `site/`): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest: `Tests  126 passed (126)`; `astro check` with 0 errors; a build in `site/.vercel/output`. |
-| 8 | Site, local: `npm run dev` (in `site/`), then open http://127.0.0.1:4321 | The landing page, `/dashboard/`, `/help`, `/whitepaper`. Without server secrets the help chat and support API answer 503 (not configured). `site/README.md` explains how to run the API locally with in-memory storage. |
+| 7 | Site (in `site/`): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest: `Tests  130 passed (130)`; `astro check`: `0 errors`; a build in `site/.vercel/output`. |
+| 8 | Site, local: `npm run dev` (in `site/`), then open http://127.0.0.1:4321 | The landing page, `/dashboard/`, `/help`, `/whitepaper`. `/admin` answers 401 when not signed in. Without server secrets the help chat and support API answer 503 ("not configured yet"). `site/README.md` explains how to run the API locally with in-memory storage. |
 
 Hosted site: https://royltee.vercel.app <!-- TODO before submission: confirm the production site is reachable without a sign-in. -->
 
@@ -141,7 +141,7 @@ The **registrar is a trusted role** in this demo: it grants credentials, resolve
 - [THREAT_MODEL.md](THREAT_MODEL.md): 39 rows (T1 to T39), written before any contract code. Each row has the attack, impact, mitigation and the test that proves it. Rows that are trust assumptions rather than code (T12 registrar, T13 keys) say so.
 - [AUDIT.md](AUDIT.md): a manual audit pass and the contract review fixes.
 
-Test suites (counts from `npm test` on 2026-11-13 UTC):
+Test suites (counts from `npm test` and the site's `npm test`, run on a fresh clone on 2026-11-13 UTC):
 
 | Suite | Where | Count |
 |---|---|---|
@@ -153,7 +153,7 @@ Test suites (counts from `npm test` on 2026-11-13 UTC):
 | Sandbox: disputes | `contracts/tests/tests/disputes.rs` | 4 |
 | Sandbox: limits and gas | `contracts/tests/tests/limits.rs` | 3 |
 | Sandbox: review fixes | `contracts/tests/tests/review.rs` | 4 |
-| Site (help chat, tickets, limits) | `site/tests/` | 126 |
+| Site (help chat, tickets, limits) | `site/tests/` | 130 |
 
 Brief test list to sandbox tests (every sandbox test ends with a solvency check; tests that touch a vault also check it has zero keys):
 
