@@ -16,3 +16,15 @@ Branch: `fix/review-03b` for site changes, `fix/review-03a` for README parts. Lo
 | L5 method names and deposits | PARTLY | `add_line_credits` exists (agents.rs:139). `grant_role` has no fixed 0.01 NEAR fee: it charges the measured role storage and credits the rest as statement lines at 0.001 NEAR each (`LINE_STORAGE_BYTES` = 100); /agents now says that. The registrar's `sync` and `revoke_role` were added to the powers list, marked as taking no document hash. |
 | L6 refused agent claim | REAL | Marked as seen in a local CLI log only on /activity, /agents and help notes. |
 | I1 to I5 | Noted | I3 (footer TEE line) and I4 (stale "read on" copies after redeploy) deferred to the redeploy pass. |
+
+## Second reviewer, part 03c
+
+| # | Item | Verdict | Status |
+|---|---|---|---|
+| 1 | Undeployed restrictions shown as deployed (registrar, agents) | REAL | Registrar credential refusal and "not a payer" for agents labelled as after the planned registry update; "Claim from any share account" narrowed to shares it does not hold. |
+| 2 | "Nobody can change a split alone" | REAL | Carries the registrar dispute exception (first review M2). |
+| 3 | share.astro "no outside contract can list or move a share" | REAL | Reworded: no third party can be approved; a credentialed contract that becomes the holder (for example via `nft_transfer_call`) has normal holder powers. |
+| 4 | Agent 1 yoctoNEAR claim attempt listed under "Also on chain" | REAL | Moved to its own help notes line, "Refused before submission, with no transaction", seen in a local CLI log only. |
+| 5 | Document hash claim too broad | REAL | Limited to registrar actions that move a share or money; `sync` and `revoke_role` listed as taking none. |
+
+The second reviewer's read-only transaction checks corroborated the sampled mint, credential, sale, claim, agent and dispute transactions. Exact recorded timestamps remain UNVERIFIED.
