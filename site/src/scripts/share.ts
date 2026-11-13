@@ -70,7 +70,7 @@ $('[data-history]').replaceChildren(rows.length
   ? h('div', { class: 'table-wrap' }, h('table', { class: 'ledger rows-sm' },
       h('thead', {}, h('tr', {}, h('th', { text: 'Step' }), h('th', { text: 'What happened' }), h('th', { text: 'Result' }), h('th', { text: 'Transaction' }))),
       h('tbody', {}, ...rows.map((s) => h('tr', {},
-        h('td', { class: 'p nowrap' }, h('strong', { text: s.step }), s.simulated ? h('span', { class: 'badge sim step-sim', text: 'Simulated payer' }) : null),
+        h('td', { class: 'p nowrap' }, h('strong', { text: s.step }), s.simulated ? h('span', { class: 'badge sim step-sim', text: 'Simulated payer' }) : null, s.agent ? h('span', { class: 'badge info step-sim', text: 'Scripted agent' }) : null),
         h('td', { class: 'p-wrap' }, s.what, h('span', { class: 'small muted only-wide' }, h('br'), s.shows)),
         h('td', { class: 'p-end' }, s.result === 'refused' ? badge('Refused', 'bad') : badge(s.result === 'info' ? 'Recorded' : 'Done', s.result === 'info' ? 'info' : 'ok')),
         h('td', { class: 'm' }, ...s.txs.map(tx)))))))

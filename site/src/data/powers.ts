@@ -26,6 +26,8 @@ export const POWERS: Power[] = [
   { method: 'attest_share', who: 'payer', what: 'A payer confirms a share, raising its evidence tier', ui: null, note: 'Simulated payer' },
   { method: 'grant_credential, suspend_credential, reinstate_credential', who: 'registrar', what: 'Admit, pause and restore verified members', ui: null },
   { method: 'grant_payer_role, revoke_payer_role', who: 'registrar', what: 'Name which accounts may pay works', ui: null },
+  { method: 'sync', who: 'registrar', what: 'Pull a plain deposit into the share ledger for any share (no document hash)', ui: null },
+  { method: 'revoke_role', who: 'registrar', what: 'Stop any agent at its next call (no document hash)', ui: null },
   { method: 'resolve', who: 'registrar', what: 'Decide a dispute with a document hash', ui: null },
   { method: 'release_unallocated', who: 'registrar', what: 'Release money that reached the registry for no share, within fixed rules', ui: null },
   { method: 'registrar_transfer', who: 'registrar', what: 'Move the share of a suspended member, with a document hash', ui: null },

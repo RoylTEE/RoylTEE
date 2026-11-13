@@ -13,8 +13,8 @@ export const TOKEN_DECIMALS = 6;
 /** Both hosts are already in the site CSP connect-src. The first is tried first. */
 export const RPC_URLS = ['https://test.rpc.fastnear.com', 'https://rpc.testnet.near.org'] as const;
 export const EXPLORER = 'https://testnet.nearblocks.io';
-export const txUrl = (hash: string) => `${EXPLORER}/txns/${hash}`;
-export const accountUrl = (account: string) => `${EXPLORER}/address/${account}`;
+export const txUrl = (hash: string) => `${EXPLORER}/txns/${encodeURIComponent(hash)}`;
+export const accountUrl = (account: string) => `${EXPLORER}/address/${encodeURIComponent(account)}`;
 /** Display names for the demo accounts. All fictional. */
 export const ROLE_OF: Record<string, string> = {
   'writer-a.royltee-dev.testnet': 'Writer A',
@@ -25,7 +25,7 @@ export const ROLE_OF: Record<string, string> = {
   'outsider.royltee-dev.testnet': 'Outsider, no credential',
   'registrar.royltee-dev.testnet': 'Registrar',
 };
-export type Scene = { step: string; what: string; shows: string; txs: string[]; tokens: string[]; result: 'ok' | 'refused' | 'info'; simulated?: boolean };
+export type Scene = { step: string; what: string; shows: string; txs: string[]; tokens: string[]; result: 'ok' | 'refused' | 'info'; simulated?: boolean; agent?: boolean };
 export const SCENES: Scene[] = [
   { step: 'Pay', what: 'Payer pays work 0 once, 1.0 mUSDC, split 0.5 and 0.5 into vaults s1 and s2', shows: 'One payment, split by basis points', txs: ['HBzKi5ptr5sGvPSgwWQSUNMKBRJksNCp3tAeT4xByo8u'], tokens: ['s1', 's2'], result: 'ok', simulated: true },
   { step: 'Deposit', what: 'Plain 0.2 mUSDC straight into vault s3, then sync', shows: 'A direct deposit is picked up', txs: ['5wiQVMdfYtuFvUsYcaTeM31sZPizytAaT8etsDx9dQZo', '2Jsht1EatGqZfeVrZePKyVMQPyqyeqTCpEcoaHWK44LY'], tokens: ['s3'], result: 'ok' },
@@ -33,7 +33,7 @@ export const SCENES: Scene[] = [
   { step: 'Sale', what: 'Catalog sale: writer-b transfers s2 to buyer-pub', shows: 'Control moves with the NFT. Vault s2 keeps 0 keys', txs: ['HZ9pD2kLbqbjmKqC68ao6KBTUpQmQstyd2Tro8hWwYPy'], tokens: ['s2'], result: 'ok' },
   { step: 'Claim', what: 'buyer-pub claims s2, the 0.5 paid before the sale', shows: 'Unclaimed money moved with the token', txs: ['M4pWDbEgnUfz4TiJA8ZZdNVCnwV9vzsBnnEqRgALDrp'], tokens: ['s2'], result: 'ok' },
   { step: 'Refusal', what: 'outsider tries to claim s1', shows: 'Refused: only the current holder can claim', txs: ['GvcHLtG7vLQXihNgbH6cmGSnG8QWhsNgzYGFQ2URwAVB'], tokens: ['s1'], result: 'refused' },
-  { step: 'Agent', what: 'Agent pays work 1 from its allowance, line agent-line-1', shows: 'The contract picks the payees. Signed with the agent full access key before that key was deleted', txs: ['7DJThzgCgnZYf9uNhPgH5ZsuJKx8mJqHkiLcqszdRSTu'], tokens: ['s3', 's4'], result: 'ok', simulated: true },
+  { step: 'Agent', what: 'Agent pays work 1 from its allowance, line agent-line-1', shows: 'The contract picks the payees. Signed with the agent full access key before that key was deleted', txs: ['7DJThzgCgnZYf9uNhPgH5ZsuJKx8mJqHkiLcqszdRSTu'], tokens: ['s3', 's4'], result: 'ok', agent: true },
   { step: 'Agent', what: 'Agent full access key deleted', shows: 'From here the agent holds a function call key only', txs: ['7Bwi9rmQk4R4iApdVTXMWLkGjMgDnh2qZiVEfGPY5NAH'], tokens: [], result: 'info' },
   { step: 'Agent', what: 'Agent report, signed with the function call key', shows: 'The scoped key works', txs: ['CmRvd9ZNcfsR5EnMsc3VJ6YYncE3mQgLWqF21YhS1w5G'], tokens: [], result: 'ok' },
   { step: 'Agent', what: 'Agent submits agent-line-1 again', shows: 'Refused: a statement line pays once', txs: ['2547uRUDcHokGMabzgLXdHZVfuG1VzDyxBc2X1rxmFb3'], tokens: [], result: 'refused' },

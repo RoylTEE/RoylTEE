@@ -2,14 +2,14 @@
 import App from '../layouts/App.astro';
 import PowerTable from '../components/PowerTable.astro';
 import { REGISTRAR, REGISTRAR_EVENTS, REGISTRAR_EVENT_KINDS, accountUrl, txUrl } from '../data/testnet';
-const cannot = ['Hold a credential', 'Claim from any share account', "Move an active member's share", 'Sign for a share account (they have no keys)'];
+const cannot = ['Hold a credential (after the planned registry update; the deployed build does not refuse it yet)', 'Claim from any share account', "Move an active member's share", 'Sign for a share account (they have no keys)'];
 const count = (k: string) => REGISTRAR_EVENTS.filter((e) => e.kind === k).length;
 const one: Record<string, string> = { credential_granted: 'Credential granted', credential_suspended: 'Credential suspended', credential_reinstated: 'Credential reinstated', payer_role_granted: 'Payer role granted', payer_role_revoked: 'Payer role revoked', registrar_transfer: 'Registrar transfer', dispute_resolved: 'Dispute resolved' };
 const none = REGISTRAR_EVENT_KINDS.filter(([k]) => !count(k)).map(([, l]) => l);
 const events = [...REGISTRAR_EVENTS].sort((a, b) => b.at.localeCompare(a.at));
 const short = (a: string) => a.replace(/\.royltee-dev\.testnet$/, '');
 ---
-<App area="registrar" tab="log" title="Registrar log" intro="The registrar is a trusted role in this demo. Every registrar action is an event with a document hash.">
+<App area="registrar" tab="log" title="Registrar log" intro="The registrar is a trusted role in this demo. Every registrar action that moves a share or money is an event with a document hash; sync and revoke_role take none.">
   <section class="panel" id="log" data-tab-panel aria-labelledby="log-h">
     <div class="panel-head"><h2 id="log-h">Registrar log</h2><span class="caption">Read from the recorded events, newest first</span></div>
     <div class="table-wrap">
@@ -57,7 +57,7 @@ const short = (a: string) => a.replace(/\.royltee-dev\.testnet$/, '');
       <p class="label">Cannot</p>
       <div class="method-list">{cannot.map((c) => <span class="method no">{c}</span>)}</div>
     </div>
-    <p class="panel-foot">Methods checked against the deployed contract code on 2026-11-13. A multisig council with a time delay is roadmap.</p>
+    <p class="panel-foot">Methods checked against the contract code on 2026-11-13; items marked for the planned registry update are on the branch code only. A multisig council with a time delay is roadmap.</p>
   </section>
 </App>
 <script>import '../scripts/registrar.ts';</script>

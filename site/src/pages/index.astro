@@ -10,7 +10,7 @@ const sheet = [
 const sale = SCENES.filter((s) => s.tokens.includes('s2') || (s.step === 'Refusal'));
 const people = [
   { who: 'Songwriters and artists', job: 'Check the split on record, see what each share earned, claim it.', where: 'Your shares', href: '/member' },
-  { who: 'Publishers and labels', job: 'Hold shares, approve split sheets for works they registered, run a payment agent.', where: 'Split sheets', href: '/catalog/splits/' },
+  { who: 'Publishers and labels', job: 'Hold shares, run a payment agent, and approve split sheets for works they registered (after the planned registry update; not on the deployed build yet).', where: 'Split sheets', href: '/catalog/splits/' },
   { who: 'Catalog buyers', job: 'Confirm the share, the payout account, that the seller kept no key, and that unclaimed money came along.', where: 'Share accounts', href: '/shares/accounts/' },
   { who: 'Payers and their agents', job: 'Pay a work once, inside fixed limits, without ever choosing the payee.', where: 'Agents', href: '/agents' },
   { who: 'Registrar', job: 'Admit members, resolve disputes with a document hash, answer support.', where: 'Registrar', href: '/registrar' },
@@ -23,7 +23,7 @@ const steps = [
 ];
 const holder = ['Claim the balance of its share account', 'Transfer the share to another verified member', 'Set a short public note on the share (CLI only in this demo)', 'Confirm a co-holder share of the same work (CLI only in this demo)'];
 const agent = ['Pay a work or share from its allowance', 'Report a statement line', 'Stay under a per payment limit, a 24 hour limit and a daily count'];
-const nobody = ['Choose where an agent payment goes', 'Change a split alone', 'Add a key to a share account', 'Pay the same statement line twice'];
+const nobody = ['Choose where an agent payment goes', 'Change a split alone (except the registrar resolving a dispute, with a document hash)', 'Add a key to a share account', 'Pay the same statement line twice'];
 const real = [
   ['Registry, share account and Mock USDC (testnet) contracts', 'Identity checks (KYB) behind a member credential'],
   ['Share accounts with zero access keys', 'The fiat rail and conversion to USDC'],
@@ -40,7 +40,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
       <div class="hero-copy">
         <p class="eyebrow">Music rights registry, live on NEAR testnet</p>
         <h1>{PITCH}</h1>
-        <p class="lead">The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.</p>
+        <p class="lead">The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it. The registry account itself still holds one full access key on testnet; see Real and Simulated below.</p>
         <div class="actions">
           <a class="btn primary" href={DASHBOARD_URL}>Open the registry</a>
           <a class="btn" href="#verify">Check it yourself</a>
@@ -131,7 +131,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
             <tbody>
               {sale.map((s) => (
                 <tr>
-                  <td class="p nowrap"><strong>{s.step}</strong>{s.simulated && <span class="badge sim">Simulated payer</span>}</td>
+                  <td class="p nowrap"><strong>{s.step}</strong>{s.simulated && <span class="badge sim">Simulated payer</span>}{s.agent && <span class="badge info">Scripted agent</span>}</td>
                   <td class="p-wrap">{s.what}<span class="small muted only-wide"><br />{s.shows}</span></td>
                   <td class="p-end">{s.result === 'refused' ? <span class="badge bad">Refused</span> : <span class="badge ok">Done</span>}</td>
                   <td class="m">{s.txs.map((h) => <a class="acct-link" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td>
@@ -173,7 +173,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
             <tbody>{real.map(([a, b]) => <tr><td class="p-wrap">{a}</td><td class="m wrap"><span class="only-narrow">Simulated: </span>{b}</td></tr>)}</tbody>
           </table>
         </div>
-        <div class="panel-foot">The registrar is a trusted role: every registrar action carries a document hash and emits an event. The registry and token accounts still hold one full access key each, so the registry itself is not keyless yet. The contracts use no trusted execution environment.</div>
+        <div class="panel-foot">The registrar is a trusted role: every registrar action that moves a share or money carries a document hash and emits an event. The registry and token accounts still hold one full access key each, so the registry itself is not keyless yet. The contracts use no trusted execution environment.</div>
       </div>
     </div>
   </section>

@@ -40,14 +40,14 @@ export const prerender = false;
     </section>
 
     <section class="panel" id="approvals" data-tab-panel aria-labelledby="ap-h">
-      <div class="panel-head"><h2 id="ap-h">Split sheets to approve</h2><span class="caption">Shares other members registered on works this account registered</span></div>
+      <div class="panel-head"><h2 id="ap-h">Split sheets to approve</h2><span class="caption">Shares other members registered on works this account registered</span><span class="end"><span class="badge info">Not on the deployed build yet</span></span></div>
       <div data-approvals><div class="panel-body"><div class="empty"><p>Choose an account first. Shares that wait for its signature show up here.</p></div></div></div>
     </section>
 
     <section class="panel" id="draft" data-tab-panel aria-labelledby="draft-h">
       <div class="panel-head"><h2 id="draft-h">Draft a split sheet</h2><span class="end"><span class="badge unv">UNVERIFIED</span></span></div>
       <div class="panel-body" data-draft><p class="loading">Reading works</p></div>
-      <p class="panel-foot">Sending from this page has not been run on testnet yet. Each row becomes one register_share call from your wallet with 0.2 NEAR attached for the share account and storage; the contract refunds what it does not use.</p>
+      <p class="panel-foot">Sending from this page has not been run on testnet yet. Each row becomes one register_share call from your wallet with 0.2 NEAR attached. The contract takes 0.1 NEAR for the share account, 0.00125 NEAR for its token registration and the storage the record uses plus 1000 bytes reserved for the mint, and refunds the rest in the same call (whether 0.2 NEAR always covers it is UNVERIFIED on testnet). If the mint later fails because the holder lost its credential, or is released as stale, that NEAR is not refunded.</p>
     </section>
   </div>
 </App>

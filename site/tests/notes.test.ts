@@ -10,7 +10,7 @@ describe('grounding notes', () => {
     'Testnet only', 'not an investment product', 'no keys', 'only the current holder can claim', 'moves with the token', 'active credential',
     'does not use a trusted execution environment', 'Attestation is not verified by this app', 'TEE auction: not built', 'Licenses: not built', 'scripted Node agent, not an AI model',
     'seven shares s1 to s7', 'The dispute scene is on chain too', 'split sheet (approve or reject a share) is tested in the code but not deployed yet', 'still hold one full access key', 'Simulated', 'NEP-413', 'deleted 30 days after they close', 'never on chain and never in logs',
-    'read live NEAR testnet values with view calls', 'so it is UNVERIFIED', 'needs an event indexer, which is roadmap',
+    'are read live from NEAR testnet with view calls', 'are the recorded demo', 'so it is UNVERIFIED', 'needs an event indexer, which is roadmap',
   ])('states %s', fact => expect(notes).toContain(fact));
   it('every link resolves to a real route and anchor', () => {
     const found = [...notes.matchAll(/\]\(([^)]+)\)/g)].map(m => m[1]);

@@ -60,24 +60,30 @@ export async function createTicket(store: Store, owner: string, input: Record<st
   await store.add('tickets:all', now, ticket.id);
   return ticket;
 }
+/** Upper bound on index entries read for one page. */
+const MAX_WINDOW = 4096;
 export async function listTickets(store: Store, owner: string | null, now: number, cursorValue: string | null = null, limit = PAGE_SIZE): Promise<TicketPage> {
   await sweep(store, now);
   const cursor = decodeCursor(cursorValue);
   const index = owner ? wallet(owner) : 'tickets:all';
   const take = Math.min(Math.max(limit, 1), 500);
-  const ids = await store.rangeNewest(index, cursor ? cursor.createdAt : Number.MAX_SAFE_INTEGER, take + 2);
-  const tickets: Ticket[] = [];
-  let seenCursor = !cursor;
-  for (const id of ids) {
-    const t = await store.get<Ticket>(`ticket:${id}`);
-    if (!t) { await store.remove(index, id); continue; }
-    if (owner !== null && t.wallet !== owner) continue;
-    if (!seenCursor) {
-      if (id === cursor!.id && t.createdAt === cursor!.createdAt) seenCursor = true;
-      continue;
+  // Skip by position (createdAt, then id, in the index order: newest first, ties by id descending),
+  // not by finding the cursor record, so a cursor ticket that expired between pages does not end the
+  // list. Tickets on the cursor's own millisecond that were already shown are skipped, and the window
+  // grows if they fill it, so ties never end the list early either.
+  let tickets: Ticket[] = [];
+  for (let window = take + 2; ; window = Math.min(window * 2, MAX_WINDOW)) {
+    const ids = await store.rangeNewest(index, cursor ? cursor.createdAt : Number.MAX_SAFE_INTEGER, window);
+    tickets = [];
+    for (const id of ids) {
+      const t = await store.get<Ticket>(`ticket:${id}`);
+      if (!t) { await store.remove(index, id); continue; }
+      if (cursor && !(t.createdAt < cursor.createdAt || (t.createdAt === cursor.createdAt && id < cursor.id))) continue;
+      if (owner !== null && t.wallet !== owner) continue;
+      tickets.push(t);
+      if (tickets.length === take + 1) break;
     }
-    tickets.push(t);
-    if (tickets.length === take + 1) break;
+    if (tickets.length === take + 1 || ids.length < window || window === MAX_WINDOW) break;
   }
   const more = tickets.length > take;
   const page = more ? tickets.slice(0, take) : tickets;

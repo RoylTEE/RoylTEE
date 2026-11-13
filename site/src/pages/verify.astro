@@ -8,7 +8,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
   <section class="panel" aria-labelledby="ch-h">
     <div class="panel-head"><h2 id="ch-h">Contract code</h2><span class="caption">Code hash on chain now against the deploy record</span></div>
     <div class="table-wrap" data-code><p class="loading panel-body">Reading code hashes</p></div>
-    <p class="panel-foot">The deploy record is deployments/testnet.json in the repository. The wasm files are built locally and not committed, so which git commit produced them is UNVERIFIED; their sha256 matches the chain.</p>
+    <p class="panel-foot">The deploy record is deployments/testnet.json in the repository. The wasm files are built locally and not committed, so which git commit produced them is UNVERIFIED; their sha256 matched the chain when they were deployed. Whether a fresh build reproduces the same bytes is UNVERIFIED, so a rebuild may not match byte for byte. The deployed registry wasm itself is kept in the repository as a test fixture for the upgrade test.</p>
   </section>
   <section class="panel" aria-labelledby="sa-h">
     <div class="panel-head"><h2 id="sa-h">Share accounts</h2><span class="caption">Vault code and access keys of every share account</span></div>
