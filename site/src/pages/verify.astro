@@ -1,0 +1,36 @@
+---
+import App from '../layouts/App.astro';
+const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"s2.reg.royltee-dev.testnet"}}'`;
+---
+<App area="verify" title="Verify" intro="Check the deployment yourself: the code running on each contract, the share accounts with no keys, and the keys still left on the contract accounts. Everything here is read live.">
+  <section class="figures kpi" data-vfig><p class="loading figure">Reading testnet</p></section>
+  <section class="panel" aria-labelledby="ch-h">
+    <div class="panel-head"><h2 id="ch-h">Contract code</h2><span class="caption">Code hash on chain now against the deploy record</span></div>
+    <div class="table-wrap" data-code><p class="loading panel-body">Reading code hashes</p></div>
+    <p class="panel-foot">The deploy record is deployments/testnet.json in the repository. The wasm files are built locally and not committed, so which git commit produced them is UNVERIFIED; their sha256 matches the chain.</p>
+  </section>
+  <section class="panel" aria-labelledby="sa-h">
+    <div class="panel-head"><h2 id="sa-h">Share accounts</h2><span class="caption">Vault code and access keys of every share account</span></div>
+    <div class="table-wrap" data-vaults><p class="loading panel-body">Reading share accounts</p></div>
+  </section>
+  <section class="panel" aria-labelledby="k-h">
+    <div class="panel-head"><h2 id="k-h">Keys still on contract accounts</h2></div>
+    <div class="table-wrap" data-keys><p class="loading panel-body">Reading keys</p></div>
+    <p class="panel-foot">The registry and the Mock USDC contract each keep one full access key so the planned registry update can be deployed in place. Deleting them is planned after that update (roadmap). Until then the registry itself is not keyless; the share accounts are.</p>
+  </section>
+  <section class="panel" aria-labelledby="cmd-h">
+    <div class="panel-head"><h2 id="cmd-h">From your own machine</h2><span class="caption">No wallet needed</span></div>
+    <div class="panel-body">
+      <p class="small">From a clone of the repository, this checks all seven share accounts, the code hashes and the balances against the deploy record:</p>
+      <pre class="code"><code>npm run verify:testnet</code></pre>
+      <p class="small">Or ask a public testnet node for the keys of the share account that was sold. The answer is an empty list:</p>
+      <pre class="code"><code>{curl}</code></pre>
+    </div>
+  </section>
+</App>
+<script>import '../scripts/verify.ts';</script>
+<style is:global>
+  .code { margin: 0; padding: var(--s4); background: var(--ink); color: #f3f1ea; border-radius: var(--r-ctl); overflow-x: auto; font-family: var(--mono); font-size: var(--fs-12); line-height: 1.6; }
+  .hash { font-family: var(--mono); font-size: var(--fs-12); }
+</style>

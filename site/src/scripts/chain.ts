@@ -95,3 +95,13 @@ export const near = (yocto: string | bigint) => units(yocto, 24, 4, 4);
 export const pct = (bps: number) => `${(bps / 100).toFixed(bps % 100 ? 2 : 0)}%`;
 export const utc = (ns: string | null | undefined) => ns ? new Date(Number(BigInt(ns) / 1_000_000n)).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' : 'none';
 export const short = (account: string) => account.replace(/\.royltee-dev\.testnet$/, '');
+
+const B58 = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+/** Base58 (as in NEAR code_hash) to lowercase hex, so it can be compared with a sha256 hex. */
+export function base58ToHex(s: string): string {
+  let n = 0n;
+  for (const c of s) { const i = B58.indexOf(c); if (i < 0) throw new Error('not base58'); n = n * 58n + BigInt(i); }
+  let hex = n.toString(16); if (hex.length % 2) hex = '0' + hex;
+  const lead = s.match(/^1*/)![0].length;
+  return '00'.repeat(lead) + hex;
+}

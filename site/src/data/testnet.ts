@@ -54,3 +54,10 @@ export function categoriesOf(s: Scene): string[] {
   if (s.step === 'Resolve') c.add('registrar');
   return [...c];
 }
+
+/** Code hashes from deployments/testnet.json in the contracts repository (recorded 2026-11-13 07:59 UTC). */
+export const DEPLOY_RECORD = {
+  registry: { account: 'reg.royltee-dev.testnet', codeHash: 'GZkyojcHYDip7pZsDYvkgkjEtgGakPZZcX28cgSyAVhq', sha256: 'e7439e120c7c00e3b71a658b1083dfd28bfd67708d820ef84a10157c87de10f8' },
+  mockUsdc: { account: 'usdc.royltee-dev.testnet', codeHash: '47ybTZxhaJ9ZW3FC9jwaDdLfwgkJ59cCrnkSn5oop67t', sha256: '2e5c896b2ead7d1bd12a2944971d6a393902084cf47616c54d18e7a577efc0bb' },
+  vault: { codeHash: 'BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU', sha256: '973b2cbdbe904de710dcc7bf54a7b4164156f8c81d2932191e6968514aaaa727' },
+} as const;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
-import { units, musdc, near, pct, utc, short } from '../src/scripts/chain';
+import { units, musdc, near, pct, utc, short, base58ToHex } from '../src/scripts/chain';
+import { DEPLOY_RECORD } from '../src/data/testnet';
 import { RPC_URLS, SCENES, REGISTRY, TOKEN, EXPLORER } from '../src/data/testnet';
 import { strictPolicy, walletPolicy } from '../src/server/csp';
 import { AREAS, GROUPS } from '../src/data/ia';
@@ -97,7 +98,7 @@ describe('app shell: menu by purpose', () => {
   });
   it('every app page names a known area, and admin stays out of the menu', () => {
     const keys = AREAS.map((a) => a.key);
-    for (const f of ['dashboard', 'catalog/index', 'catalog/splits', 'shares/index', 'shares/accounts', 'shares/claims', 'share', 'activity', 'agents', 'disputes', 'registrar', 'member', 'help', 'docs', 'whitepaper', 'admin']) {
+    for (const f of ['dashboard', 'catalog/index', 'catalog/splits', 'shares/index', 'shares/accounts', 'shares/claims', 'share', 'activity', 'agents', 'disputes', 'registrar', 'verify', 'member', 'help', 'docs', 'whitepaper', 'admin']) {
       const m = src(`pages/${f}.astro`).match(/<App area="([a-z]+)"/);
       expect(m, f).not.toBeNull();
       expect(keys, f).toContain(m![1]);
@@ -110,5 +111,19 @@ describe('app shell: menu by purpose', () => {
     expect(app.match(/<script is:inline/g)?.length).toBe(1);
     expect(app).toMatch(/\{cspNonce && <script is:inline nonce=\{cspNonce\} data-csp-nonce><\/script>\}/);
     expect(src('scripts/shell.ts')).not.toMatch(/innerHTML|eval\(/);
+  });
+});
+
+describe('verify page', () => {
+  it('base58 code hashes convert to the sha256 hex in the deploy record', () => {
+    expect(base58ToHex(DEPLOY_RECORD.registry.codeHash)).toBe(DEPLOY_RECORD.registry.sha256);
+    expect(base58ToHex(DEPLOY_RECORD.mockUsdc.codeHash)).toBe(DEPLOY_RECORD.mockUsdc.sha256);
+    expect(base58ToHex(DEPLOY_RECORD.vault.codeHash)).toBe(DEPLOY_RECORD.vault.sha256);
+  });
+  it('shows the verify command and labels key deletion as planned, not done', () => {
+    const v = src('pages/verify.astro');
+    expect(v).toMatch(/npm run verify:testnet/);
+    expect(v).toMatch(/Deleting them is planned after that update \(roadmap\)/);
+    expect(v).toMatch(/UNVERIFIED/);
   });
 });

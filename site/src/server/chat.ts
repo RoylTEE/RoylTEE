@@ -22,7 +22,7 @@ export function refusal(question: string) {
   if (unrelated.test(question)) return 'That is outside what I can help with here. I can explain RoylTEE shares, vaults, the testnet demo or wallet support. [How it works](/#how) is a good place to start.';
   return null;
 }
-export const LINKS = new Set(['/', '/#how', '/#agents', '/#lifecycle', '/#trust', '/#notice', '/#problem', '/dashboard/', '/catalog/', '/catalog/splits/', '/shares/', '/shares/accounts/', '/shares/claims/', '/activity', '/agents', '/disputes', '/registrar', '/member', '/docs', '/whitepaper', '/help', '/help#chat', '/help#support']);
+export const LINKS = new Set(['/', '/#how', '/#agents', '/#lifecycle', '/#trust', '/#notice', '/#problem', '/dashboard/', '/catalog/', '/catalog/splits/', '/shares/', '/shares/accounts/', '/shares/claims/', '/activity', '/agents', '/disputes', '/registrar', '/verify', '/member', '/docs', '/whitepaper', '/help', '/help#chat', '/help#support']);
 /** Returns null when the reply must not be shown; otherwise drops links outside the app. Raw outside URLs are withheld instead of leaving a mid-sentence placeholder. */
 const RAW_URL = /(?<![A-Za-z0-9])(?:https?:\/\/|(?:javascript|data|vbscript):)\S*|(?<![A-Za-z0-9:])\/\/[A-Za-z0-9][^\s)]*/i;
 export function cleanAnswer(value: string): string | null {
