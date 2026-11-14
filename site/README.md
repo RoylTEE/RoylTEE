@@ -27,7 +27,7 @@ Names only; values live in the host's environment settings, never in the repo.
 | `NEARAI_MODEL` | help chat | optional, default `z-ai/glm-5.3-flash` |
 | `CHAT_HMAC_SECRET` | help chat | 32+ random characters; signs assistant turns |
 | `SESSION_SECRET` | support | 32+ random characters; signs the sign in cookie and keys hashed client addresses |
-| `ALLOWED_ORIGINS` | both | comma separated exact origins of the deployed site |
+| `ALLOWED_ORIGINS` | both | comma separated exact origins of the deployed site, for example `https://royltee.vercel.app,https://royltee.app`. A request from an origin that is not in the list is refused. The list lives only in this setting: neither the code nor `vercel.json` has a default, and the page security policy uses `'self'`, so it follows whatever domain serves the site |
 | `ADMIN_WALLET` | support admin | owner wallet, intended `admin.royltee-dev.testnet` (not created yet) |
 | `ADMIN_PUBLIC_KEY` | support admin | optional. If set to an `ed25519:` public key, admin sign-in and admin routes also require that exact key. Not set in the environment in this pass (needs a separate yes). |
 | `NEAR_RPC_URL` | support | optional, default `https://test.rpc.fastnear.com` |
