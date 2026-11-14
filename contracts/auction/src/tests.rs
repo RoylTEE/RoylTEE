@@ -1484,7 +1484,11 @@ fn ar2_a_delayed_return_callback_keeps_a_newer_auctions_index() {
     c.on_delivered(0, c.auction(0).delivery_op);
     let old_op = c.auction(0).return_op;
     // The return fails visibly, then the share is found elsewhere.
-    ctx_result("auction.root.testnet", after_end() + SEC, PromiseResult::Failed);
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + SEC,
+        PromiseResult::Failed,
+    );
     assert!(!c.on_returned(0, old_op));
     ctx("anyone.testnet", after_end() + 2 * SEC, 0);
     let _ = c.refresh_share(U64(0));
@@ -1900,7 +1904,11 @@ fn on_withdrawn_takes_account_and_amount_from_the_pending_record() {
     let mut c = sold();
     ctx("anyone.testnet", after_end() + SEC, 0);
     c.withdraw(vec![acc("seller.testnet")]);
-    ctx_result("auction.root.testnet", after_end() + 2 * SEC, PromiseResult::Failed);
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + 2 * SEC,
+        PromiseResult::Failed,
+    );
     assert!(!c.on_withdrawn(0, acc("carol.testnet"), U128(1)));
     assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
     assert_eq!(c.get_owed(acc("carol.testnet")).0, MAX);

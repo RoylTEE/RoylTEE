@@ -204,7 +204,9 @@ impl AuctionContract {
                 (0u8, a.delivery_op)
             }
             Status::Cancelled
-                if a.share_held && a.returning && now >= a.returning_since.0 + RECONCILE_AFTER_NS =>
+                if a.share_held
+                    && a.returning
+                    && now >= a.returning_since.0 + RECONCILE_AFTER_NS =>
             {
                 (1u8, a.return_op)
             }
@@ -235,9 +237,7 @@ impl AuctionContract {
         };
         let current = match stage {
             0 => a.status == Status::Delivering && a.delivery_op == op,
-            _ => {
-                a.status == Status::Cancelled && a.share_held && a.returning && a.return_op == op
-            }
+            _ => a.status == Status::Cancelled && a.share_held && a.returning && a.return_op == op,
         };
         if !current {
             return false;

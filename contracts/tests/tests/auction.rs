@@ -1070,6 +1070,21 @@ async fn a14_a_sale_completes_with_almost_no_spare_near() -> anyhow::Result<()> 
         .all(|b| b["ciphertext"] == ""));
     assert_eq!(a.accounting().await?, (0, 2 * MAX));
     a.assert_auction_solvent().await?;
+    // AR-4: with almost no free NEAR the contract refuses to write pending
+    // withdrawal records, and nothing is debited.
+    let refused = a
+        .withdraw(&[a.e.writer_a.id(), a.e.buyer.id(), a.e.writer_b.id()])
+        .await?;
+    assert!(
+        refused.is_failure(),
+        "withdraw needs the free balance floor"
+    );
+    assert_eq!(a.accounting().await?, (0, 2 * MAX));
+    // After a top up the same call works.
+    check(
+        root.transfer_near(a.auction.id(), NearToken::from_near(1))
+            .await?,
+    );
     check(
         a.withdraw(&[a.e.writer_a.id(), a.e.buyer.id(), a.e.writer_b.id()])
             .await?,
