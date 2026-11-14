@@ -11,7 +11,21 @@
 //  2. no ledger has a payout lock or a transfer lock
 //  3. forwards_in_flight_total is 0
 // Every token is read page by page until the end. Exit code 0 only if all
+//  4. no stored forward watch (raw storage key prefix "fwd:") exists
+// Every token is read page by page until the end. Exit code 0 only if all
 // of this holds. If it fails, wait for the callbacks and run it again.
+//
+// All reads use ONE pinned block: the script first asks for the latest final
+// block, then sends every query with that block hash, so the checks describe
+// a single state and not a mix of states. A pass prints "SNAPSHOT QUIET".
+// This is a precheck for people. The atomic guarantee is the on-chain
+// assert_quiescent call in the same transaction as the deploy (DEPLOY_PLAN
+// step 15c). Run this script once more after the deploy: the registry should
+// still be quiet and holding no watch entries unless a payment came in.
+//
+// Check 4 exists because the watch layout changed between builds (36, 60 and
+// now 68 bytes). The new code must never meet an older entry, and the live
+// registry has none because the deployed code never writes them.
 //
 // RPC endpoint: NEAR_RPC_URL, default https://rpc.testnet.near.org.
 // VERIFY_RECORD overrides the record path (used by the script's own tests).
@@ -30,30 +44,37 @@ let failures = 0;
 const pass = (msg) => console.log(`PASS  ${msg}`);
 const fail = (msg) => { failures += 1; console.log(`FAIL  ${msg}`); };
 
-async function view(account_id, method_name, args = {}) {
+async function rpc(method, params) {
   for (let attempt = 1; attempt <= 4; attempt += 1) {
     try {
       const res = await fetch(RPC, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0', id: 'quiet', method: 'query',
-          params: {
-            finality: 'final', request_type: 'call_function', account_id, method_name,
-            args_base64: Buffer.from(JSON.stringify(args)).toString('base64'),
-          },
-        }),
+        body: JSON.stringify({ jsonrpc: '2.0', id: 'quiet', method, params }),
       });
       const body = await res.json();
       if (body.error) throw new Error(JSON.stringify(body.error));
       if (body.result && body.result.error) throw new Error(body.result.error);
-      return JSON.parse(Buffer.from(body.result.result).toString('utf8'));
+      return body.result;
     } catch (err) {
       if (attempt === 4) throw err;
       await new Promise((r) => setTimeout(r, 1500 * attempt));
     }
   }
   throw new Error('unreachable');
+}
+
+// One block for every read.
+const head = await rpc('block', { finality: 'final' });
+const block_id = head.header.hash;
+console.log(`Pinned block ${head.header.height} (${block_id})`);
+
+async function view(account_id, method_name, args = {}) {
+  const result = await rpc('query', {
+    block_id, request_type: 'call_function', account_id, method_name,
+    args_base64: Buffer.from(JSON.stringify(args)).toString('base64'),
+  });
+  return JSON.parse(Buffer.from(result.result).toString('utf8'));
 }
 
 console.log(`RPC ${RPC}`);
@@ -86,5 +107,14 @@ fif === '0' || fif === 0
   ? pass('forwards_in_flight_total is 0')
   : fail(`forwards_in_flight_total is ${JSON.stringify(fif)}, expected 0`);
 
-console.log(`\n${failures === 0 ? 'QUIET: SAFE TO REDEPLOY' : `${failures} CHECK(S) FAILED: DO NOT REDEPLOY YET`}`);
+const watched = await rpc('query', {
+  block_id, request_type: 'view_state', account_id: reg.account_id,
+  prefix_base64: Buffer.from('fwd:').toString('base64'),
+});
+const nWatch = Array.isArray(watched.values) ? watched.values.length : -1;
+nWatch === 0
+  ? pass('no fwd: watch entries in storage')
+  : fail(`fwd: watch entries in storage: ${nWatch}, expected 0`);
+
+console.log(`\n${failures === 0 ? 'SNAPSHOT QUIET at block ' + head.header.height + ': SAFE TO REDEPLOY' : `${failures} CHECK(S) FAILED: DO NOT REDEPLOY YET`}`);
 process.exit(failures === 0 ? 0 : 1);
