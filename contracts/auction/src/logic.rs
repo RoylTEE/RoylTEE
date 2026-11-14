@@ -60,6 +60,35 @@ pub enum Outcome {
     NoSale,
 }
 
+/// Unwraps the older `{success, result}` answer shape. A failed run is an
+/// error; a plain guest JSON passes through unchanged.
+pub fn unwrap_answer(
+    v: near_sdk::serde_json::Value,
+) -> Result<near_sdk::serde_json::Value, String> {
+    use near_sdk::serde_json::{self, Value};
+    // A guest answer delivered as a JSON string is read once. Every check
+    // after this is strict, so it can only make a good answer readable.
+    if let Value::String(text) = &v {
+        return serde_json::from_str::<Value>(text)
+            .map_err(|_| "answer is a string that is not JSON".to_string())
+            .and_then(|inner| {
+                if inner.is_string() {
+                    Err("answer is nested too deep".to_string())
+                } else {
+                    unwrap_answer(inner)
+                }
+            });
+    }
+    if v.get("ok").is_none() && (v.get("success").is_some() || v.get("result").is_some()) {
+        return match (v.get("success").and_then(Value::as_bool), v.get("result")) {
+            (Some(true), Some(result)) => Ok(result.clone()),
+            (Some(false), _) => Err("OutLayer reported a failed run".into()),
+            _ => Err("answer wrapper is malformed".into()),
+        };
+    }
+    Ok(v)
+}
+
 /// Reads the OutLayer answer for a settle request. Accepts the guest JSON as
 /// returned today and the older `{success, result}` wrapper. Every check is
 /// strict: a wrong auction id or bid list hash is an error, never a sale.
@@ -69,20 +98,11 @@ pub fn parse_settle_output(
     expected_hash: &str,
 ) -> Result<Outcome, String> {
     use near_sdk::serde_json::{self, Value};
-    let mut v: Value = serde_json::from_slice(raw).map_err(|_| "answer is not JSON".to_string())?;
+    let v: Value = serde_json::from_slice(raw).map_err(|_| "answer is not JSON".to_string())?;
     if v.is_null() {
         return Err("null answer: the run failed or printed nothing".into());
     }
-    if v.get("ok").is_none() {
-        if let (Some(success), Some(result)) =
-            (v.get("success").and_then(Value::as_bool), v.get("result"))
-        {
-            if !success {
-                return Err("OutLayer reported a failed run".into());
-            }
-            v = result.clone();
-        }
-    }
+    let v = unwrap_answer(v)?;
     if v.get("ok").and_then(Value::as_bool) != Some(true) {
         return Err("module reported ok=false".into());
     }

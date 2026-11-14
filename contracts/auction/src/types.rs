@@ -59,6 +59,10 @@ pub struct AuctionRec {
     pub attempt: u32,
     pub failures: u32,
     pub settling_since: U64,
+    /// When the share transfer to the winner started (Delivering).
+    pub delivering_since: U64,
+    /// When the share's return to the seller started (`returning`).
+    pub returning_since: U64,
     /// True while this contract still holds the share.
     pub share_held: bool,
     /// True while a transfer of the share back to the seller is in flight.

@@ -782,21 +782,74 @@ fn seller_cancels_only_before_any_bid() {
     );
 }
 
-#[test]
-fn anyone_cancels_an_unsettled_auction_after_the_grace_period() {
+/// An open auction whose settle run answered badly once (failures = 1).
+fn failed_once() -> AuctionContract {
     let mut c = listed();
     place(&mut c, "bob.testnet", 1);
-    ctx("anyone.testnet", T0 + 3600 * SEC + SETTLE_GRACE_NS, 0);
-    assert!(
-        panics(std::panic::AssertUnwindSafe(|| {
-            c.cancel(U64(0));
-        })),
-        "grace not over"
+    ctx(
+        "anyone.testnet",
+        after_end(),
+        20_000_000_000_000_000_000_000,
     );
-    ctx("anyone.testnet", T0 + 3600 * SEC + SETTLE_GRACE_NS + 1, 0);
-    assert!(c.cancel(U64(0)).is_some());
-    assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX);
-    assert_eq!(c.escrow_total, 0);
+    assert!(c.settle(U64(0)).is_some());
+    ctx_result("auction.root.testnet", after_end(), PromiseResult::Failed);
+    assert!(!c.on_settled(0, 1));
+    assert_eq!(c.auction(0).status, Status::Open);
+    assert_eq!(c.auction(0).failures, 1);
+    c
+}
+
+#[test]
+fn a_third_party_cannot_void_a_sale_nobody_tried_to_settle() {
+    fresh(|| {
+        let mut c = listed();
+        place(&mut c, "bob.testnet", 1);
+        // Six hours and a bit past the end, but no settle run has failed.
+        ctx("anyone.testnet", T0 + 3600 * SEC + SETTLE_GRACE_NS + 1, 0);
+        assert!(panics(std::panic::AssertUnwindSafe(|| {
+            c.cancel(U64(0));
+        })));
+        // Still refused one second before the hard limit.
+        ctx("anyone.testnet", T0 + 3600 * SEC + SETTLE_HARD_GRACE_NS, 0);
+        assert!(panics(std::panic::AssertUnwindSafe(|| {
+            c.cancel(U64(0));
+        })));
+    });
+}
+
+#[test]
+fn anyone_cancels_after_a_failed_run_and_the_grace_period() {
+    fresh(|| {
+        let mut c = failed_once();
+        let end = after_end() - SEC;
+        ctx("anyone.testnet", end + SETTLE_GRACE_NS, 0);
+        assert!(
+            panics(std::panic::AssertUnwindSafe(|| {
+                c.cancel(U64(0));
+            })),
+            "grace not over"
+        );
+        ctx("anyone.testnet", end + SETTLE_GRACE_NS + 1, 0);
+        assert!(c.cancel(U64(0)).is_some());
+        assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX);
+        assert_eq!(c.escrow_total, 0);
+    });
+}
+
+#[test]
+fn anyone_cancels_after_the_hard_limit_even_if_no_run_failed() {
+    fresh(|| {
+        let mut c = listed();
+        place(&mut c, "bob.testnet", 1);
+        ctx(
+            "anyone.testnet",
+            T0 + 3600 * SEC + SETTLE_HARD_GRACE_NS + 1,
+            0,
+        );
+        assert!(c.cancel(U64(0)).is_some());
+        assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX);
+        assert_eq!(c.escrow_total, 0);
+    });
 }
 
 #[test]
@@ -892,6 +945,27 @@ fn withdraw_rejects_empty_and_oversized_lists_and_low_gas() {
     )));
 }
 
+/// L2: the gas check counts the promise fees of every account. Nine accounts
+/// need (15 + 8 + 3) * 9 + 10 = 244 Tgas; 243 is refused, 244 goes through.
+#[test]
+fn withdraw_counts_promise_fees_per_account() {
+    let nine: Vec<AccountId> = ["seller", "bob", "carol", "d", "e", "f", "g", "h", "i"]
+        .iter()
+        .map(|n| acc(&format!("{n}.testnet")))
+        .collect();
+    for (tgas, accepted) in [(243u64, false), (244, true)] {
+        let nine = nine.clone();
+        fresh(move || {
+            let mut c = sold();
+            let mut b = base("anyone.testnet");
+            b.prepaid_gas(Gas::from_tgas(tgas));
+            testing_env!(b.build());
+            let r = panics(std::panic::AssertUnwindSafe(|| c.withdraw(nine)));
+            assert_eq!(!r, accepted, "{tgas} Tgas");
+        });
+    }
+}
+
 // ---------- the key ----------
 
 #[test]
@@ -941,6 +1015,16 @@ fn publish_key_rejects_bad_answers_and_low_deposit() {
             r#"{"v":1,"ok":false,"pubkey":"c99e0b3a826c8f3852bd2c40073f4c3b857f24af0d3ce42561e761402056ea7f"}"#,
         ),
         ok_bytes(r#"{"v":1,"ok":true}"#),
+        // L6: a wrapper that says the run failed, or is malformed.
+        ok_bytes(&format!(
+            r#"{{"success":false,"result":{{"v":1,"ok":true,"pubkey":"{PK}"}}}}"#
+        )),
+        ok_bytes(&format!(
+            r#"{{"result":{{"v":1,"ok":true,"pubkey":"{PK}"}}}}"#
+        )),
+        ok_bytes(&format!(
+            r#"{{"success":"yes","result":{{"v":1,"ok":true,"pubkey":"{PK}"}}}}"#
+        )),
     ] {
         ctx_result("auction.root.testnet", T0 + 101 * SEC, bad);
         assert!(!c.on_key());
@@ -1001,4 +1085,250 @@ fn request_arguments_match_the_outlayer_shape() {
     assert_eq!(input["reserve"], json!(RESERVE.to_string()));
     assert_eq!(input["bids"][0]["bidder"], json!("bob.testnet"));
     assert!(get_logs().iter().any(|l| l.contains("settle_requested")));
+}
+
+/// L6 and M4: the key and the settle answer are read from the shapes OutLayer
+/// may return (the guest JSON, a `{success, result}` wrapper, a JSON string),
+/// and a wrapper that did not succeed never counts.
+#[test]
+fn answers_are_read_from_every_known_shape_and_only_when_successful() {
+    let inner = format!(r#"{{"v":1,"ok":true,"pubkey":"{PK}"}}"#);
+    let shapes = [
+        inner.clone(),
+        format!(r#"{{"success":true,"result":{inner}}}"#),
+        serde_json::to_string(&inner).unwrap(),
+        serde_json::to_string(&format!(r#"{{"success":true,"result":{inner}}}"#)).unwrap(),
+    ];
+    for shape in shapes {
+        fresh(move || {
+            let mut c = new_contract();
+            ctx(
+                "anyone.testnet",
+                T0 + 100 * SEC,
+                20_000_000_000_000_000_000_000,
+            );
+            let _ = c.publish_key();
+            ctx_result("auction.root.testnet", T0 + 101 * SEC, ok_bytes(&shape));
+            assert!(c.on_key(), "{shape}");
+            assert_eq!(c.get_tee_pubkey().as_deref(), Some(PK));
+        });
+    }
+    // Nested strings are not unwrapped without end.
+    let deep = serde_json::to_string(&serde_json::to_string(&inner).unwrap()).unwrap();
+    fresh(move || {
+        let mut c = new_contract();
+        ctx(
+            "anyone.testnet",
+            T0 + 100 * SEC,
+            20_000_000_000_000_000_000_000,
+        );
+        let _ = c.publish_key();
+        ctx_result("auction.root.testnet", T0 + 101 * SEC, ok_bytes(&deep));
+        assert!(!c.on_key());
+    });
+    // The settle answer goes through the same reader.
+    let c = settling();
+    let plain = answer(&c, Some(("bob.testnet", 30_000_000)));
+    let wrapped =
+        json!({"success": true, "result": serde_json::from_str::<Value>(&plain).unwrap()})
+            .to_string();
+    let failed =
+        json!({"success": false, "result": serde_json::from_str::<Value>(&plain).unwrap()})
+            .to_string();
+    let stringified = serde_json::to_string(&plain).unwrap();
+    let hash = bid_hash(&c);
+    for ok_shape in [&plain, &wrapped, &stringified] {
+        assert!(matches!(
+            logic::parse_settle_output(ok_shape.as_bytes(), "0", &hash),
+            Ok(Outcome::Sale(..))
+        ));
+    }
+    assert!(logic::parse_settle_output(failed.as_bytes(), "0", &hash).is_err());
+}
+
+// ---------- reconcile (H1) ----------
+
+fn nft_token_owner(owner: &str) -> PromiseResult {
+    ok_bytes(&json!({"token_id": "s1", "owner_id": owner}).to_string())
+}
+
+#[test]
+fn reconcile_waits_fifteen_minutes_and_only_for_stuck_states() {
+    fresh(|| {
+        let c = delivering();
+        let t = c.auction(0).delivering_since.0;
+        ctx("anyone.testnet", t + RECONCILE_AFTER_NS - 1, 0);
+        assert!(panics(std::panic::AssertUnwindSafe(|| {
+            let _ = c.reconcile(U64(0));
+        })));
+        ctx("anyone.testnet", t + RECONCILE_AFTER_NS, 0);
+        let _ = c.reconcile(U64(0));
+    });
+    fresh(|| {
+        // An open, a settling and a sold auction are not reconcilable.
+        let c = listed();
+        ctx("anyone.testnet", T0 + 100 * 3600 * SEC, 0);
+        assert!(panics(std::panic::AssertUnwindSafe(|| {
+            let _ = c.reconcile(U64(0));
+        })));
+        let c = settling();
+        ctx("anyone.testnet", after_end() + 100 * 3600 * SEC, 0);
+        assert!(panics(std::panic::AssertUnwindSafe(|| {
+            let _ = c.reconcile(U64(0));
+        })));
+    });
+    fresh(|| {
+        let c = sold();
+        ctx("anyone.testnet", after_end() + 100 * 3600 * SEC, 0);
+        assert!(panics(std::panic::AssertUnwindSafe(|| {
+            let _ = c.reconcile(U64(0));
+        })));
+    });
+}
+
+/// The delivery callback was lost and the registry says the share never left.
+#[test]
+fn a_lost_delivery_callback_is_reconciled_from_the_registry() {
+    fresh(|| {
+        let mut c = delivering();
+        ctx_result(
+            "auction.root.testnet",
+            after_end() + 20 * 60 * SEC,
+            nft_token_owner("auction.root.testnet"),
+        );
+        assert!(c.on_reconciled(0, 0));
+        let a = c.auction(0);
+        assert_eq!(a.status, Status::Cancelled);
+        assert!(a.share_held && a.returning, "the share is sent back");
+        assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX);
+        assert_eq!(c.get_owed(acc("carol.testnet")).0, MAX);
+        assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
+        assert_eq!(c.escrow_total, 0);
+        assert_eq!(c.owed_total, 2 * MAX);
+    });
+    // The registry says the winner holds it: the sale is paid.
+    fresh(|| {
+        let mut c = delivering();
+        ctx_result(
+            "auction.root.testnet",
+            after_end() + 20 * 60 * SEC,
+            nft_token_owner("bob.testnet"),
+        );
+        assert!(c.on_reconciled(0, 0));
+        assert_eq!(c.auction(0).status, Status::Sold);
+        assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
+        assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX - 30_000_000);
+        assert_eq!(c.get_owed(acc("carol.testnet")).0, MAX);
+        assert_eq!(c.owed_total, 2 * MAX);
+        assert_eq!(c.escrow_total, 0);
+        assert_eq!(c.auction_for_token("s1".into()), None);
+        // A late on_delivered after this does nothing.
+        ctx_result(
+            "auction.root.testnet",
+            after_end() + 21 * 60 * SEC,
+            PromiseResult::Successful(vec![]),
+        );
+        assert!(!c.on_delivered(0));
+        assert_eq!(c.owed_total, 2 * MAX);
+    });
+    // The share went on from the winner to someone else: still a paid sale.
+    fresh(|| {
+        let mut c = delivering();
+        ctx_result(
+            "auction.root.testnet",
+            after_end() + 20 * 60 * SEC,
+            nft_token_owner("third.testnet"),
+        );
+        assert!(c.on_reconciled(0, 0));
+        assert_eq!(c.auction(0).status, Status::Sold);
+    });
+    // The share is back with the seller: refund everyone, nothing to return.
+    fresh(|| {
+        let mut c = delivering();
+        ctx_result(
+            "auction.root.testnet",
+            after_end() + 20 * 60 * SEC,
+            nft_token_owner("seller.testnet"),
+        );
+        assert!(c.on_reconciled(0, 0));
+        let a = c.auction(0);
+        assert_eq!(a.status, Status::Cancelled);
+        assert!(!a.share_held && !a.returning);
+        assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
+        assert_eq!(c.owed_total, 2 * MAX);
+        assert_eq!(c.auction_for_token("s1".into()), None);
+    });
+    // An unreadable registry answer changes nothing.
+    fresh(|| {
+        let mut c = delivering();
+        for bad in [PromiseResult::Failed, ok_bytes("null"), ok_bytes("{}")] {
+            ctx_result("auction.root.testnet", after_end() + 20 * 60 * SEC, bad);
+            assert!(!c.on_reconciled(0, 0));
+            assert_eq!(c.auction(0).status, Status::Delivering);
+            assert_eq!(c.owed_total, 0);
+        }
+    });
+}
+
+/// The return callback was lost: `returning` would stay true forever.
+#[test]
+fn a_lost_return_callback_is_reconciled() {
+    fn returning() -> AuctionContract {
+        let mut c = delivering();
+        ctx_result("auction.root.testnet", after_end(), PromiseResult::Failed);
+        c.on_delivered(0);
+        let a = c.auction(0);
+        assert!(a.share_held && a.returning);
+        c
+    }
+    fresh(|| {
+        let c = returning();
+        let t = c.auction(0).returning_since.0;
+        ctx("anyone.testnet", t + RECONCILE_AFTER_NS - 1, 0);
+        assert!(panics(std::panic::AssertUnwindSafe(|| {
+            let _ = c.reconcile(U64(0));
+        })));
+        ctx("anyone.testnet", t + RECONCILE_AFTER_NS, 0);
+        let _ = c.reconcile(U64(0));
+    });
+    // Still held by the auction: the flag is cleared, so `return_share` works.
+    fresh(|| {
+        let mut c = returning();
+        ctx_result(
+            "auction.root.testnet",
+            after_end() + 20 * 60 * SEC,
+            nft_token_owner("auction.root.testnet"),
+        );
+        assert!(c.on_reconciled(0, 1));
+        let a = c.auction(0);
+        assert!(a.share_held && !a.returning);
+        ctx("anyone.testnet", after_end() + 21 * 60 * SEC, 0);
+        assert!(c.return_share(U64(0)).is_some());
+    });
+    // The share is elsewhere (the lost callback had succeeded): marked out.
+    fresh(|| {
+        let mut c = returning();
+        ctx_result(
+            "auction.root.testnet",
+            after_end() + 20 * 60 * SEC,
+            nft_token_owner("seller.testnet"),
+        );
+        assert!(c.on_reconciled(0, 1));
+        let a = c.auction(0);
+        assert!(!a.share_held && !a.returning);
+        assert_eq!(c.auction_for_token("s1".into()), None);
+        // Money is untouched by this path.
+        assert_eq!(c.owed_total, 2 * MAX);
+    });
+    // The wrong stage for the state does nothing.
+    fresh(|| {
+        let mut c = returning();
+        ctx_result(
+            "auction.root.testnet",
+            after_end() + 20 * 60 * SEC,
+            nft_token_owner("seller.testnet"),
+        );
+        assert!(!c.on_reconciled(0, 0));
+        assert!(c.auction(0).returning);
+    });
 }

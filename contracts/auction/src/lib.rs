@@ -48,8 +48,15 @@ pub const MAX_CIPHERTEXT: usize = 512;
 pub const MIN_DURATION_NS: u64 = 60 * NS_PER_SEC;
 pub const MAX_DURATION_NS: u64 = 14 * 24 * 3600 * NS_PER_SEC;
 pub const NS_PER_SEC: u64 = 1_000_000_000;
-/// After `ends_at` plus this, anyone can cancel an auction nobody settled.
+/// After `ends_at` plus this, anyone can cancel an auction whose settle runs
+/// have failed at least once (see `cancel`).
 pub const SETTLE_GRACE_NS: u64 = 6 * 3600 * NS_PER_SEC;
+/// After `ends_at` plus this, anyone can cancel an unsettled auction even if
+/// no settle run ever failed (nobody could or would settle).
+pub const SETTLE_HARD_GRACE_NS: u64 = 7 * 24 * 3600 * NS_PER_SEC;
+/// A delivery or a share return that has not reported back after this can be
+/// reconciled from the registry (`reconcile`).
+pub const RECONCILE_AFTER_NS: u64 = 15 * 60 * NS_PER_SEC;
 /// A settle request that has not answered after this can be cancelled.
 pub const SETTLING_STALE_NS: u64 = 3600 * NS_PER_SEC;
 /// Least NEAR a settle call must attach for OutLayer (the rest is refunded to
@@ -66,7 +73,7 @@ pub const MAX_RETURN: usize = 4096;
 pub const GAS_IS_MEMBER: Gas = Gas::from_tgas(10);
 pub const GAS_BID_CB: Gas = Gas::from_tgas(20);
 pub const GAS_REQUEST: Gas = Gas::from_tgas(40);
-pub const GAS_SETTLED_CB: Gas = Gas::from_tgas(90);
+pub const GAS_SETTLED_CB: Gas = Gas::from_tgas(120);
 pub const GAS_KEY_CB: Gas = Gas::from_tgas(15);
 pub const GAS_NFT_TRANSFER: Gas = Gas::from_tgas(25);
 pub const GAS_DELIVERED_CB: Gas = Gas::from_tgas(60);
@@ -77,7 +84,11 @@ pub const MAX_TOKEN_RETURN: usize = 16 * 1024;
 pub const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 pub const GAS_WITHDRAW_CB: Gas = Gas::from_tgas(8);
 /// Gas a `settle` call must carry: the OutLayer call plus the callback chain.
-pub const GAS_SETTLE_MIN: Gas = Gas::from_tgas(200);
+pub const GAS_SETTLE_MIN: Gas = Gas::from_tgas(230);
+/// Promise fees per paid account in `withdraw`, on top of the two static gas
+/// amounts (measured as about 2.5 Tgas, rounded up).
+pub const GAS_WITHDRAW_FEES: Gas = Gas::from_tgas(3);
+pub const GAS_RECONCILE_CB: Gas = Gas::from_tgas(60);
 
 #[derive(BorshStorageKey)]
 #[near]

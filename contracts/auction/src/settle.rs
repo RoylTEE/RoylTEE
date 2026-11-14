@@ -21,7 +21,9 @@ impl AuctionContract {
             "a key request was made in the last minute"
         );
         self.key_requested_at = now;
-        let input = json!({ "mode": "pubkey" }).to_string();
+        // The module refuses any request whose `contract` is not the account
+        // that called OutLayer, so the request names this contract.
+        let input = json!({ "mode": "pubkey", "contract": env::current_account_id() }).to_string();
         self.request_execution(
             &input,
             env::attached_deposit(),
@@ -41,10 +43,8 @@ impl AuctionContract {
         }
         let key = callback_result(MAX_RETURN)
             .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
-            .and_then(|mut v| {
-                if v.get("ok").is_none() {
-                    v = v.get("result")?.clone();
-                }
+            .and_then(|v| logic::unwrap_answer(v).ok())
+            .and_then(|v| {
                 (v.get("ok").and_then(Value::as_bool) == Some(true)
                     && v.get("v").and_then(Value::as_u64) == Some(1))
                 .then(|| v.get("pubkey").and_then(Value::as_str).map(str::to_owned))
@@ -64,14 +64,14 @@ impl AuctionContract {
         }
     }
 
-    /// Anyone, after `ends_at`. Attach at least 0.01 NEAR and 200 Tgas.
+    /// Anyone, after `ends_at`. Attach at least 0.01 NEAR and 230 Tgas.
     /// OutLayer refunds what it does not use to the caller.
     #[payable]
     pub fn settle(&mut self, auction_id: U64) -> Option<Promise> {
         let id = auction_id.0;
         require!(
             env::prepaid_gas() >= GAS_SETTLE_MIN,
-            "attach at least 200 Tgas to settle"
+            "attach at least 230 Tgas to settle"
         );
         let caller = env::predecessor_account_id();
         let deposit = env::attached_deposit();
@@ -168,6 +168,7 @@ impl AuctionContract {
                 let token_id = {
                     let a = self.auction_mut(auction_id);
                     a.status = Status::Delivering;
+                    a.delivering_since = U64(env::block_timestamp());
                     a.winner = Some(winner.clone());
                     a.price = Some(U128(price));
                     a.token_id.clone()
@@ -203,25 +204,63 @@ impl AuctionContract {
     /// cancel, refund every deposit and send the share back.
     #[private]
     pub fn on_delivered(&mut self, auction_id: u64) -> bool {
-        let (delivering, winner, price, max, seller, bidders) = {
-            let a = self.auction(auction_id);
-            (
-                a.status == Status::Delivering,
-                a.winner.clone(),
-                a.price,
-                a.max_deposit.0,
-                a.seller.clone(),
-                a.bids.iter().map(|b| b.bidder.clone()).collect::<Vec<_>>(),
-            )
-        };
-        let (true, Some(winner), Some(price)) = (delivering, winner, price) else {
+        let live = self.auctions.get(&auction_id).is_some_and(|a| {
+            a.status == Status::Delivering && a.winner.is_some() && a.price.is_some()
+        });
+        if !live {
             return false;
-        };
+        }
         let delivered = callback_result(64).is_some();
         if !delivered {
             let _ = self.cancel_now(auction_id, "the share could not be delivered to the winner");
             return false;
         }
+        self.finish_sale(auction_id);
+        true
+    }
+
+    /// Cancels an auction that cannot finish. Allowed for the seller while
+    /// there are no bids; for anyone 6 hours after `ends_at` once at least one
+    /// settle run has failed (so a third party cannot void a sale that nobody
+    /// tried to settle); for anyone 7 days after `ends_at` whatever happened;
+    /// and for anyone 1 hour after a settle request that never answered.
+    /// Credits every deposit back and returns the share.
+    pub fn cancel(&mut self, auction_id: U64) -> Option<Promise> {
+        let id = auction_id.0;
+        let now = env::block_timestamp();
+        let caller = env::predecessor_account_id();
+        let a = self.auction(id);
+        let allowed = match a.status {
+            Status::Open => {
+                (caller == a.seller && a.bids.is_empty())
+                    || (a.failures >= 1 && now > a.ends_at.0 + SETTLE_GRACE_NS)
+                    || now > a.ends_at.0 + SETTLE_HARD_GRACE_NS
+            }
+            Status::Settling => now > a.settling_since.0 + SETTLING_STALE_NS,
+            _ => false,
+        };
+        require!(allowed, "this auction cannot be cancelled now");
+        self.cancel_now(id, "cancelled")
+    }
+}
+
+impl AuctionContract {
+    /// Pays out a delivered sale: the seller gets the price, the winner the
+    /// change, every loser the whole deposit. The caller has checked that the
+    /// auction is Delivering with a winner and a price.
+    pub(crate) fn finish_sale(&mut self, auction_id: u64) {
+        let (winner, price, max, seller, bidders) = {
+            let a = self.auction(auction_id);
+            (
+                a.winner
+                    .clone()
+                    .unwrap_or_else(|| env::panic_str("no winner")),
+                a.price.unwrap_or_else(|| env::panic_str("no price")),
+                a.max_deposit.0,
+                a.seller.clone(),
+                a.bids.iter().map(|b| b.bidder.clone()).collect::<Vec<_>>(),
+            )
+        };
         for b in &bidders {
             if b == &winner {
                 self.credit(b, max - price.0);
@@ -242,31 +281,8 @@ impl AuctionContract {
             "auction_sold",
             json!({ "auction_id": U64(auction_id), "winner": winner, "price": price, "seller": seller }),
         );
-        true
     }
 
-    /// Cancels an auction that cannot finish. Allowed for the seller while
-    /// there are no bids, for anyone 6 hours after `ends_at` if nobody
-    /// settled, and for anyone 1 hour after a settle request that never
-    /// answered. Credits every deposit back and returns the share.
-    pub fn cancel(&mut self, auction_id: U64) -> Option<Promise> {
-        let id = auction_id.0;
-        let now = env::block_timestamp();
-        let caller = env::predecessor_account_id();
-        let a = self.auction(id);
-        let allowed = match a.status {
-            Status::Open => {
-                (caller == a.seller && a.bids.is_empty()) || now > a.ends_at.0 + SETTLE_GRACE_NS
-            }
-            Status::Settling => now > a.settling_since.0 + SETTLING_STALE_NS,
-            _ => false,
-        };
-        require!(allowed, "this auction cannot be cancelled now");
-        self.cancel_now(id, "cancelled")
-    }
-}
-
-impl AuctionContract {
     /// Checks the TEE answer against what the contract knows. Output the
     /// contract can bound (not verify): winner is a bidder, price is between
     /// the reserve and `max_deposit`.

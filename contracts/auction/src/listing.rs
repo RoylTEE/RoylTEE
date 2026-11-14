@@ -75,6 +75,8 @@ impl AuctionContract {
             attempt: 0,
             failures: 0,
             settling_since: U64(0),
+            delivering_since: U64(0),
+            returning_since: U64(0),
             share_held: true,
             returning: false,
             winner: None,

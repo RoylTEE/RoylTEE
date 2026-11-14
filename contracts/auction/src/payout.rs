@@ -14,7 +14,10 @@ impl AuctionContract {
         );
         require!(
             env::prepaid_gas().as_gas()
-                >= (GAS_FT_TRANSFER.as_gas() + GAS_WITHDRAW_CB.as_gas()) * accounts.len() as u64
+                >= (GAS_FT_TRANSFER.as_gas()
+                    + GAS_WITHDRAW_CB.as_gas()
+                    + GAS_WITHDRAW_FEES.as_gas())
+                    * accounts.len() as u64
                     + Gas::from_tgas(10).as_gas(),
             "not enough gas attached for withdraw"
         );
@@ -125,6 +128,111 @@ impl AuctionContract {
         true
     }
 
+    /// Recovery when a callback never reported back (for example the sale
+    /// payout could not be written because the contract was short of NEAR for
+    /// storage, or a return callback was lost). Anyone can call it once the
+    /// auction has been Delivering, or Cancelled with a return in flight, for
+    /// 15 minutes. It reads who owns the share in the registry and finishes
+    /// the job from that fact:
+    ///
+    /// - Delivering, owner is this contract: the delivery never happened.
+    ///   Cancel, refund every deposit, send the share back.
+    /// - Delivering, owner is the seller: the share was moved back (for
+    ///   example by the registrar). Cancel and refund, the share is out.
+    /// - Delivering, owner is anyone else: the winner has it. Pay the sale.
+    /// - Cancelled, return in flight, owner is this contract: clear the
+    ///   flag so `return_share` can retry.
+    /// - Cancelled, return in flight, owner is anyone else: the share is out.
+    ///
+    /// If the payout still cannot be written, add NEAR to this account and
+    /// call it again; nothing is lost in between.
+    pub fn reconcile(&self, auction_id: U64) -> Promise {
+        let a = self.auction(auction_id.0);
+        let now = env::block_timestamp();
+        let stuck = match a.status {
+            Status::Delivering => now >= a.delivering_since.0 + RECONCILE_AFTER_NS,
+            Status::Cancelled => {
+                a.share_held && a.returning && now >= a.returning_since.0 + RECONCILE_AFTER_NS
+            }
+            _ => false,
+        };
+        require!(stuck, "nothing to reconcile yet");
+        let stage = if a.status == Status::Delivering {
+            0u8
+        } else {
+            1u8
+        };
+        Promise::new(self.registry.clone())
+            .function_call(
+                "nft_token".to_string(),
+                json_bytes(json!({ "token_id": a.token_id })),
+                NearToken::from_yoctonear(0),
+                GAS_NFT_TOKEN,
+            )
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_RECONCILE_CB)
+                    .with_unused_gas_weight(0)
+                    .on_reconciled(auction_id.0, stage),
+            )
+    }
+
+    #[private]
+    pub fn on_reconciled(&mut self, auction_id: u64, stage: u8) -> bool {
+        let owner = callback_result(MAX_TOKEN_RETURN)
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .and_then(|v| v.get("owner_id").and_then(Value::as_str).map(str::to_owned));
+        let Some(owner) = owner else { return false };
+        let me = env::current_account_id();
+        let (status, held, returning, seller, token_id) = {
+            let a = self.auction(auction_id);
+            (
+                a.status,
+                a.share_held,
+                a.returning,
+                a.seller.clone(),
+                a.token_id.clone(),
+            )
+        };
+        match (stage, status) {
+            // Still the same stuck delivery the call was made for.
+            (0, Status::Delivering) => {
+                if owner == me.as_str() {
+                    let _ = self.cancel_now(auction_id, "delivery did not complete");
+                } else if owner == seller.as_str() {
+                    self.cancel_share_out(auction_id, "share is back with the seller");
+                } else {
+                    self.finish_sale(auction_id);
+                }
+                emit(
+                    "reconciled",
+                    json!({ "auction_id": U64(auction_id), "owner": owner }),
+                );
+                true
+            }
+            (1, Status::Cancelled) if held && returning => {
+                if owner == me.as_str() {
+                    self.auction_mut(auction_id).returning = false;
+                } else {
+                    let a = self.auction_mut(auction_id);
+                    a.returning = false;
+                    a.share_held = false;
+                    self.token_auction.remove(&token_id);
+                    emit(
+                        "share_out",
+                        json!({ "auction_id": U64(auction_id), "owner": owner }),
+                    );
+                }
+                emit(
+                    "reconciled",
+                    json!({ "auction_id": U64(auction_id), "owner": owner }),
+                );
+                true
+            }
+            _ => false,
+        }
+    }
+
     #[private]
     pub fn on_returned(&mut self, auction_id: u64) -> bool {
         let ok = callback_result(64).is_some();
@@ -150,6 +258,24 @@ impl AuctionContract {
 }
 
 impl AuctionContract {
+    /// Cancels the auction and refunds every deposit when the share is
+    /// already out of this contract's hands (no return is started).
+    pub(crate) fn cancel_share_out(&mut self, id: u64, reason: &str) {
+        self.credit_all_deposits(id);
+        let token_id = {
+            let a = self.auction_mut(id);
+            a.status = Status::Cancelled;
+            a.cancel_reason = Some(reason.to_string());
+            a.share_held = false;
+            a.token_id.clone()
+        };
+        self.token_auction.remove(&token_id);
+        emit(
+            "auction_cancelled",
+            json!({ "auction_id": U64(id), "reason": reason }),
+        );
+    }
+
     pub(crate) fn start_return(&mut self, id: u64) -> Option<Promise> {
         let (seller, token_id) = {
             let a = self.auction_mut(id);
@@ -157,6 +283,7 @@ impl AuctionContract {
                 return None;
             }
             a.returning = true;
+            a.returning_since = U64(env::block_timestamp());
             (a.seller.clone(), a.token_id.clone())
         };
         Some(
