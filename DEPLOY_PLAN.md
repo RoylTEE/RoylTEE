@@ -400,8 +400,8 @@ near account create-account fund-myself $AUCTION '6 NEAR' \
 17b. Publish the WASI module with FastFS. The module serves one account, fixed when it is built. `npm run build:wasm` builds it for `auction.royltee-dev.testnet` (Rust 1.99.1, committed lock files, `--locked`; the exact command is in the README). The crate has no default account: a direct build without `ROYLTEE_AUCTION_ACCOUNT` fails to compile. For any other auction account rebuild with `ROYLTEE_AUCTION_ACCOUNT=<account>` set and use the new hash everywhere below (findings C1, B-02 and N-L2). Publish it (1 tx; it fails with MethodNotFound on the receiver by design, because FastFS reads the transaction data, and FastFS still serves the module; this is what happened on 2026-11-14). Build the payload with `spike/outlayer/scripts/fastfs_payload.py`, then check the URL serves the same hash:
 
 ```bash
-python3 spike/outlayer/scripts/fastfs_payload.py $WASI /tmp/auction_fastfs.bin
-near contract call-function as-transaction $OL __fastdata_fastfs file-args /tmp/auction_fastfs.bin \
+python3 spike/outlayer/scripts/fastfs_payload.py $WASI ./auction_fastfs.bin
+near contract call-function as-transaction $OL __fastdata_fastfs file-args ./auction_fastfs.bin \
   prepaid-gas '1 Tgas' attached-deposit '0 NEAR' sign-as $AUCTION $NET $SIGN   # expected to fail with MethodNotFound (FastFS reads the data)
 curl -s $WASI_URL | sha256sum                                                  # must print $WASI_HASH
 ```
@@ -415,8 +415,8 @@ near contract deploy $AUCTION use-file contracts/res/auction.wasm \
 near contract call-function as-read-only $AUCTION get_config json-args '{}' $NET now
 # Check every pinned field by eye before going on: registry, usdc, outlayer, wasm_url, wasm_hash (equal to $WASI_HASH),
 # secrets_account and secrets_profile. Also check the deployed code is the built file:
-near contract download-wasm regular $AUCTION save-to-file /tmp/auction_deployed.wasm network-config testnet now
-sha256sum /tmp/auction_deployed.wasm contracts/res/auction.wasm   # the two hashes must be equal
+near contract download-wasm regular $AUCTION save-to-file ./auction_deployed.wasm network-config testnet now
+sha256sum ./auction_deployed.wasm contracts/res/auction.wasm   # the two hashes must be equal
 ```
 
 Do not credential the auction (17d) or send it anything until the printed config is exactly what the plan says.
