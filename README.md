@@ -67,7 +67,7 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 | 4 | `npm test` | Builds all contracts to wasm, prints the size and sha256 of each file in `contracts/res/`, then runs every unit test and the near-workspaces sandbox tests: `9 passed` (agents), `15 passed` (auction), `4 passed` (disputes), `4 passed` (final), `4 passed` (limits), `4 passed` (review), `11 passed` (sandbox), `3 passed` (upgrade), then the 14 WASI host tests and the 18 Node tests. 54 sandbox tests, 318 in total. Takes a few minutes. |
 | 5 | Optional: `npm run lint` | `cargo fmt --check`, then `cargo clippy -D warnings` for the host and wasm targets; ends with `Finished` and exit code 0. |
 | 6 | Open the explorer links under [Live testnet deployment](#live-testnet-deployment) | The same accounts, the catalog sale transfer of `s2`, the refused outsider claim, the agent payment and the dispute, on NEAR testnet. |
-| 7 | Site (in `site/`): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest: `Test Files  27 passed (27)` and `Tests  272 passed (272)`; `astro check`: `0 errors`; a build in `site/.vercel/output`. |
+| 7 | Site (in `site/`): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest on a fresh clone: `Test Files  29 passed (29)` and `Tests  322 passed | 9 skipped (331)`; the 9 skipped are the built-page checks, which run only once a build exists, so after the build `npx vitest run` in `site/` gives `Tests  331 passed (331)`; `astro check`: `0 errors`; a build in `site/.vercel/output`. |
 | 8 | Site, local: `npm run dev` (at the repo root or in `site/`, after the `npm ci` of step 7), then open http://127.0.0.1:4321 | The pages listed under [Website and help chat](#website-and-help-chat), each answering 200 (checked 2026-11-14 UTC). `/admin` answers 401 when not signed in. Without server secrets the help chat and support API answer 503 ("not configured yet"). `site/README.md` explains how to run the API locally with in-memory storage. |
 
 Hosted site: https://royltee.app (custom domain; UNVERIFIED that it serves the site, see the note above; the default address https://royltee.vercel.app answered with a Vercel login redirect on 2026-11-14. Also UNVERIFIED: which commit it runs, its live security headers, whether chat and support are configured, and whether a wallet sign-in works there have not been checked yet. **Pre-submission item:** check it in a private window and record the result here.)
@@ -291,7 +291,7 @@ Test suites (counts from `npm test` and the site's `npm test` on the merged rele
 | Auction WASI module host tests | `tee/auction-wasi/src/lib.rs` | 14 |
 | Auction Node tests (real module under WASI) | `scripts/auction/auction.test.mjs` | 18 |
 | Sandbox: auction (mock OutLayer, real module answers) | `contracts/tests/tests/auction.rs` | 15 |
-| Site (help chat, tickets, limits, dashboard) | `site/tests/` | 272 (27 files) |
+| Site (help chat, tickets, limits, dashboard) | `site/tests/` | 331 (29 files; 9 of them need a prior build) |
 
 Brief test list to sandbox tests (every sandbox test ends with a solvency check; tests that touch a vault also check it has zero keys):
 
@@ -615,7 +615,7 @@ site/src/pages           the pages listed under Website and help chat, plus the 
 site/src/scripts         browser code: read-only testnet view calls (chain.ts), wallet sign in and transactions (wallet.ts)
 site/src/server          server side: help chat, tickets, sign in, admin checks, rate limits, security headers
 site/src/data/testnet.ts accounts and the recorded demo, copied from deployments/testnet.json
-site/tests               Vitest tests for the site (272 in 27 files)
+site/tests               Vitest tests for the site (331 in 29 files)
 .github/workflows/ci.yml CI: wasm build, fmt, clippy, Rust tests, site typecheck, tests and build, gitleaks
 spike/outlayer/          throwaway OutLayer call-path spike (its own Cargo workspace, not a root workspace member): echo module, probe contract, evidence bundle
 docs/WHITEPAPER.md       design whitepaper, version 1.0 (14 November 2026); site/public/royltee-whitepaper.pdf is made from the same text
