@@ -179,7 +179,7 @@ describe('second reviewer 03b item 5: grounding notes match the deployed snapsho
     expect(notes).not.toContain('six shares s1 to s6');
     expect(notes).not.toContain('Not on chain yet: the scripted agent and the dispute scene');
     expect(notes).not.toContain('seven shares s1 to s7');
-    expect(notes).toContain('13 shares s1 to s13');
+    expect(notes).toContain('15 shares s1 to s15');
   });
 });
 

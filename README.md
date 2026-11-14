@@ -46,17 +46,17 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 | # | Do | See |
 |---|---|---|
 | 1 | `git clone https://github.com/RoylTEE/RoylTEE.git royltee && cd royltee && git checkout <submission revision>` (pre-submission item: the submission revision is the merged `main` commit, to be written here once the branches are merged; until then the default branch does not yet contain every part described here) | The files listed under [Repository layout](#repository-layout). |
-| 2 | `npm run verify:testnet` (read only, about one minute, no install needed) | One `PASS` line per check and `ALL CHECKS PASSED` at the end: 7 share vaults `s1` to `s7` with `0 access keys`, every code hash equal to `deployments/testnet.json`, token `s2` owned by `buyer-pub.royltee-dev.testnet` (the catalog sale), the registry and mock USDC keys equal to the record (`access keys match the record: full_access`), the payment agent's single function call key scoped to the registry with `pay_from_allowance` and `report`, `nft_tokens read to the end: 7 token(s)`, and the solvency line, which needs all five accounting counters. `npm run test:verify` runs the checker's own 8 tests against a local fake RPC (no network). |
-| 3 | `npm run test:unit` | Rust unit tests: `test result: ok. 4 passed` (mock USDC), `101 passed` (registry), `5 passed` (vault). 110 in total. No wasm build is needed: the registry embeds the vault wasm only when it is compiled to wasm. |
-| 4 | `npm test` | Builds all contracts to wasm, prints the size and sha256 of each file in `contracts/res/`, then runs every unit test and the near-workspaces sandbox tests: `9 passed` (agents), `4 passed` (disputes), `3 passed` (limits), `4 passed` (review), `11 passed` (sandbox), `1 passed` (upgrade). 32 sandbox tests, 142 in total. Takes a few minutes. |
+| 2 | `npm run verify:testnet` (read only, about one minute, no install needed) | One `PASS` line per check and `ALL CHECKS PASSED` at the end: 15 share vaults `s1` to `s15` with `0 access keys`, every code hash equal to `deployments/testnet.json`, tokens `s2` (the catalog sale) and `s10` (the auction sale) owned by `buyer-pub.royltee-dev.testnet`, the registry and mock USDC keys equal to the record (`access keys match the record: full_access`), the payment agent's single function call key scoped to the registry with `pay_from_allowance` and `report`, `nft_tokens read to the end: 15 token(s)`, and the solvency line, which needs all five accounting counters. `npm run test:verify` runs the two checkers' own 18 tests (10 for `verify:testnet`, 8 for `check:quiescent`) against a local fake RPC (no network). |
+| 3 | `npm run test:unit` | Rust unit tests: `test result: ok. 4 passed` (mock USDC), `155 passed` (registry), `5 passed` (vault). 164 in total. No wasm build is needed: the registry embeds the vault wasm only when it is compiled to wasm. |
+| 4 | `npm test` | Builds all contracts to wasm, prints the size and sha256 of each file in `contracts/res/`, then runs every unit test and the near-workspaces sandbox tests: `9 passed` (agents), `4 passed` (disputes), `4 passed` (final), `4 passed` (limits), `4 passed` (review), `11 passed` (sandbox), `3 passed` (upgrade). 39 sandbox tests, 203 in total. Takes a few minutes. |
 | 5 | Optional: `npm run lint` | `cargo fmt --check`, then `cargo clippy -D warnings` for the host and wasm targets; ends with `Finished` and exit code 0. |
 | 6 | Open the explorer links under [Live testnet deployment](#live-testnet-deployment) | The same accounts, the catalog sale transfer of `s2`, the refused outsider claim, the agent payment and the dispute, on NEAR testnet. |
-| 7 | Site (in `site/`): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest: `Test Files  18 passed (18)` and `Tests  219 passed (219)`; `astro check`: `0 errors`; a build in `site/.vercel/output`. |
+| 7 | Site (in `site/`): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest: `Test Files  22 passed (22)` and `Tests  231 passed (231)`; `astro check`: `0 errors`; a build in `site/.vercel/output`. |
 | 8 | Site, local: `npm run dev` (at the repo root or in `site/`, after the `npm ci` of step 7), then open http://127.0.0.1:4321 | The pages listed under [Website and help chat](#website-and-help-chat). `/admin` answers 401 when not signed in. Without server secrets the help chat and support API answer 503 ("not configured yet"). `site/README.md` explains how to run the API locally with in-memory storage. |
 
 Hosted site: https://royltee.vercel.app (UNVERIFIED: which commit it runs, its live security headers, whether chat and support are configured, and whether a wallet sign-in works there have not been checked yet. **Pre-submission item:** check it in a private window and record the result here.)
 
-The contract numbers above (steps 2 to 5) come from running these commands on 2026-11-13 (UTC) on branch code that is NOT yet deployed (see [Live testnet deployment](#live-testnet-deployment)). Steps 7 and 8 were run on the merged tree (contract, server and UI branches) on 2026-11-13 (UTC): 219 site tests in 18 files; on the local dev server every page answered 200, `/admin` answered 401, and the chat and ticket API answered 503 without server secrets.
+The numbers above (steps 2 to 5 and 7) come from running these commands on 2026-11-14 (UTC) on branch `fix/final-contract`, whose contract code is the code deployed on testnet since the final redeploy (the local build equals the on chain sha256, see [Live testnet deployment](#live-testnet-deployment)). Step 8 (every page answered 200 on the local dev server, `/admin` answered 401, chat and ticket API 503 without server secrets) was last run on 2026-11-13 (UTC) on the merged tree and was not re-run for this branch (UNVERIFIED since).
 
 Demo scripts: there are no separate `seed-demo`, `simulated-payer` or `scripted-agent` scripts. The on-chain demo (seed accounts and works, the Simulated payer's payments, the scripted agent's calls) was run as the `near` CLI commands written out step by step in [DEPLOY_PLAN.md](DEPLOY_PLAN.md), steps 1 to 13, and every resulting transaction id is in `deployments/testnet.json`. The key check (zero keys on every vault, the registry and mock USDC keys equal to the record, the agent's single scoped function call key) is `npm run verify:testnet` (`scripts/verify-testnet.mjs`), not a separate `verify-keys` script.
 
@@ -156,20 +156,21 @@ It cannot hold a credential (refused on testnet since step 15; the first build c
 - [THREAT_MODEL.md](THREAT_MODEL.md): 39 rows (T1 to T39). T1 to T33 were written before any contract code; T34 to T39 and the rows marked "review" were added or rewritten after code, as its status line says. Most rows give the attack, impact, mitigation and test; trust rows (T12 registrar, T13 keys) give the trust and controls instead, and T34 needs no test (it is the absence of a method).
 - [AUDIT.md](AUDIT.md): a manual audit pass and the contract review fixes.
 
-Test suites (counts from `npm test` and the site's `npm test` on the merged tree, 2026-11-13 UTC):
+Test suites (counts from `npm test` and the site's `npm test` on this branch, 2026-11-14 UTC):
 
 | Suite | Where | Count |
 |---|---|---|
-| Registry unit tests | `contracts/registry/src/tests.rs`, `review_fixes.rs`, `logic.rs` | 101 |
+| Registry unit tests | `contracts/registry/src/` (`tests.rs`, `review_fixes.rs`, `final_fixes.rs`, `logic.rs`) | 155 |
 | Vault unit tests | `contracts/vault/src/lib.rs` | 5 |
 | Mock USDC unit tests | `contracts/mock-usdc/src/lib.rs` | 4 |
 | Sandbox: core transfer path | `contracts/tests/tests/sandbox.rs` | 11 |
 | Sandbox: agents | `contracts/tests/tests/agents.rs` | 9 |
 | Sandbox: disputes | `contracts/tests/tests/disputes.rs` | 4 |
-| Sandbox: limits and gas | `contracts/tests/tests/limits.rs` | 3 |
+| Sandbox: final contract fixes | `contracts/tests/tests/final.rs` | 4 |
+| Sandbox: limits and gas | `contracts/tests/tests/limits.rs` | 4 |
 | Sandbox: review fixes | `contracts/tests/tests/review.rs` | 4 |
-| Sandbox: in-place upgrade from the testnet wasm | `contracts/tests/tests/upgrade.rs` | 1 |
-| Site (help chat, tickets, limits, dashboard) | `site/tests/` | 219 (18 files) |
+| Sandbox: in-place upgrade from the testnet wasm | `contracts/tests/tests/upgrade.rs` | 3 |
+| Site (help chat, tickets, limits, dashboard) | `site/tests/` | 231 (22 files) |
 
 Brief test list to sandbox tests (every sandbox test ends with a solvency check; tests that touch a vault also check it has zero keys):
 
@@ -203,7 +204,7 @@ All accounts, public keys, wasm hashes and transaction ids: [deployments/testnet
 
 | Review finding | First build (`GZkyojcH...`, before step 15) | On testnet since step 15 (and kept by the later redeploys) |
 |---|---|---|
-| H1 sync | Anyone can call `sync`; vaults have no `ft_on_transfer`, so the phantom balance race is open | Holder or registrar only; new vaults (`s8` to `s13`) keep `ft_transfer_call` tokens. The 7 old vaults `s1` to `s7` keep their code forever (T20, T21) |
+| H1 sync | Anyone can call `sync`; vaults have no `ft_on_transfer`, so the phantom balance race is open | Holder or registrar only; new vaults (`s8` to `s15`) keep `ft_transfer_call` tokens. The 7 old vaults `s1` to `s7` keep their code forever (T20, T21) |
 | H2 contests | No `contests` list means every active share of the group is contested, so a 1 bps claim freezes the whole group | `contests` is mandatory and minimal; own shares cannot be named; dead entries are pruned |
 | H3 registrar credential | The registrar account can be granted a credential | Refused |
 | M1 stuck mints | No `release_stale_mint`; a mint whose callbacks never commit blocks its bps; forward callback gas 5 Tgas | `release_stale_mint` after 20 minutes; late callbacks mint nothing; 10 Tgas |
@@ -217,23 +218,24 @@ All accounts, public keys, wasm hashes and transaction ids: [deployments/testnet
 
 Every row above was open on testnet until step 15 ran. The full per finding inventory, with the tests for each, is in [docs/reviews/03a-status.md](docs/reviews/03a-status.md) and the review rows of [THREAT_MODEL.md](THREAT_MODEL.md).
 
-The live demo below ran on the first build up to the dispute resolve, and on the step 15 build from the second payment on work 0. The audit redeploy and the final redeploy moved no state (the final one also asserted it was quiet): after it, `get_accounting` read `allowance_total` 200000 and every other counter 0, and `s2`, `s12` and `s13` kept their owners and approvals.
+The live demo below ran on the first build up to the dispute resolve, on the step 15 build from the second payment on work 0 until the audit redeploy, and the split sheet scene and the auction sale on the final build. The audit redeploy and the final redeploy moved no state (the final one also asserted it was quiet): after it, `get_accounting` read `allowance_total` 200000 and every other counter 0, and `s2`, `s12` and `s13` kept their owners and approvals.
 
-**Keys.** The 13 vault accounts have zero access keys. The registry (`reg.royltee-dev.testnet`) and the mock USDC (`usdc.royltee-dev.testnet`) accounts still have one full-access key each. Deleting both keys is planned; until then whoever holds the registry key can redeploy the registry, as all three in-place updates did (THREAT_MODEL T13). The agent account has only a function-call key; its full-access key was deleted on chain.
+**Keys.** The 15 vault accounts (`s1` to `s15`) have zero access keys (re-read on 2026-11-14 at about 11:03 UTC, `s14` and `s15` included). The registry (`reg.royltee-dev.testnet`) and the mock USDC (`usdc.royltee-dev.testnet`) accounts still have one full-access key each, kept on purpose on testnet (see [Keys on testnet vs mainnet](#keys-on-testnet-vs-mainnet) below), so whoever holds the registry key can redeploy the registry, as all three in-place updates did (THREAT_MODEL T13). The agent account has only a function-call key; its full-access key was deleted on chain.
 
 | Account | Role | Code hash (base58, from `deployments/testnet.json`) |
 |---|---|---|
 | [`reg.royltee-dev.testnet`](https://testnet.nearblocks.io/address/reg.royltee-dev.testnet) | Registry, NFT name `RoylTEE`, symbol `ROYLT` | `5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG` (sha256 `4378568f0459560130cdb56fa05152f9946116d3332d6c3f7f53e939005dc271`). Earlier: `GZkyojcH...` (first build), `22JaDgJd...` (step 15), `5Taw8Syz...` (audit F1) |
 | [`usdc.royltee-dev.testnet`](https://testnet.nearblocks.io/address/usdc.royltee-dev.testnet) | Mock USDC (testnet), `mUSDC` | `47ybTZxhaJ9ZW3FC9jwaDdLfwgkJ59cCrnkSn5oop67t` (sha256 `2e5c896b2ead7d1bd12a2944971d6a393902084cf47616c54d18e7a577efc0bb`) |
 | [`s1.reg.royltee-dev.testnet`](https://testnet.nearblocks.io/address/s1.reg.royltee-dev.testnet) to `s7` | Share vaults, 0 keys, vault code of the first build (no `ft_on_transfer`) | `BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU` (sha256 `973b2cbdbe904de710dcc7bf54a7b4164156f8c81d2932191e6968514aaaa727`) |
-| [`s8.reg.royltee-dev.testnet`](https://testnet.nearblocks.io/address/s8.reg.royltee-dev.testnet) to `s13` | Share vaults, 0 keys, vault code the current registry deploys (`get_vault_code_hash`) | `BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP` (sha256 `9e9ef97840a3a3e6967565b43a9c2a467c1925153ea8c5577d666c9b16966cda`) |
+| [`s8.reg.royltee-dev.testnet`](https://testnet.nearblocks.io/address/s8.reg.royltee-dev.testnet) to `s15` | Share vaults, 0 keys, vault code the current registry deploys (`get_vault_code_hash`) | `BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP` (sha256 `9e9ef97840a3a3e6967565b43a9c2a467c1925153ea8c5577d666c9b16966cda`) |
+| [`auction.royltee-dev.testnet`](https://testnet.nearblocks.io/address/auction.royltee-dev.testnet) | Sealed-bid share auction contract (code on branch `feat/tee-auction`; it keeps its own full-access key on testnet), a credentialed member that held share `s10` while it was for sale | `48d32c71de83d94a4225502a726b80bd678ac3dfb1471952c93c4c16595a8d09` (sha256 of the deployed code) |
 | [`registrar.royltee-dev.testnet`](https://testnet.nearblocks.io/address/registrar.royltee-dev.testnet) | Registrar (trusted role) | |
 | `writer-a`, `writer-b`, `buyer-pub` `.royltee-dev.testnet` | Members | |
 | [`pay-agent.buyer-pub.royltee-dev.testnet`](https://testnet.nearblocks.io/address/pay-agent.buyer-pub.royltee-dev.testnet) | Scripted payment agent, function-call key only | |
 | [`payer.royltee-dev.testnet`](https://testnet.nearblocks.io/address/payer.royltee-dev.testnet) | **Simulated** payer and Mock USDC minter | |
 | [`outsider.royltee-dev.testnet`](https://testnet.nearblocks.io/address/outsider.royltee-dev.testnet) | No credential, used to show refusals | |
 
-On-chain demo, in order (all on 2026-11-13 UTC; amounts in mUSDC):
+On-chain demo, in order (2026-11-13 UTC up to the last agent row, then 2026-11-14 UTC; amounts in mUSDC, all of it Simulated money):
 
 | Scene | Transaction | What it shows |
 |---|---|---|
@@ -261,8 +263,18 @@ On-chain demo, in order (all on 2026-11-13 UTC; amounts in mUSDC):
 | Agent tries to pay 100001 base units, one over its per-transaction limit | [`7Vu5wRDq...`](https://testnet.nearblocks.io/txns/7Vu5wRDqx7dj487LAk3e69wFt6FmH8bMNfzpL8E2LuaW) | Refused: "over per-transaction limit" |
 | `writer-a` registers work 5 (`ZZRYL2600007`) with a `metadata_uri` that tells agents to pay `outsider` instead, and shares `s12` and `s13` | [`ryAcUUtR...`](https://testnet.nearblocks.io/txns/ryAcUUtRGdxyzsraWZjJE3SnytCbZzpsmZNNCmNFq3y), [`GJopxb2z...`](https://testnet.nearblocks.io/txns/GJopxb2zVGHNEgSUq9RKFHA3wmBYjcyM4wVmhZH5NcKd), [`FR5SZZWy...`](https://testnet.nearblocks.io/txns/FR5SZZWyr9dfQdpkxDTQamQXXoRKG6SPTPwK7NU21W1P) | Metadata text is stored, never obeyed |
 | Agent pays work 5, 0.1 mUSDC, line `agent-line-3`, with extra `payee` and `receiver_id` arguments naming `outsider` | [`CUW8qssJ...`](https://testnet.nearblocks.io/txns/CUW8qssJVCJZuUgzzWHf9bdEyNCkFXpQjUKrJeWXeVPS) | The extra arguments are ignored: `s12` 0.05, `s13` 0.05, `outsider` 0 |
+| *From here on the final build, 2026-11-14 UTC.* | | |
+| **Split sheet scene.** `writer-a` registers work 6 (`ZZRYL2600004`), then its own 50 percent share `s14` | [`EMdw5gBJ...`](https://testnet.nearblocks.io/txns/EMdw5gBJg8LAeuZ96n767iYiV6zyYhAgqmQ1Gf89W2sy), [`9aUzpdgB...`](https://testnet.nearblocks.io/txns/9aUzpdgBPrdJ3XaSn3YdKu19yjaBjKZj1S9wzowL9Nwt) | The registrant's own share is approved at once; its vault `s14` has 0 keys |
+| `writer-b` registers the other 50 percent of work 6 as share `s15` | [`5xYY2sWQ...`](https://testnet.nearblocks.io/txns/5xYY2sWQQrZL7XCiQ8CVKhw27pUWDRhnN5k3doqjsgjB) | Not the registrant, so `s15` is **pending**: `get_share_approval` reads pending |
+| Simulated payer pays work 6, 1.0 mUSDC, line `line-4` | [`8y7g9Rfo...`](https://testnet.nearblocks.io/txns/8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL) | `s14` vault gets 0.5 at once; the 0.5 for `s15` is held in escrow (reason `awaiting_approval`), its vault stays at 0 |
+| `writer-a` signs `approve_share` on `s15` | [`5dgncSm1...`](https://testnet.nearblocks.io/txns/5dgncSm1CyDuiEKRzeUpZJTWrBnHzNuuEP6k51RNseGa) | Event `share_approved`: the held 0.5 is released to the `s15` vault (0.5), escrow 0. Consent comes before the money moves. |
+| **Auction sale.** `writer-a` lists share `s10` in the sealed-bid auction (`nft_transfer_call`, reserve 20, ends 10:38:50 UTC) | [`Ae6ZccUJ...`](https://testnet.nearblocks.io/txns/Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR) | `s10` is held by the auction contract; its vault had 0 money and no dispute |
+| `writer-b` and `buyer-pub` each place a sealed bid with a 100 mUSDC deposit (sealed amounts 70 and 90) | [`GHCfH4Ph...`](https://testnet.nearblocks.io/txns/GHCfH4PhhcNCG4mmDCZXKmy9WvDucEnhCmerYVSjNm1v), [`AK88NkPk...`](https://testnet.nearblocks.io/txns/AK88NkPkXsik1xPbTNDNZB6VCCRi2rKhxeVbap9bHkSc) | Only ciphertext is on chain; nobody can read the amounts before the end |
+| `outsider` asks OutLayer directly to open the bids, naming the auction as contract, and then naming itself | [`EaHtbQ54...`](https://testnet.nearblocks.io/txns/EaHtbQ54aAyZUgakGc4EkrYNLPMafboWStyC4rfQ9BvM), [`57tzs8Nb...`](https://testnet.nearblocks.io/txns/57tzs8NbCKhhC9guscGE1NbgqZWxNLXsTF4mZgyFXtqP) | Both refused by the OutLayer keystore (`Access denied by access condition`), 0 instructions run, return value null. Run before the listing. |
+| Settle through the real OutLayer TEE | [`CATqXVEa...`](https://testnet.nearblocks.io/txns/CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW) | Sold to `buyer-pub` at the second price, 70 mUSDC; `s10` is now owned by `buyer-pub`. `outlayer-verify` passed all 5 checks on this transaction (the verifier output is kept as evidence on branch `feat/tee-auction`) |
+| `withdraw` for the three accounts | [`2PMK4vf1...`](https://testnet.nearblocks.io/txns/2PMK4vf1dKsPNhZwtNkWL2xninc7ZNRN515HiwndQdVY) | Seller +70, losing bidder refunded 100, winner change 30; the auction owes 0 afterwards |
 
-Per-token history: each share's `nft_token` metadata `extra` carries earned, paid out, claimable, status and locks, and every change is a NEP-297 event (`EVENT_JSON:`, standard `share_registry`) in the transactions above. The full transaction list (67 on-chain transactions including both registry redeploys, plus the one refused locally above) is in `deployments/testnet.json`.
+Per-token history: each share's `nft_token` metadata `extra` carries earned, paid out, claimable, status and locks, and every change is a NEP-297 event (`EVENT_JSON:`, standard `share_registry`) in the transactions above. The full transaction list (87 on-chain transactions including the three registry redeploys, step 16 and the auction demo, plus the one refused locally above) is in `deployments/testnet.json`. The auction contract and its tests are on branch `feat/tee-auction`; the rows above are here because the sale moved share `s10` (the record's `token_owners` lists `buyer-pub` as its owner, and `npm run verify:testnet` checks it).
 
 Zero-keys proof without Node, with curl:
 
@@ -272,6 +284,12 @@ curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \
 ```
 
 See: `"keys":[]` in the result.
+
+### Keys on testnet vs mainnet
+
+On testnet the registry and mock USDC full-access keys are kept, by the owner's decision on 2026-11-14 (DEPLOY_PLAN step 6 is not run). This is a testnet demo with Simulated money, and keeping the keys means a late fix can still be deployed in place. It also means T13 is open here: whoever holds the registry key can swap the code, which is why this README never calls the registry keyless. `npm run verify:testnet` checks that the live keys equal the record, so a change cannot go unseen. The sealed-bid auction account keeps its own full-access key too, because its recovery calls need it.
+
+On mainnet both full-access keys would be deleted after the final deploy (or upgrades handed to a multisig or DAO with a delay), and the same zero-keys check that the 15 share vaults pass today would prove it for the registry and the token: `view_access_key_list` returns `"keys":[]` and the code hash equals a local build. After that point no code can be fixed, so the deploy would be preceded by the full security pack and a real wallet test of the site's signing screens.
 
 ## Website and help chat
 
@@ -344,7 +362,7 @@ Not built, in no particular order:
 - NEAR Intents for cross-chain payers.
 - DDEX and CWR import.
 - Period allocation using `effective_from` (recorded on every transfer today, not used by payout logic).
-- Deleting the registry and Mock USDC full-access keys (planned for this testnet deployment).
+- Deleting the registry and Mock USDC full-access keys (for a mainnet deployment; kept on this testnet deployment by decision, see [Keys on testnet vs mainnet](#keys-on-testnet-vs-mainnet)).
 
 ## Known limits
 
@@ -358,6 +376,7 @@ Residual risks of the branch code, from the review passes. None of them lets any
 - **Forward gas on testnet** (audit F1). Fixed on testnet by the audit redeploy on 2026-11-14 (code hash `5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo`, kept by the final redeploy, now `5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG`), which reserves 5 + 10 Tgas per forward. A direct payment to a full group of 16 shares at 300 Tgas is shown in the sandbox only; it has not been sent on testnet (UNVERIFIED there).
 - **Lost callbacks** (THREAT_MODEL T19, T19b). A stuck transfer lock is released by anyone after 1200 blocks (about 12 minutes at the 0.59 to 0.60 s block time measured on testnet). A stuck payout lock is never cleared by code: anyone may ask for a read that only reports the vault balance (`payout_uncertain`), and the lock stays until the real late callback or the registrar settles it. A payment forward whose callback never ran can be quarantined by anyone after about a day (`release_stale_forward`, 150000 blocks): it credits nothing and resends nothing, because a balance read cannot show where funds came from and no block count proves the original transfer cannot still land. A quarantined amount or a stuck payout lock is settled by the real late callback, or by the registrar with `resolve_written_off` / `resolve_stale_payout` and the final public receipt outcome (procedure in DEPLOY_PLAN). After a registrar call the old callbacks of that quarantine are ignored, so a late callback cannot settle a later quarantine. This is a stated registrar trust: a wrong answer can pay a share twice from pooled registry funds or credit it what the vault does not hold. If the registrar is gone, such an amount stays stuck (the money is not taken, there is no method to move it). A forward or lock in flight at upgrade time has no record and cannot be recovered; the redeploy is one transaction that deploys the code and calls `assert_quiescent`, which fails and rolls the deploy back unless the registry is quiet (`npm run check:quiescent` is the precheck). A callback that never commits cannot be produced on a sandbox node: the sandbox tests write the state it would leave and run the real recovery calls. Without a registrar a stale payout lock stays and that share is frozen; the money stays in its vault. These methods exist on testnet only after the final redeploy (see Live testnet deployment).
 - **Registrar trust and the registry key**: see [Who can hold a token](#who-can-hold-a-token) and THREAT_MODEL T12, T13.
+- **Not done, by decision on 2026-11-14.** The fixes for M1 and M2 above (each needs a registry redeploy). An extra security pack on the final code. A test of the site's signing screens with a real wallet: they stay UNVERIFIED. A payer role for the `payer` account on chain. Keys: see [Keys on testnet vs mainnet](#keys-on-testnet-vs-mainnet).
 
 ## Libraries, templates and AI-written code
 
@@ -386,7 +405,7 @@ site/src/pages           the pages listed under Website and help chat, plus the 
 site/src/scripts         browser code: read-only testnet view calls (chain.ts), wallet sign in and transactions (wallet.ts)
 site/src/server          server side: help chat, tickets, sign in, admin checks, rate limits, security headers
 site/src/data/testnet.ts accounts and the recorded demo, copied from deployments/testnet.json
-site/tests               Vitest tests for the site (219 in 18 files)
+site/tests               Vitest tests for the site (231 in 22 files)
 .github/workflows/ci.yml CI: wasm build, fmt, clippy, Rust tests, site typecheck, tests and build, gitleaks
 docs/reviews/            status of each external review finding (fixed, documented, deferred or false)
 README.md  THREAT_MODEL.md  DESIGN.md  AUDIT.md  DEPLOY_PLAN.md  DECISIONS_LOG.md  SPEND_LOG.md  LICENSE

@@ -47,6 +47,6 @@ describe('holder chain from the record', () => {
   });
   it('every recorded transfer is also a recorded scene, and every share has a mint', () => {
     for (const t of TRANSFERS) expect(SCENES.some((s) => s.txs.includes(t.tx))).toBe(true);
-    expect(Object.keys(MINTS)).toEqual(Array.from({ length: 13 }, (_, i) => `s${i + 1}`));
+    expect(Object.keys(MINTS)).toEqual(Array.from({ length: 15 }, (_, i) => `s${i + 1}`));
   });
 });

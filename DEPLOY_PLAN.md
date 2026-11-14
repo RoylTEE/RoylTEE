@@ -142,6 +142,8 @@ Proves: same as step 4; the name `RoylTEE` and the share symbol `ROYLT` (owner d
 
 ### Step 6. Delete the full-access keys of REG and USDC (2 transactions), then prove zero keys
 
+Status: NOT RUN, by owner decision on 2026-11-14 (decision 117). On testnet the registry and mock USDC full-access keys are kept so late fixes stay possible. On mainnet both keys would be deleted after the final deploy, or upgrades would be handed to a multisig or DAO, and the same zero-keys check that the share vaults pass (`npm run verify:testnet` reads 0 access keys on every vault) would prove it for the registry and the token. The commands below are the plan for that day and were not sent.
+
 ```bash
 REG_PK=$(near account get-public-key from-legacy-keychain $REG $NET | tail -n 1)    # public key only
 USDC_PK=$(near account get-public-key from-legacy-keychain $USDC $NET | tail -n 1)
@@ -359,7 +361,19 @@ After the key is deleted the registrar is the only way to settle a quarantined f
 5. `resolve_stale_payout(token_id, paid, expected_since_block, doc_hash)` needs a lock older than 1200 blocks; `expected_since_block` is the `since_block` of `payout_in_flight` in `get_ledger`, read with your review (a different lock is refused), and confirm in the explorer that no `on_claim` callback receipt executed for it. `paid` is true only if the withdraw receipt succeeded. The balance shown in `payout_uncertain` is a hint, never the evidence.
 6. Each call needs 1 yoctoNEAR (a full-access key of the registrar) and is public with its `doc_hash`. A wrong decision can pay a share twice or credit it more than its vault holds, up to the quarantined or locked amount (T12).
 
-### Step 16. Split sheet demo (DRAFT, not run, needs the owner's yes; about 7 transactions)
+### Step 16. Split sheet demo (run on 2026-11-14 from 10:54 to 10:57 UTC, 5 transactions, decision 118)
+
+Status: DONE, each transaction after its own owner yes. The registry was the final build (code hash `5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG`). Work 6 took the id; the share tokens are s14 and s15. Mock USDC is Simulated. The plan was shortened from about 7 to 5 transactions: the two read calls stayed read only and are not counted.
+
+| Step | What | Transaction | Block (UTC time) | Fee (NEAR) |
+|---|---|---|---|---|
+| 16.1 | writer-a registers work 6, ISRC `ZZRYL2600004` | `EMdw5gBJg8LAeuZ96n767iYiV6zyYhAgqmQ1Gf89W2sy` | 277647259 (10:54:52) | 0.0003588195886742 |
+| 16.2 | writer-a registers its own 50 percent share: s14, approval approved | `9aUzpdgBPrdJ3XaSn3YdKu19yjaBjKZj1S9wzowL9Nwt` | 277647307 (10:55:21) | 0.0087903663911723 |
+| 16.3 | writer-b registers the other 50 percent: s15, approval pending | `5xYY2sWQQrZL7XCiQ8CVKhw27pUWDRhnN5k3doqjsgjB` | 277647393 (10:56:13) | 0.0088750057064136 |
+| 16.4 | payer pays work 6 one mock USDC, period 2026-Q4, line `line-4`: s14 vault +500000, s15 escrowed 500000 (awaiting_approval) | `8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL` | 277647447 (10:56:46) | 0.001291858779242 |
+| 16.5 | writer-a signs `approve_share` on s15: event `share_approved` released 500000 to the s15 vault | `5dgncSm1CyDuiEKRzeUpZJTWrBnHzNuuEP6k51RNseGa` | 277647543 (10:57:44) | 0.0008330314951524 |
+
+Read back afterwards (read only, 2026-11-14 about 11:03 UTC): `get_work` 6 is active and registered by writer-a; `get_share_approval` reads approved for s14 and s15; the mock USDC balance of each of the two vaults is 500000; both vaults have 0 access keys (`view_access_key_list`) and the vault code hash `BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP`; `get_accounting` has escrow 0 and the registry holds 200000 (equal to the allowance counter). The escrow of 500000 for s15 is shown by the `payment_in` event of 16.4 (`escrowed` with reason `awaiting_approval`), not by a separate `get_ledger` call before the approval (that call was not run; UNVERIFIED as a read of its own). One earlier send of 16.1 failed with `Transaction has expired` (the signing block hash was too old when it reached the network) and never landed; nothing on chain. The plan text below is what was run, with the numbers of this run (the ISRC was unused, work id 6, tokens s14 and s15).
 
 ```bash
 near contract call-function as-transaction $REG register_work \
@@ -384,4 +398,4 @@ Proves: T39 live. A share registered by someone other than the work registrant i
 
 ## Transaction count
 
-The planned count for steps 1 to 13 was 51 transactions, including the two key deletions in step 6. Step 6 was not run (keys on the registry and mock USDC are still present). The run of steps 1 to 13 recorded in `deployments/testnet.json` has 50 on-chain transactions, plus one agent claim that the protocol refused before a transaction was sent. The record also holds step 15, demo writes W1 to W15 and step 15b: 67 on-chain transactions in all. Step 5 (registry deploy and init) is on chain. Step 6 stays reversible until the owner says go.
+The planned count for steps 1 to 13 was 51 transactions, including the two key deletions in step 6. Step 6 was not run (keys on the registry and mock USDC are still present, by owner decision). The run of steps 1 to 13 recorded in `deployments/testnet.json` has 50 on-chain transactions, plus one agent claim that the protocol refused before a transaction was sent. The record also holds step 15, demo writes W1 to W15, step 15b, step 15c (the final redeploy), the auction demo steps 17a to 17m (14 transactions; step 17e, the owner's dashboard action, has no transaction id recorded here) and step 16 (5 transactions): 87 on-chain transactions in all, plus the one refused with no transaction (88 entries). The auction plan is in the auction branch of this repository; its transactions are recorded here because they spend from the same accounts and moved share `s10`.
