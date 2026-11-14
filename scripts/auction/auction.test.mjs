@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
-import { bidMsg, bidPlaintext, sealBid } from "./bid-crypto.mjs";
+import { spawnSync } from "node:child_process";
+import { AMOUNT_WIDTH, bidMsg, bidPlaintext, checkBidAmount, sealBid } from "./bid-crypto.mjs";
 import { runWasi } from "./run-wasi.mjs";
 
 const WASM = new URL("../../contracts/res/auction_wasi.wasm", import.meta.url).pathname;
@@ -15,14 +16,17 @@ const CONTRACT = "auction.example.testnet";
 
 assert.ok(existsSync(WASM), "build first: npm run build:wasm");
 
-// `run(req)` uses the test secret; `run(req, null)` runs with none set.
-const run = async (req, master = MASTER) => {
-  const { code, out } = await runWasi(WASM, req, master === null ? undefined : master);
+// `run(req)` uses the test secret and the auction contract as the caller (what
+// OutLayer reports as NEAR_PREDECESSOR_ID); `run(req, null)` runs with no
+// secret; `run(req, MASTER, caller)` picks the caller (`null` leaves it unset).
+const run = async (req, master = MASTER, caller = CONTRACT) => {
+  const { code, out } = await runWasi(WASM, req, master === null ? undefined : master, caller === null ? undefined : caller);
   assert.equal(code, 0);
   return { out, json: JSON.parse(out) };
 };
 
-const pubkey = async () => (await run({ mode: "pubkey" })).json.pubkey;
+const PK_REQ = { mode: "pubkey", contract: CONTRACT };
+const pubkey = async () => (await run(PK_REQ)).json.pubkey;
 
 const bid = (pk, auctionId, bidder, amount, over = {}) => ({
   bidder,
@@ -40,12 +44,12 @@ const settle = (bids, extra = {}) => ({
 });
 
 test("pubkey mode prints a 32 byte key and never the secret", async () => {
-  const { out, json } = await run({ mode: "pubkey" });
+  const { out, json } = await run(PK_REQ);
   assert.match(json.pubkey, /^[0-9a-f]{64}$/);
   assert.equal(json.ok, true);
   assert.ok(!out.includes(MASTER));
-  assert.equal((await run({ mode: "pubkey" })).json.pubkey, json.pubkey, "deterministic");
-  assert.notEqual((await run({ mode: "pubkey" }, MASTER.replace("0", "1"))).json.pubkey, json.pubkey);
+  assert.equal((await run(PK_REQ)).json.pubkey, json.pubkey, "deterministic");
+  assert.notEqual((await run(PK_REQ, MASTER.replace("0", "1"))).json.pubkey, json.pubkey);
 });
 
 test("second price: highest bid wins and pays the second highest", async () => {
@@ -106,15 +110,15 @@ test("no valid bid: no winner", async () => {
 });
 
 test("bids sealed to another key do not open", async () => {
-  const other = (await run({ mode: "pubkey" }, MASTER.replace("0", "9"))).json.pubkey;
+  const other = (await run(PK_REQ, MASTER.replace("0", "9"))).json.pubkey;
   const { json } = await run(settle([bid(other, 5, "a.testnet", "50000000")]));
   assert.equal(json.winner, null);
 });
 
 test("missing secret and bad requests fail with ok=false", async () => {
-  assert.equal((await run({ mode: "pubkey" }, null)).json.ok, false);
+  assert.equal((await run(PK_REQ, null)).json.ok, false);
   assert.equal((await run("not json")).json.ok, false);
-  assert.equal((await run({ mode: "other" })).json.ok, false);
+  assert.equal((await run({ mode: "other", contract: CONTRACT })).json.ok, false);
 });
 
 test("bids_hash is the sha256 of the canonical text the contract also builds", async () => {
@@ -134,6 +138,52 @@ test("eight bids settle quickly", async () => {
   assert.equal(json.winner, "bidder7.testnet");
   assert.equal(json.price, "26000000");
   assert.ok(Date.now() - t < 5000);
+});
+
+test("a direct request from another caller is refused (C1)", async () => {
+  const pk = await pubkey();
+  const victim = bid(pk, 5, "a.testnet", "50000000");
+  const attacker = bid(pk, 5, "x.testnet", "100000000");
+  const req = settle([victim, attacker]);
+  for (const caller of ["x.testnet", "", null, `${CONTRACT}.evil`]) {
+    const { json } = await run(req, MASTER, caller);
+    assert.equal(json.ok, false, `caller ${caller}`);
+    assert.equal(json.price, undefined);
+    assert.equal(json.winner, undefined);
+    assert.equal((await run(PK_REQ, MASTER, caller)).json.ok, false);
+  }
+  assert.equal((await run(req)).json.price, "50000000", "the contract itself is admitted");
+});
+
+test("amounts are padded to 38 digits and the module rejects other widths", async () => {
+  const pk = await pubkey();
+  const p = JSON.parse(bidPlaintext({ auctionId: 5, contract: CONTRACT, bidder: "a.testnet", amount: "50000000" }));
+  assert.equal(p.amount.length, AMOUNT_WIDTH);
+  assert.equal(p.amount, "50000000".padStart(38, "0"));
+  // Ciphertext length is the same for a 1 digit and an 18 digit bid.
+  const small = bid(pk, 5, "a.testnet", "1").ct.length;
+  const big = bid(pk, 5, "a.testnet", "100000000000000000").ct.length;
+  assert.equal(small, big);
+  // An unpadded amount sealed by hand is dropped.
+  const raw = { ...JSON.parse(bidPlaintext({ auctionId: 5, contract: CONTRACT, bidder: "a.testnet", amount: "50000000" })), amount: "50000000" };
+  const { json } = await run(settle([{ bidder: "a.testnet", ct: sealBid(pk, JSON.stringify(raw)) }]));
+  assert.equal(json.winner, null);
+  assert.throws(() => bidPlaintext({ auctionId: 5, contract: CONTRACT, bidder: "a", amount: "1".repeat(39) }));
+});
+
+test("encrypt-bid refuses an amount outside the reserve and max deposit (L5)", () => {
+  assert.doesNotThrow(() => checkBidAmount({ amount: "10000000", reserve: "10000000", maxDeposit: "100000000" }));
+  assert.doesNotThrow(() => checkBidAmount({ amount: "100000000", reserve: "10000000", maxDeposit: "100000000" }));
+  assert.throws(() => checkBidAmount({ amount: "9999999", reserve: "10000000", maxDeposit: "100000000" }), /below the reserve/);
+  assert.throws(() => checkBidAmount({ amount: "100000001", reserve: "10000000", maxDeposit: "100000000" }), /above max_deposit/);
+  assert.throws(() => checkBidAmount({ amount: "1e8", reserve: "1", maxDeposit: "100000000" }));
+  const script = new URL("./encrypt-bid.mjs", import.meta.url).pathname;
+  const base = ["--pubkey", "00".repeat(32), "--auction", "0", "--contract", CONTRACT, "--bidder", "a.testnet", "--reserve", "10000000", "--max-deposit", "100000000"];
+  const bad = spawnSync("node", [script, ...base, "--amount", "5"], { encoding: "utf8" });
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /below the reserve/);
+  const noRange = spawnSync("node", [script, ...base.slice(0, 8), "--amount", "50000000"], { encoding: "utf8" });
+  assert.equal(noRange.status, 2, "reserve and max-deposit are required");
 });
 
 test("the ft_transfer_call msg is the JSON the contract parses", () => {

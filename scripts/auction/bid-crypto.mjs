@@ -32,15 +32,31 @@ function rawPublic(keyObject) {
   return Buffer.from(keyObject.export({ format: "jwk" }).x, "base64url");
 }
 
+/** Every amount is zero padded to this width, so the ciphertext length does
+ * not reveal how many digits the bid has. The module rejects any other width. */
+export const AMOUNT_WIDTH = 38;
+
+/** Throws unless reserve <= amount <= maxDeposit (all decimal strings, micro
+ * mUSDC). A bid outside the range is silently dropped by the module while its
+ * deposit stays locked, so refuse to make one. */
+export function checkBidAmount({ amount, reserve, maxDeposit }) {
+  for (const [name, v] of [["amount", amount], ["reserve", reserve], ["max deposit", maxDeposit]]) {
+    if (!/^[0-9]{1,38}$/.test(String(v))) throw new Error(`${name} must be a decimal string of at most 38 digits`);
+  }
+  const a = BigInt(amount);
+  if (a < BigInt(reserve)) throw new Error(`amount ${amount} is below the reserve ${reserve}; the bid would be dropped`);
+  if (a > BigInt(maxDeposit)) throw new Error(`amount ${amount} is above max_deposit ${maxDeposit}; the bid would be dropped`);
+}
+
 /** Builds the bid plaintext. Amount is a decimal string in micro mUSDC. */
 export function bidPlaintext({ auctionId, contract, bidder, amount, salt }) {
-  if (!/^[0-9]+$/.test(String(amount))) throw new Error("amount must be a decimal string");
+  if (!/^[0-9]{1,38}$/.test(String(amount))) throw new Error("amount must be a decimal string of at most 38 digits");
   return JSON.stringify({
     v: 1,
     auction: String(auctionId),
     contract,
     bidder,
-    amount: String(amount),
+    amount: String(amount).padStart(AMOUNT_WIDTH, "0"),
     salt: salt ?? randomBytes(16).toString("hex"),
   });
 }

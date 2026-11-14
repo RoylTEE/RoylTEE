@@ -4,6 +4,14 @@
 //! `PROTECTED_AUCTION_MASTER` from the environment, and writes one JSON line
 //! to stdout.
 //!
+//! Caller check: OutLayer gives the guest the account that called it on chain
+//! in `NEAR_PREDECESSOR_ID` (the worker writes it from the request receipt;
+//! it is empty over HTTPS and a secret cannot set it). Every mode fails unless
+//! that account equals the `contract` field of the request. The auction
+//! contract is the only code that builds a request with its own name in that
+//! field, so a direct request from any other account cannot use the secret
+//! as a decryption oracle.
+//!
 //! Modes:
 //! - `pubkey`: prints the public key bidders encrypt to. The private key is
 //!   derived from the master secret and never printed.
@@ -31,6 +39,9 @@ use x25519_dalek::{PublicKey, StaticSecret};
 pub const MAX_INPUT: usize = 64 * 1024;
 /// Most bids a request may carry.
 pub const MAX_BIDS: usize = 16;
+/// Width of the amount inside a bid plaintext. Every amount is zero padded to
+/// this width, so the ciphertext length does not reveal its digit count.
+pub const AMOUNT_WIDTH: usize = 38;
 /// Version tag inside every bid plaintext and every output.
 pub const VERSION: u64 = 1;
 
@@ -174,10 +185,18 @@ fn open_bid(sk: &StaticSecret, ct_b64: &str) -> Option<BidPlain> {
 }
 
 fn parse_amount(s: &str) -> Option<u128> {
-    if s.is_empty() || s.len() > 38 || !s.bytes().all(|b| b.is_ascii_digit()) {
+    if s.is_empty() || s.len() > AMOUNT_WIDTH || !s.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
     s.parse().ok()
+}
+
+/// A bid amount: exactly `AMOUNT_WIDTH` digits. Any other width is dropped.
+fn parse_bid_amount(s: &str) -> Option<u128> {
+    if s.len() != AMOUNT_WIDTH {
+        return None;
+    }
+    parse_amount(s)
 }
 
 /// Second price with a reserve. `valid` holds (index, amount) for every valid
@@ -204,8 +223,9 @@ pub fn pick_winner(valid: &[(usize, u128)], reserve: u128) -> Option<(usize, u12
     Some((wi, second.unwrap_or(reserve).max(reserve)))
 }
 
-/// Handles one request. `master` is the value of `PROTECTED_AUCTION_MASTER`.
-pub fn handle(input: &str, master: Option<&str>) -> String {
+/// Handles one request. `master` is the value of `PROTECTED_AUCTION_MASTER`
+/// and `caller` the value of `NEAR_PREDECESSOR_ID`.
+pub fn handle(input: &str, master: Option<&str>, caller: Option<&str>) -> String {
     if input.len() > MAX_INPUT {
         return fail("input too large");
     }
@@ -213,6 +233,12 @@ pub fn handle(input: &str, master: Option<&str>) -> String {
         Ok(r) => r,
         Err(_) => return fail("bad request json"),
     };
+    // The account that called OutLayer must be the contract the request names.
+    // Empty or missing (HTTPS, an old worker) fails closed.
+    match caller {
+        Some(c) if !c.is_empty() && !req.contract.is_empty() && c == req.contract => {}
+        _ => return fail("caller is not the auction contract"),
+    }
     let Some(master) = master.filter(|m| m.len() >= 32) else {
         return fail("master secret missing");
     };
@@ -260,7 +286,7 @@ fn settle(req: &Request, master: &str) -> String {
         {
             continue;
         }
-        let Some(amount) = parse_amount(&p.amount) else {
+        let Some(amount) = parse_bid_amount(&p.amount) else {
             continue;
         };
         if amount < reserve || amount > max_deposit {
@@ -376,7 +402,11 @@ mod wasi {
     pub extern "C" fn _start() {
         let input = read_stdin();
         let out = match core::str::from_utf8(&input) {
-            Ok(s) => handle(s, env_var("PROTECTED_AUCTION_MASTER").as_deref()),
+            Ok(s) => handle(
+                s,
+                env_var("PROTECTED_AUCTION_MASTER").as_deref(),
+                env_var("NEAR_PREDECESSOR_ID").as_deref(),
+            ),
             Err(_) => super::fail("input is not utf8"),
         };
         write_stdout(out.as_bytes());
@@ -439,7 +469,17 @@ mod tests {
         b64(&raw)
     }
 
+    /// Zero pads a plain digit string to the bid width, as the Node script does.
+    fn pad(amount: &str) -> String {
+        if amount.bytes().all(|b| b.is_ascii_digit()) && amount.len() <= AMOUNT_WIDTH {
+            format!("{amount:0>38}")
+        } else {
+            amount.to_string()
+        }
+    }
+
     fn plain(auction: &str, bidder: &str, amount: &str) -> String {
+        let amount = pad(amount);
         format!(
             r#"{{"v":1,"auction":"{auction}","contract":"{CONTRACT}","bidder":"{bidder}","amount":"{amount}","salt":"00"}}"#
         )
@@ -454,8 +494,12 @@ mod tests {
         .to_string()
     }
 
+    fn pubkey_req() -> String {
+        serde_json::json!({ "mode": "pubkey", "contract": CONTRACT }).to_string()
+    }
+
     fn run(r: &str) -> serde_json::Value {
-        serde_json::from_str(&handle(r, Some(MASTER))).unwrap()
+        serde_json::from_str(&handle(r, Some(MASTER), Some(CONTRACT))).unwrap()
     }
 
     #[test]
@@ -501,10 +545,10 @@ mod tests {
             public_key_hex(&MASTER.replace('0', "1"))
         );
         assert_eq!(public_key_hex(MASTER).len(), 64);
-        let out = run(r#"{"mode":"pubkey"}"#);
+        let out = run(&pubkey_req());
         assert_eq!(out["pubkey"], public_key_hex(MASTER));
         assert_eq!(out["ok"], true);
-        assert!(!handle(r#"{"mode":"pubkey"}"#, Some(MASTER)).contains(MASTER));
+        assert!(!handle(&pubkey_req(), Some(MASTER), Some(CONTRACT)).contains(MASTER));
     }
 
     #[test]
@@ -600,12 +644,19 @@ mod tests {
     #[test]
     fn bad_requests_fail_without_leaking() {
         let f = |r: &str, m: Option<&str>| {
-            serde_json::from_str::<serde_json::Value>(&handle(r, m)).unwrap()
+            serde_json::from_str::<serde_json::Value>(&handle(r, m, Some(CONTRACT))).unwrap()
         };
+        let pk = pubkey_req();
         assert_eq!(f("not json", Some(MASTER))["ok"], false);
-        assert_eq!(f(r#"{"mode":"pubkey"}"#, None)["ok"], false);
-        assert_eq!(f(r#"{"mode":"pubkey"}"#, Some("short"))["ok"], false);
-        assert_eq!(f(r#"{"mode":"nope"}"#, Some(MASTER))["ok"], false);
+        assert_eq!(f(&pk, None)["ok"], false);
+        assert_eq!(f(&pk, Some("short"))["ok"], false);
+        assert_eq!(
+            f(
+                &serde_json::json!({"mode":"nope","contract":CONTRACT}).to_string(),
+                Some(MASTER)
+            )["ok"],
+            false
+        );
         assert_eq!(
             f(&req(&[], "0", "100"), Some(MASTER))["ok"],
             false,
@@ -626,7 +677,7 @@ mod tests {
             "too many bids"
         );
         let big = format!(
-            "{{\"mode\":\"pubkey\",\"pad\":\"{}\"}}",
+            "{{\"mode\":\"pubkey\",\"contract\":\"{CONTRACT}\",\"pad\":\"{}\"}}",
             "x".repeat(MAX_INPUT)
         );
         assert_eq!(f(&big, Some(MASTER))["ok"], false);
@@ -653,5 +704,52 @@ mod tests {
             .map(|(b, c)| (b.to_string(), c.clone()))
             .collect();
         assert_eq!(out["bids_hash"], bids_hash("3", &pairs));
+    }
+
+    /// C1: the secret is never used for a request that did not come from the
+    /// auction contract named inside it.
+    #[test]
+    fn a_direct_request_from_another_caller_is_refused() {
+        let bids = [
+            ("a.testnet", seal(&plain("3", "a.testnet", "50"), 1, 1)),
+            ("x.testnet", seal(&plain("3", "x.testnet", "100"), 2, 2)),
+        ];
+        let r = req(&bids, "10", "100");
+        // The attacker's own account calls OutLayer: it is the predecessor.
+        for caller in [
+            Some("x.testnet"),
+            Some(""),
+            None,
+            Some("auction.example.testnet.evil"),
+            Some("AUCTION.example.testnet"),
+        ] {
+            let out: serde_json::Value =
+                serde_json::from_str(&handle(&r, Some(MASTER), caller)).unwrap();
+            assert_eq!(out["ok"], false, "caller {caller:?}");
+            assert!(out.get("winner").is_none() && out.get("price").is_none());
+            let pk = handle(&pubkey_req(), Some(MASTER), caller);
+            assert!(pk.contains("\"ok\":false") && !pk.contains(&public_key_hex(MASTER)));
+        }
+        // The contract itself is admitted.
+        assert_eq!(run(&r)["price"], "50");
+        // A request that names no contract is refused even for an empty caller.
+        let none = r#"{"mode":"pubkey"}"#;
+        assert!(handle(none, Some(MASTER), Some("")).contains("\"ok\":false"));
+    }
+
+    #[test]
+    fn amounts_must_be_padded_to_the_fixed_width() {
+        let unpadded = |amount: &str| {
+            format!(
+                r#"{{"v":1,"auction":"3","contract":"{CONTRACT}","bidder":"a.testnet","amount":"{amount}","salt":"00"}}"#
+            )
+        };
+        for amount in ["50", &format!("{:0>37}", "50"), &format!("{:0>39}", "50")] {
+            let r = req(&[("a.testnet", seal(&unpadded(amount), 1, 1))], "10", "100");
+            assert!(run(&r)["winner"].is_null(), "width {}", amount.len());
+        }
+        let r = req(&[("a.testnet", seal(&unpadded(&pad("50")), 1, 1))], "10", "100");
+        assert_eq!(run(&r)["winner"], "a.testnet");
+        assert_eq!(pad("50").len(), AMOUNT_WIDTH);
     }
 }
