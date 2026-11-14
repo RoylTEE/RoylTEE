@@ -33,8 +33,8 @@ done
 # The auction's WASI module (run by OutLayer, not a NEAR contract) is its own
 # workspace with its own lock file. It imports the WASI Preview 1 functions
 # it needs itself, so the installed wasm32-unknown-unknown target is enough.
-cargo build --manifest-path tee/auction-wasi/Cargo.toml --target "$TARGET" --release --locked \
-  --target-dir tee/auction-wasi/target
+ROYLTEE_AUCTION_ACCOUNT=auction.royltee-dev.testnet cargo build --manifest-path tee/auction-wasi/Cargo.toml \
+  --target "$TARGET" --release --locked --target-dir tee/auction-wasi/target
 cp "tee/auction-wasi/target/$TARGET/release/auction_wasi.wasm" contracts/res/auction_wasi.wasm
 
 # The module serves one auction account, fixed when it is built (so it is part

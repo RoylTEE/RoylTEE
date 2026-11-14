@@ -8,7 +8,7 @@
 //! in `NEAR_PREDECESSOR_ID` (the worker writes it from the request receipt;
 //! it is empty over HTTPS and a secret cannot set it). Every mode fails unless
 //! that account equals `EXPECTED_CONTRACT`, the auction account compiled into
-//! this module (default `auction.royltee-dev.testnet`, set at build time with
+//! this module (no default, set at build time with
 //! `ROYLTEE_AUCTION_ACCOUNT`, and so part of the pinned hash), and the
 //! request's own `contract` field names the same account. The name is not
 //! taken from the request alone: an attacker contract that names itself in the
@@ -56,10 +56,12 @@ pub const VERSION: u64 = 1;
 /// Version of the key and bid format. The auction contract must send the same.
 pub const KEY_VERSION: u64 = 1;
 /// The auction account this build serves. Fixed when the module is built.
-pub const EXPECTED_CONTRACT: &str = match option_env!("ROYLTEE_AUCTION_ACCOUNT") {
-    Some(a) => a,
-    None => "auction.royltee-dev.testnet",
-};
+/// There is no default: a build without `ROYLTEE_AUCTION_ACCOUNT` does not
+/// compile, so a module can never be built for an account by accident.
+pub const EXPECTED_CONTRACT: &str = env!(
+    "ROYLTEE_AUCTION_ACCOUNT",
+    "ROYLTEE_AUCTION_ACCOUNT must be set to the auction account when building this module"
+);
 
 const KEY_SALT: &[u8] = b"royltee-auction-v1";
 const KEY_INFO: &[u8] = b"x25519-secret";
