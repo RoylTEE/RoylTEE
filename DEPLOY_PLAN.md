@@ -351,9 +351,33 @@ near tokens $TOKEN.$REG view-ft-balance $USDC $NET now                          
 
 Proves: T39 live. A share registered by someone other than the work registrant is held until the registrant signs; the signature is an on-chain event. The reject path (`reject_share`, held money to the group's unallocated escrow) is shown by unit and sandbox tests only.
 
-### Step 17. Sealed-bid share auction (DRAFT, not run, needs the owner's yes; about 17 transactions)
+### Step 17. Sealed-bid share auction (17a to 17m RUN on 2026-11-14, 14 transactions plus the owner's dashboard step 17e; 17l and 17n not run; decision 121)
 
-Zero registry change: the auction is a normal credentialed member at a sibling account (`auction.royltee-dev.testnet`, never under `reg`, because `is_system_account` blocks those names). Nothing here touches `reg` or `usdc` code or keys. Design, costs and trust limits are in the README section "Sealed-bid share auction". Every `near` transaction command below was parsed with `--help` on near-cli-rs 0.31.1 (the parser accepted each one); none was sent. Read-only views were run for real against testnet where the text says so.
+Status: DONE up to 17m, each chain write after its own owner yes. Full record, with block heights, fees and the auction 0 result: `deployments/auction-testnet.json`. The `outlayer-verify` output for the settle transaction is `deployments/auction-settle-verify.txt` (all 5 checks pass). Real OutLayer was called four times by the auction side: 17f, 17g (twice, refused) and 17k. All mock USDC is Simulated.
+
+| Step | What happened | Transaction | Block (UTC time) |
+|---|---|---|---|
+| 17a | Account `auction.royltee-dev.testnet` created with 6 NEAR | `6c1KYbcDcNvYqzLUMTyiPWWoouSLprQhViPrtoY4punJ` | 277639017 (09:33:49) |
+| 17b | FastFS upload of the WASI module. The transaction fails with MethodNotFound on `outlayer.testnet`, by design of FastFS (it reads the transaction data); FastFS then served the module with sha256 `c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e` | `4c4xPqRuuhfcmj949aMzDB8VuvxGYFNiWK6B5cxMBrG1` | 277639509 (09:38:41) |
+| 17c | Deploy and init in one transaction, signed by the auction account; code sha256 `48d32c71de83d94a4225502a726b80bd678ac3dfb1471952c93c4c16595a8d09` | `EWWMu3chsa56hBybTpZ5hgiM6bazXRBekESv7KzpWYEt` | 277639814 (09:41:36) |
+| 17d | Registrar credential for the auction (read back with `is_active_member`, argument `account_id`: true) | `2zysmt9BZCbFs3bcVQSdwQPouPNgtt4W1DH7RHMw4eeG` | 277640210 (09:45:29) |
+| 17e | Owner set the secret access rule in the OutLayer dashboard: `And[WasmHash(c4a29e55...), Predecessor Whitelist[auction.royltee-dev.testnet]]`. Verified on chain with `get_secrets` (storage deposit 0.00692 NEAR). No transaction id recorded by this project | none recorded | about 10:02 UTC (row `created_at`) |
+| 17f | `publish_key`: OutLayer request 44227, key `6260be000b604a3998c530ab429092285dc806d2712d138b90b2a5ec723a692f`, key_version 1 | `7TLqoWrnBbTupg3PLccuc2eXgbquXACtYZqGDNgV58fq` | 277642341 (10:06:25) |
+| 17g part 1 | Outsider calls OutLayer directly naming the auction as contract (request 44242): refused by the keystore, `Access denied by access condition`, 0 instructions, return null; charged 0.001, refunded 0.019 NEAR | `EaHtbQ54aAyZUgakGc4EkrYNLPMafboWStyC4rfQ9BvM` | 277642548 (10:08:27) |
+| 17g part 2 | Outsider names itself as contract (request 44261): same refusal | `57tzs8NbCKhhC9guscGE1NbgqZWxNLXsTF4mZgyFXtqP` | 277643025 (10:13:15) |
+| 17h | Mint 200 mUSDC to writer-b and to buyer-pub (Simulated) | `9kwufV5FfUjXbZVwN662kawt2Q9RDRz9Hb6WiYt4vZY`, `6KZx5zga2jSAtWV1PPfucAra6RfECaSmWzx1v2wBnTmj` | 277643285, 277643349 (10:15:50, 10:16:26) |
+| 17i | writer-a lists share `s10`; auction id 0; ends 2026-11-14 10:38:50 UTC (20 minutes after sending) | `Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR` | 277643609 (10:18:51) |
+| 17j | Sealed bid 1 (writer-b, sealed 70) and bid 2 (buyer-pub, sealed 90), deposit 100 each | `GHCfH4PhhcNCG4mmDCZXKmy9WvDucEnhCmerYVSjNm1v`, `AK88NkPkXsik1xPbTNDNZB6VCCRi2rKhxeVbap9bHkSc` | 277644542, 277644667 (10:27:57, 10:29:06) |
+| 17k | Settle through the real OutLayer TEE (request 44422, task 106286; charged 0.0010383018, refunded 0.0189616982 NEAR). Sold to buyer-pub at the second price, 70 mUSDC; `s10` owned by buyer-pub. Events `winner_chosen`, `nft_transfer`, `share_transfer`, `auction_sold` | `CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW` | 277645673 (10:39:05) |
+| 17k (off chain) | `outlayer-verify` (git 90c27d9) on that transaction: Authenticity (Intel TDX, TCB UpToDate), Identity (approved on chain), Binding, Input, Output all PASS; wasm sha256 `c4a29e55...`, secrets ref `royltee-admin.testnet/royltee-auction` | evidence file | 2026-11-14 |
+| 17m | `withdraw` for writer-a, writer-b, buyer-pub; afterwards `get_accounting` owed_total 0, pending 0, escrow 0; mUSDC writer-a 70.5 (had 0.5), writer-b 200, buyer-pub 131 | `2PMK4vf1dKsPNhZwtNkWL2xninc7ZNRN515HiwndQdVY` | 277646389 (10:46:17) |
+| 17l | Recovery calls: not run (not needed) | none | none |
+| 17n | Delete the auction key: NOT run, by decision (review B reasoning; the key stays) | none | none |
+
+Changes from the draft text below, all from the run: 17b fails with MethodNotFound, not out of gas; the 17d read-back argument is `account_id`, not `account`; 17i used share `s10` (work 4, its vault held 0 money, no dispute) and an end time 20 minutes after sending instead of 10, so both bids fit (decision 119 on the registry branch, decision 121 here); 17g ran before any listing, as ordered. The text of each step below is the plan as written, kept for the record.
+
+
+Zero registry change: the auction is a normal credentialed member at a sibling account (`auction.royltee-dev.testnet`, never under `reg`, because `is_system_account` blocks those names). Nothing here touches `reg` or `usdc` code or keys. Design, costs and trust limits are in the README section "Sealed-bid share auction". Every `near` transaction command below was parsed with `--help` on near-cli-rs 0.31.1 before it was sent (the parser accepted each one). Read-only views were run for real against testnet where the text says so.
 
 Order matters. Do not list a real share before 17g (the refusal check) and 17k (the rehearsal) have passed.
 
@@ -373,12 +397,12 @@ near account create-account fund-myself $AUCTION '6 NEAR' \
   autogenerate-new-keypair save-to-legacy-keychain sign-as $ROOT $NET $SIGN
 ```
 
-17b. Publish the WASI module with FastFS. The module serves one account, fixed when it is built. `npm run build:wasm` builds it for `auction.royltee-dev.testnet` (Rust 1.99.1, committed lock files, `--locked`; the exact command is in the README). The crate has no default account: a direct build without `ROYLTEE_AUCTION_ACCOUNT` fails to compile. For any other auction account rebuild with `ROYLTEE_AUCTION_ACCOUNT=<account>` set and use the new hash everywhere below (findings C1, B-02 and N-L2). Publish it (1 tx, fails out of gas by design, same as the spike). Build the payload with `spike/outlayer/scripts/fastfs_payload.py`, then check the URL serves the same hash:
+17b. Publish the WASI module with FastFS. The module serves one account, fixed when it is built. `npm run build:wasm` builds it for `auction.royltee-dev.testnet` (Rust 1.99.1, committed lock files, `--locked`; the exact command is in the README). The crate has no default account: a direct build without `ROYLTEE_AUCTION_ACCOUNT` fails to compile. For any other auction account rebuild with `ROYLTEE_AUCTION_ACCOUNT=<account>` set and use the new hash everywhere below (findings C1, B-02 and N-L2). Publish it (1 tx; it fails with MethodNotFound on the receiver by design, because FastFS reads the transaction data, and FastFS still serves the module; this is what happened on 2026-11-14). Build the payload with `spike/outlayer/scripts/fastfs_payload.py`, then check the URL serves the same hash:
 
 ```bash
 python3 spike/outlayer/scripts/fastfs_payload.py $WASI /tmp/auction_fastfs.bin
 near contract call-function as-transaction $OL __fastdata_fastfs file-args /tmp/auction_fastfs.bin \
-  prepaid-gas '1 Tgas' attached-deposit '0 NEAR' sign-as $AUCTION $NET $SIGN   # expected to fail out of gas
+  prepaid-gas '1 Tgas' attached-deposit '0 NEAR' sign-as $AUCTION $NET $SIGN   # expected to fail with MethodNotFound (FastFS reads the data)
 curl -s $WASI_URL | sha256sum                                                  # must print $WASI_HASH
 ```
 
@@ -403,7 +427,7 @@ Do not credential the auction (17d) or send it anything until the printed config
 near contract call-function as-transaction $REG grant_credential \
   json-args "{\"account\":\"$AUCTION\",\"org_name_hash\":\"$H_A\",\"kyb_ref_hash\":\"$H_B\",\"doc_hash\":\"$H_C\"}" \
   prepaid-gas '300 Tgas' attached-deposit '0.02 NEAR' sign-as $REGISTRAR $NET $SIGN
-near contract call-function as-read-only $REG is_active_member json-args "{\"account\":\"$AUCTION\"}" $NET now   # true
+near contract call-function as-read-only $REG is_active_member json-args "{\"account_id\":\"$AUCTION\"}" $NET now   # true
 ```
 
 17e. OWNER, in the OutLayer dashboard (a wallet signs; no key is typed anywhere): create the secret profile `royltee-auction` for `$OL_OWNER`, bound to the WASM hash `$WASI_HASH`, with one auto-generated TEE secret `PROTECTED_AUCTION_MASTER` (hex32).
@@ -418,7 +442,7 @@ What is verified and what is not (read 2026-11-14 UTC):
 
 - Verified, view call on `outlayer.testnet`: the deployed contract accepts the target condition (`estimate_storage_cost` returned 0.00488 NEAR for it) and lists these access variants: `Logic`, `Not`, `AllowAll`, `Whitelist`, `AccountPattern`, `NearBalance`, `FtBalance`, `NftOwned`, `DaoMember`, `ValidUntil`, `WasmHash`, `Predecessor`. The deployed code also contains the string `predecessor_id`.
 - Verified in source (fastnear/near-outlayer at 2d50bfa): every access leaf except `Predecessor` is judged against the transaction signer; `Predecessor` is judged against the receipt's predecessor, the account that called `outlayer.testnet`; the worker writes that account into the guest as `NEAR_PREDECESSOR_ID` and strips every system name from the secrets first, so the guest cannot be fed a fake one.
-- UNVERIFIED: that the live keystore and worker on testnet run that source version; that the dashboard form can build option 1; that the worker sets `NEAR_PREDECESSOR_ID` for a direct WasmUrl run on testnet. If the worker does not set it, the module refuses every request, so the rehearsal in 17k fails closed and no sale is possible; nothing is lost.
+- Verified on 2026-11-14 UTC by the run: the dashboard built option 1 and the rule is on chain (`get_secrets`); the live keystore refused both outsider requests in 17g; the worker set `NEAR_PREDECESSOR_ID` for the WasmUrl run through the auction, because the module accepted the settle in 17k (the module refuses every request without it). Still UNVERIFIED: that the live worker and keystore run the source version read at 2d50bfa (the behaviour above matches it).
 
 Read the stored row back (view, no signature) and check it by eye or with `jq`:
 
@@ -427,7 +451,7 @@ near contract call-function as-read-only $OL get_secrets json-args "{\"accessor\
 # the printed "access" must contain a Predecessor leaf whose Whitelist names $AUCTION, and a WasmHash leaf equal to $WASI_HASH
 ```
 
-(`get_secrets` and `secrets_exist` exist in the contract source; `secrets_exist` was run and returned false before the owner stored the row. `get_secrets` has not been run on a stored row yet.)
+(`secrets_exist` returned false before the owner stored the row and true after. `get_secrets` was run on the stored row on 2026-11-14 and shows the rule above.)
 
 17f. Publish the TEE public key (the answer must carry `key_version` 1 and a key that is not a low order point, or the contract refuses it) (1 tx, anyone, or the owner for fallback 2; OutLayer refunds what it does not use). This is the first real call of OutLayer by the auction:
 
@@ -465,11 +489,11 @@ for b in $BIDDER1 $BIDDER2; do
 done
 ```
 
-17i. Seller side (2 to 3 tx). If the vault holds money, `sync` and `claim` first (unclaimed money travels with the share; T-A8). Then list: registry `nft_transfer_call` to the auction. Always use `nft_transfer_call`: a plain `nft_transfer` of a share to the auction account leaves it stranded with no auction (T-A16). `TOKEN` is a share id held by `WA` from step 9; `ENDS_AT` is nanoseconds, 10 minutes from now for the rehearsal:
+17i. Seller side (2 to 3 tx). If the vault holds money, `sync` and `claim` first (unclaimed money travels with the share; T-A8). Then list: registry `nft_transfer_call` to the auction. Always use `nft_transfer_call`: a plain `nft_transfer` of a share to the auction account leaves it stranded with no auction (T-A16). `TOKEN` is a share id held by `WA` from step 9; `ENDS_AT` is nanoseconds. The plan said 10 minutes from now; the run used 20 minutes (1200 seconds, `ends_at` 1794652730000000000) so that both bids fit, and the share was `s10`:
 
 ```bash
 TOKEN=<share token id held by $WA>
-ENDS_AT=$(( ($(date +%s) + 600) * 1000000000 ))
+ENDS_AT=$(( ($(date +%s) + 1200) * 1000000000 ))      # 20 minutes in the run
 near contract call-function as-transaction $REG nft_transfer_call \
   json-args "{\"receiver_id\":\"$AUCTION\",\"token_id\":\"$TOKEN\",\"msg\":\"{\\\"reserve\\\":\\\"$RESERVE\\\",\\\"max_deposit\\\":\\\"$MAX\\\",\\\"ends_at\\\":\\\"$ENDS_AT\\\"}\"}" \
   prepaid-gas '100 Tgas' attached-deposit '1 yoctoNEAR' sign-as $WA $NET $SIGN
@@ -534,7 +558,7 @@ near contract call-function as-read-only $AUCTION get_accounting json-args '{}' 
 
 Off chain proof: verify the settle transaction with `outlayer-verify tx <hash> --network testnet --api https://testnet-api.outlayer.ai` (see `spike/outlayer/README.md`). UNVERIFIED for this module until run.
 
-17n. Optional and NOT recommended yet: delete the auction's full-access key, then prove zero keys. Review B says do not delete it on the present evidence, because the key is also the only way to fix a bug or to rescue a stranded share (T-A16, T-A19). Do it only when the owner decides that no further fix is wanted after the rehearsal and the demo, and never while an auction is Delivering or returning or `pending_total` in `get_accounting` is not zero: the `resolve_*` calls in 17l need this key and nothing else can finish those states. The contract has no owner or admin method, so a bug can only be fixed while the key exists, and while the key exists its holder can claim vault money of listed shares and move all escrow (T-A19).
+17n. NOT RUN, by decision (the auction key stays on testnet). Optional and NOT recommended: delete the auction's full-access key, then prove zero keys. Review B says do not delete it on the present evidence, because the key is also the only way to fix a bug or to rescue a stranded share (T-A16, T-A19). Do it only when the owner decides that no further fix is wanted after the rehearsal and the demo, and never while an auction is Delivering or returning or `pending_total` in `get_accounting` is not zero: the `resolve_*` calls in 17l need this key and nothing else can finish those states. The contract has no owner or admin method, so a bug can only be fixed while the key exists, and while the key exists its holder can claim vault money of listed shares and move all escrow (T-A19).
 
 ```bash
 near account delete-keys $AUCTION public-keys <the one key printed in 17a> network-config testnet sign-with-legacy-keychain send
