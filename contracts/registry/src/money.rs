@@ -132,27 +132,53 @@ impl Registry {
     }
 
     /// Clears a lock older than `STALE_LOCK_BLOCKS` (T19). Anyone may call
-    /// it. A payout lock is cleared WITHOUT rolling back the debit: if the
-    /// withdraw happened the debit is right; if not, `sync` finds the money
-    /// again (and `total_paid_out` overstates by that amount, flagged by an
-    /// `anomaly` event). A transfer lock is cleared and the current owner
-    /// keeps the token.
-    pub fn release_stale_lock(&mut self, token_id: TokenId) {
+    /// it. A transfer lock is cleared at once and the current owner keeps
+    /// the token. A payout lock is cleared by `on_release_payout` after the
+    /// vault's real balance is read (T19, audit F3): the debit is undone
+    /// only if the balance shows the withdraw never happened, and is kept
+    /// otherwise. If a payment forward is also stuck on the share, the
+    /// payout lock is cleared at once without a read, as before F3 was
+    /// addressed, and `anomaly` marks the share.
+    pub fn release_stale_lock(&mut self, token_id: TokenId) -> PromiseOrValue<()> {
         let now = env::block_height();
         let stale = |k: &Option<Lock>| {
             k.as_ref()
                 .is_some_and(|k| now >= k.since_block.0.saturating_add(STALE_LOCK_BLOCKS))
         };
+        let vault = self.share(&token_id).vault.clone();
+        let usdc = self.usdc.clone();
+        let forward_stale = forwards::read_watch(&token_id)
+            .is_some_and(|w| w.count > 0 && now >= w.since.saturating_add(STALE_LOCK_BLOCKS));
         let l = self.ledger_mut(&token_id);
-        let mut released = Vec::new();
-        if stale(&l.payout_in_flight) {
-            released.push(("payout_in_flight", l.payout_in_flight.take()));
+        let payout_stale = stale(&l.payout_in_flight);
+        let transfer_stale = stale(&l.transfer_pending);
+        require!(payout_stale || transfer_stale, "no stale lock");
+        let read_balance = payout_stale && l.inbound_pending == 0;
+        require!(
+            !payout_stale || read_balance || forward_stale,
+            "payment forward in flight: release the payout lock after it settles"
+        );
+        if read_balance {
+            require!(
+                env::prepaid_gas().as_gas()
+                    >= GAS_FT_BALANCE.as_gas()
+                        + GAS_RELEASE_FORWARD_CB.as_gas()
+                        + Gas::from_tgas(5).as_gas(),
+                "not enough gas attached"
+            );
         }
-        if stale(&l.transfer_pending) {
+        let mut released = Vec::new();
+        if transfer_stale {
             released.push(("transfer_pending", l.transfer_pending.take()));
         }
-        require!(!released.is_empty(), "no stale lock");
-        l.epoch += 1;
+        if payout_stale && !read_balance {
+            released.push(("payout_in_flight", l.payout_in_flight.take()));
+        }
+        if !released.is_empty() {
+            l.epoch += 1;
+        }
+        let epoch = l.epoch;
+        let lock = l.payout_in_flight.clone();
         for (kind, lock) in released {
             emit(
                 "lock_released_stale",
@@ -165,6 +191,93 @@ impl Registry {
                 );
             }
         }
+        match lock.filter(|_| read_balance) {
+            Some(lock) => PromiseOrValue::Promise(
+                Promise::new(usdc)
+                    .function_call(
+                        "ft_balance_of".to_string(),
+                        json_bytes(json!({ "account_id": vault })),
+                        NearToken::from_yoctonear(0),
+                        GAS_FT_BALANCE,
+                    )
+                    .then(
+                        Self::ext(env::current_account_id())
+                            .with_static_gas(GAS_RELEASE_FORWARD_CB)
+                            .on_release_payout(token_id, U64(epoch), lock.since_block, lock.amount),
+                    ),
+            ),
+            None => PromiseOrValue::Value(()),
+        }
+    }
+
+    /// Settles the payout part of `release_stale_lock` (audit F3). With the
+    /// lock still the same and the ledger unchanged since the read began:
+    /// - vault balance equals the ledger's known balance: the withdraw
+    ///   happened, the debit is right, the lock is cleared;
+    /// - vault balance is exactly known balance plus the locked amount: the
+    ///   withdraw did not happen, so the debit is undone (known balance back,
+    ///   paid out back), which keeps `earned` and `total_paid_out` true;
+    /// - anything else cannot be told apart from a plain deposit: the lock is
+    ///   cleared without undoing the debit and `anomaly` marks the share, as
+    ///   before. A failed read leaves the lock as it is, to try again.
+    /// Never panics. Returns true if the lock was cleared.
+    #[private]
+    pub fn on_release_payout(
+        &mut self,
+        token_id: TokenId,
+        epoch: U64,
+        lock_block: U64,
+        amount: U128,
+    ) -> bool {
+        let observed = callback_result(64).and_then(|v| serde_json::from_slice::<U128>(&v).ok());
+        let Some(l) = self.ledgers.get_mut(&token_id) else {
+            return false;
+        };
+        let same_lock = l
+            .payout_in_flight
+            .as_ref()
+            .is_some_and(|k| k.since_block == lock_block && k.amount == amount);
+        let discard_reason = if observed.is_none() {
+            Some("read failed")
+        } else if !same_lock
+            || l.epoch != epoch.0
+            || l.transfer_pending.is_some()
+            || l.inbound_pending > 0
+        {
+            Some("ledger changed during the read")
+        } else {
+            None
+        };
+        if let Some(reason) = discard_reason {
+            emit(
+                "sync_discarded",
+                json!({ "token_id": token_id, "reason": reason }),
+            );
+            return false;
+        }
+        let observed = observed.map_or(0, |o| o.0);
+        let lock = l.payout_in_flight.take();
+        l.epoch += 1;
+        let outcome = if observed == l.known_balance {
+            "withdraw_happened"
+        } else if amount.0 > 0 && observed == l.known_balance.saturating_add(amount.0) {
+            l.known_balance += amount.0;
+            l.total_paid_out = l.total_paid_out.saturating_sub(amount.0);
+            "withdraw_failed_debit_undone"
+        } else {
+            "unclear"
+        };
+        emit(
+            "lock_released_stale",
+            json!({ "token_id": token_id, "lock": "payout_in_flight", "detail": lock, "outcome": outcome }),
+        );
+        if outcome == "unclear" {
+            emit(
+                "anomaly",
+                json!({ "token_id": token_id, "kind": "payout_lock_released_stale", "detail": "sync to reconcile the vault balance" }),
+            );
+        }
+        true
     }
 
     /// Reads the vault's real token balance and records it, so plain
@@ -434,10 +547,27 @@ impl Registry {
     }
 
     /// Settles one forward. On failure the amount stays in the registry as
-    /// `undelivered` (T26). Never panics.
+    /// `undelivered` (T26). `since` is the block the forward started in;
+    /// callbacks that were already in flight before the T19b upgrade carry
+    /// none. A forward written off by `release_stale_forward` changes
+    /// nothing here: the release already set the ledger from the vault
+    /// balance. Never panics.
     #[private]
-    pub fn on_forward(&mut self, token_id: TokenId, amount: U128) -> bool {
+    pub fn on_forward(&mut self, token_id: TokenId, amount: U128, since: Option<U64>) -> bool {
         let ok = callback_result(64).is_some();
+        if matches!(
+            forwards::watch_settle(&token_id, amount.0, since.map(|s| s.0)),
+            forwards::Settle::Late
+        ) {
+            if let Some(l) = self.ledgers.get_mut(&token_id) {
+                l.epoch += 1;
+            }
+            emit(
+                "anomaly",
+                json!({ "token_id": token_id, "kind": "late_forward_callback", "ok": ok, "amount": amount, "detail": "already released by release_stale_forward" }),
+            );
+            return ok;
+        }
         self.forwards_in_flight_total = self.forwards_in_flight_total.saturating_sub(amount.0);
         if let Some(l) = self.ledgers.get_mut(&token_id) {
             l.inbound_pending = l.inbound_pending.saturating_sub(1);
@@ -643,6 +773,7 @@ impl Registry {
         }
         let vault = self.share(token_id).vault.clone();
         self.forwards_in_flight_total += amount;
+        let since = forwards::watch_start(token_id, amount);
         let l = self.ledger_mut(token_id);
         l.inbound_pending += 1;
         l.epoch += 1;
@@ -656,7 +787,7 @@ impl Registry {
             .then(
                 Self::ext(env::current_account_id())
                     .with_static_gas(GAS_FORWARD_CB)
-                    .on_forward(token_id.clone(), U128(amount)),
+                    .on_forward(token_id.clone(), U128(amount), Some(U64(since))),
             )
             .detach();
     }

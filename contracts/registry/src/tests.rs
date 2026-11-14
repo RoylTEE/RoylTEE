@@ -128,7 +128,7 @@ fn pay_share(c: &mut Registry, token_id: &TokenId, amount: u128) {
     let r = c.ft_on_transfer(acc("payer.near"), U128(amount), msg.to_string());
     assert!(matches!(r, PromiseOrValue::Value(U128(0))));
     callback(ok(b""));
-    assert!(c.on_forward(token_id.clone(), U128(amount)));
+    assert!(c.on_forward(token_id.clone(), U128(amount), None));
 }
 
 fn ledger(c: &Registry, t: &TokenId) -> LedgerView {
@@ -588,7 +588,7 @@ fn under_allocated_group_pays_exact_bps_and_escrows_the_rest() {
     assert_eq!(c.get_accounting().forwards_in_flight_total.0, 750_001);
     for (t, amt) in [(&a, 500_001u128), (&b, 250_000)] {
         callback(ok(b""));
-        c.on_forward(t.clone(), U128(amt));
+        c.on_forward(t.clone(), U128(amt), None);
     }
     assert_eq!(ledger(&c, &a).known_balance.0, 500_001);
     assert_eq!(ledger(&c, &b).known_balance.0, 250_000);
@@ -624,7 +624,7 @@ fn under_allocated_group_pays_exact_bps_and_escrows_the_rest() {
     );
     assert_eq!(c.get_accounting().unallocated_total.0, 0);
     callback(ok(b""));
-    c.on_forward(d.clone(), U128(250_002));
+    c.on_forward(d.clone(), U128(250_002), None);
     assert_eq!(ledger(&c, &d).known_balance.0, 250_002);
 
     // Now full: the next payment leaves nothing unallocated.
@@ -681,7 +681,7 @@ fn failed_forward_goes_to_undelivered() {
         json!({ "pay_share": { "token_id": t, "period": "2026-Q3", "statement_hash": h('f') } });
     let _ = c.ft_on_transfer(acc("payer.near"), U128(50_000), msg.to_string());
     callback(PromiseResult::Failed);
-    assert!(!c.on_forward(t.clone(), U128(50_000)));
+    assert!(!c.on_forward(t.clone(), U128(50_000), None));
     let l = ledger(&c, &t);
     assert_eq!(
         (l.known_balance.0, l.undelivered.0, l.inbound_pending),
@@ -1039,9 +1039,9 @@ fn agent_pays_registered_shares_only_and_once_per_line() {
     assert!(logs.contains("\"source\":\"allowance\""));
     assert!(logs.contains("allowance_spent"));
     callback(ok(b""));
-    c.on_forward(t1.clone(), U128(60_000));
+    c.on_forward(t1.clone(), U128(60_000), None);
     callback(ok(b""));
-    c.on_forward(t2.clone(), U128(40_000));
+    c.on_forward(t2.clone(), U128(40_000), None);
     assert_eq!(ledger(&c, &t1).known_balance.0, 60_000);
     assert_eq!(ledger(&c, &t2).known_balance.0, 40_000);
     let r = c.get_role(agent()).unwrap();
@@ -1298,14 +1298,14 @@ fn retry_forward_resends_undelivered() {
         json!({ "pay_share": { "token_id": t, "period": "2026-Q3", "statement_hash": h('f') } });
     let _ = c.ft_on_transfer(acc("payer.near"), U128(80_000), msg.to_string());
     callback(PromiseResult::Failed);
-    assert!(!c.on_forward(t.clone(), U128(80_000)));
+    assert!(!c.on_forward(t.clone(), U128(80_000), None));
     assert_eq!(c.get_accounting().undelivered_total.0, 80_000);
     call(&acc("anyone.near"), NearToken::from_yoctonear(0));
     c.retry_forward(t.clone());
     assert_eq!(c.get_accounting().undelivered_total.0, 0);
     assert_eq!(c.get_accounting().forwards_in_flight_total.0, 80_000);
     callback(ok(b""));
-    assert!(c.on_forward(t.clone(), U128(80_000)));
+    assert!(c.on_forward(t.clone(), U128(80_000), None));
     assert_eq!(ledger(&c, &t).known_balance.0, 80_000);
     call(&acc("anyone.near"), NearToken::from_yoctonear(0));
     assert!(panics(|| c.retry_forward(t)), "nothing left to retry");
@@ -1325,19 +1325,29 @@ fn stale_payout_lock_released_only_after_timeout_and_late_callback_is_safe() {
         0,
         100 + STALE_LOCK_BLOCKS - 1,
     );
-    assert!(panics(|| c.release_stale_lock(t.clone())), "too early");
+    assert!(
+        panics(|| {
+            let _ = c.release_stale_lock(t.clone());
+        }),
+        "too early"
+    );
     at(
         &acc("anyone.near"),
         NearToken::from_yoctonear(0),
         0,
         100 + STALE_LOCK_BLOCKS,
     );
-    c.release_stale_lock(t.clone());
+    let _ = c.release_stale_lock(t.clone());
+    // The lock is cleared by the balance read, not before it (audit F3).
+    assert!(ledger(&c, &t).payout_in_flight.is_some());
+    let epoch = c.ledgers.get(&t).unwrap().epoch;
+    // The vault is empty: the withdraw happened.
+    callback(ok(b"\"0\""));
+    assert!(c.on_release_payout(t.clone(), U64(epoch), U64(100), U128(700_000)));
     assert!(ledger(&c, &t).payout_in_flight.is_none());
     assert!(get_logs().join("\n").contains("lock_released_stale"));
 
-    // A new claim cannot start (nothing claimable), but a late success of
-    // the old claim must not touch state beyond the epoch.
+    // A late success of the old claim must not touch state beyond the epoch.
     callback(ok(b""));
     assert!(c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(100)));
     let l = ledger(&c, &t);
@@ -1364,7 +1374,7 @@ fn late_resolve_after_stale_release_keeps_current_owner() {
         0,
         10 + STALE_LOCK_BLOCKS,
     );
-    c.release_stale_lock(t.clone());
+    let _ = c.release_stale_lock(t.clone());
     assert!(ledger(&c, &t).transfer_pending.is_none());
     callback(PromiseResult::Failed);
     assert!(c.nft_resolve_transfer(
@@ -1391,19 +1401,29 @@ fn late_failed_claim_after_stale_release_changes_no_balance() {
         0,
         5 + STALE_LOCK_BLOCKS,
     );
-    c.release_stale_lock(t.clone());
+    let _ = c.release_stale_lock(t.clone());
+    let epoch = c.ledgers.get(&t).unwrap().epoch;
+    // The vault still holds the 700000: the withdraw never happened, so
+    // the release undoes the debit (audit F3).
+    callback(ok(b"\"700000\""));
+    assert!(c.on_release_payout(t.clone(), U64(epoch), U64(5), U128(700_000)));
+    let l = ledger(&c, &t);
+    assert_eq!((l.known_balance.0, l.total_paid_out.0), (700_000, 0));
+    assert_eq!(l.earned.0, 700_000);
+    // The late failed callback finds no lock and changes no balance.
     callback(PromiseResult::Failed);
     assert!(!c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(5)));
     assert!(get_logs().join("\n").contains("late_claim_callback"));
     let l = ledger(&c, &t);
-    assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
-    // sync reads the real vault balance and makes it claimable again.
+    assert_eq!((l.known_balance.0, l.total_paid_out.0), (700_000, 0));
+    // A later sync reads the same balance and counts nothing twice.
     call(&acc("bob.near"), NearToken::from_yoctonear(0));
     let _ = c.sync(t.clone());
     let epoch = c.ledgers.get(&t).unwrap().epoch;
     callback(ok(b"\"700000\""));
     assert!(c.on_sync(t.clone(), U64(epoch)).is_some());
     assert_eq!(ledger(&c, &t).claimable.0, 700_000);
+    assert_eq!(ledger(&c, &t).earned.0, 700_000);
 }
 
 // ---------- block 4: disputes, resolve, confirm_share ----------
@@ -1417,7 +1437,7 @@ fn pay_work_msg(c: &mut Registry, w: WorkId, amount: u128) -> PromiseOrValue<U12
 
 fn settle(c: &mut Registry, t: &TokenId, amount: u128) {
     callback(ok(b""));
-    assert!(c.on_forward(t.clone(), U128(amount)));
+    assert!(c.on_forward(t.clone(), U128(amount), None));
 }
 
 fn resolve(c: &mut Registry, id: DisputeId, outcome: Outcome) {
@@ -1936,6 +1956,8 @@ fn only_the_registry_account_itself_can_initialise() {
     assert!(r.is_err(), "init from another account must fail");
 }
 
+#[path = "final_fixes.rs"]
+mod final_fixes;
 #[path = "review_fixes.rs"]
 mod review_fixes;
 

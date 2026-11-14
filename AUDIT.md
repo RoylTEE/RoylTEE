@@ -62,8 +62,10 @@ Legend. Deposit: `1y` exactly 1 yoctoNEAR; `>=1` any nonzero deposit that also c
 | `ft_on_transfer` | the configured token only | n/a | Any other predecessor, malformed msg, or refused routing returns the full amount (T18). Routes `pay_work`, `pay_share`, `fund_allowance`. |
 | `sync` | anyone | none | Refused while either lock, a forward in flight, or a dispute is open; `on_sync` (private) discards results if the epoch moved (T21, T24). |
 | `retry_forward` | anyone | none | Debits undelivered before re-forwarding; failure puts it back. Active or Void shares. |
-| `release_stale_lock` | anyone | none | Only after `STALE_LOCK_BLOCKS`; clears without rollback; epoch bump; events (T19, L4). |
-| `on_forward`, `on_claim`, `on_sync`, `on_vault_created`, `on_vault_ready`, `on_member_registered`, `on_allowance_withdrawn`, `nft_resolve_transfer` | the registry itself (`#[private]`) | none | Never panic on a failed promise; results read with a size cap. |
+| `release_stale_lock` | anyone | none | Only after `STALE_LOCK_BLOCKS`. Transfer lock cleared at once. Payout lock: reads the vault balance first, undoes the debit only if the balance shows the withdraw never happened (audit F3); returns a promise; epoch bump; events (T19, L4). |
+| `release_stale_forward` | anyone | none | Only after `STALE_LOCK_BLOCKS` from the newest recorded forward, and with no lock open. Reads the vault balance, credits at most the recorded amount, the rest goes to `undelivered`. Never credits more than the vault holds (T19b). |
+| `get_forward_watch` | view | n/a | Newest recorded forward start, amount and count for a share. |
+| `on_forward`, `on_release_forward`, `on_release_payout`, `on_claim`, `on_sync`, `on_vault_created`, `on_vault_ready`, `on_member_registered`, `on_allowance_withdrawn`, `nft_resolve_transfer` | the registry itself (`#[private]`) | none | Never panic on a failed promise; results read with a size cap. |
 
 ### Registry: agents
 
@@ -130,7 +132,8 @@ Legend. Deposit: `1y` exactly 1 yoctoNEAR; `>=1` any nonzero deposit that also c
 | T16 | t16b, t13; unit split tests | covered |
 | T17 | unit `failed_claim_rolls_back_exactly` | partial: no sandbox test with an unregistered holder (every member is registered at grant) |
 | T18 | unit `refused_payments_return_the_full_amount` | partial: no sandbox fake-token test |
-| T19 | unit stale lock tests | covered in unit tests; a stuck lock cannot be produced in the sandbox |
+| T19 | unit stale lock tests; unit and sandbox F3 tests (`final_fixes.rs`, `final.rs`) | covered; the stuck lock is written with `patch_state` in the sandbox, a real lost callback cannot be produced |
+| T19b | unit `final_fixes.rs`; sandbox `u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_recovered` | covered; lost callback written with `patch_state` |
 | T20 | t01 (code equals embedded vault, zero keys) | covered by construction; live check block 5 |
 | T21 | unit `sync_records_plain_transfers_and_discards_stale_reads`, `sync_refused_during_forward` | covered |
 | T22 | unit `effective_from_bounds` | covered |
@@ -153,5 +156,15 @@ Legend. Deposit: `1y` exactly 1 yoctoNEAR; `>=1` any nonzero deposit that also c
 
 ## Contract review fixes (2026-11-13, branch `fix/contract-review`)
 
-An external review of the contracts (H1 to H3, M1, M2, L1 to L9) and Security Suite F-04 and F-12 were worked on this branch; see THREAT_MODEL.md (rows marked "review", new T39) and DESIGN.md section 19. Fixed in code: H1 (holder or registrar only sync; new vaults export `ft_on_transfer`), H2 (explicit minimal contests, pruning), H3 (registrar cannot hold a credential), M2 (on-chain split sheet approval), L2, L4 (F-04), L5, L6, L8, L9, M1 for stuck mints plus 10 Tgas forward callback gas. Not fixed in code: a lost `on_forward` (T19); vaults created before the fix keep the old code (T21); registrar trust (T12, M2 above). The vault is now 7478 bytes.
+An external review of the contracts (H1 to H3, M1, M2, L1 to L9) and Security Suite F-04 and F-12 were worked on this branch; see THREAT_MODEL.md (rows marked "review", new T39) and DESIGN.md section 19. Fixed in code: H1 (holder or registrar only sync; new vaults export `ft_on_transfer`), H2 (explicit minimal contests, pruning), H3 (registrar cannot hold a credential), M2 (on-chain split sheet approval), L2, L4 (F-04), L5, L6, L8, L9, M1 for stuck mints plus 10 Tgas forward callback gas. Not fixed in code at that time: a lost `on_forward` (later fixed, T19b); vaults created before the fix keep the old code (T21); registrar trust (T12, M2 above). The vault is now 7478 bytes.
 
+## Final contract fixes (2026-11-14)
+
+Branch `fix/final-contract`, made while the registry key still existed, because no code can be deployed after the key is deleted. Two findings of the external audit report, "Deployment and documented design risks" and F3, are addressed in code:
+
+| Finding | Change | Layout | Evidence |
+|---|---|---|---|
+| Lost forwarding callback has no timeout recovery | `release_stale_forward` and a watch entry per share (T19b) | No stored type changed. The watch is a separate storage key `fwd:<token_id>`; `on_forward` gains an optional argument, so callbacks already in flight at the upgrade still settle | unit `final_fixes.rs`; sandbox `u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_recovered` |
+| F3 stale failed payout inflates `earned` and `paid_out` | `release_stale_lock` reads the vault balance before it clears a payout lock and undoes the debit only when the balance shows the withdraw never happened (T19) | No stored type changed | unit `f3_*`; sandbox `final.rs` `f01`, `f02` |
+
+What the evidence does not show: both paths depend on a callback that never commits, which a sandbox node does not produce. The sandbox tests write the state such a callback would leave with `patch_state` and then run the real recovery calls against a real vault and token. Both recoveries assume receipts settle within `STALE_LOCK_BLOCKS` (UNVERIFIED on testnet). The F3 read cannot tell a failed withdraw from a paid one plus a plain deposit of exactly the locked amount; the result is a reporting difference only (T19). F3 is closed for the normal case and documented for that case.

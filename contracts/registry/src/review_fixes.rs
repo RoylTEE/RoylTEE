@@ -15,7 +15,7 @@ fn panic_msg(f: impl FnOnce()) -> String {
     }
 }
 
-fn assert_panics(expect: &str, f: impl FnOnce()) {
+pub(super) fn assert_panics(expect: &str, f: impl FnOnce()) {
     let m = panic_msg(f);
     assert!(
         m.contains(expect),

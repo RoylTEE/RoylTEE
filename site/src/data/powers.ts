@@ -31,6 +31,6 @@ export const POWERS: Power[] = [
   { method: 'resolve', who: 'registrar', what: 'Decide a dispute with a document hash', ui: null },
   { method: 'release_unallocated', who: 'registrar', what: 'Release money that reached the registry for no share, within fixed rules', ui: null },
   { method: 'registrar_transfer', who: 'registrar', what: 'Move the share of a suspended member, with a document hash', ui: null },
-  { method: 'release_stale_lock, retry_forward', who: 'anyone', what: 'Unstick a lock or a forward that did not settle', ui: null },
+  { method: 'release_stale_lock, release_stale_forward, retry_forward', who: 'anyone', what: 'Unstick a lock or a forward that did not settle', ui: null },
 ];
 export const powersFor = (who: Power['who']) => POWERS.filter((p) => p.who === who);

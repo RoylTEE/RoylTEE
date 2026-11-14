@@ -335,8 +335,12 @@ pub fn sync(&mut self, token_id: TokenId) -> Promise;
 // claim_cap = observed, clear snapshot_pending.
 
 pub fn release_stale_lock(&mut self, token_id: TokenId);
-// Anyone. Only if a lock is older than STALE_LOCK_BLOCKS. Clears it without rollback,
-// epoch += 1 (T19).
+// Anyone. Only if a lock is older than STALE_LOCK_BLOCKS. A transfer lock is cleared at once.
+// A payout lock is cleared after a vault balance read (on_release_payout): debit undone only if
+// the balance shows the withdraw never happened (audit F3, T19). epoch += 1.
+pub fn release_stale_forward(&mut self, token_id: TokenId) -> Promise;
+// Anyone, STALE_LOCK_BLOCKS after the newest recorded forward, no lock open (T19b). Reads the
+// vault balance, credits at most the recorded amount, the rest to undelivered.
 ```
 
 ### Agents
@@ -659,9 +663,10 @@ pub fn is_payer(&self, account_id: AccountId) -> bool;
 pub fn retry_forward(&mut self, token_id: TokenId);
 // Anyone. Re-sends the share's undelivered amount; debits undelivered before the forward, a second
 // failure puts it back. Emits forward_retried.
-pub fn release_stale_lock(&mut self, token_id: TokenId);
-// Anyone, once a lock is STALE_LOCK_BLOCKS (1200) blocks old. Clears it without rollback, bumps the
-// epoch, emits lock_released_stale (and anomaly for a payout lock). Then sync reconciles.
+pub fn release_stale_lock(&mut self, token_id: TokenId) -> PromiseOrValue<()>;
+// Anyone, once a lock is STALE_LOCK_BLOCKS (1200) blocks old. A payout lock is cleared after a
+// vault balance read (debit undone only if the withdraw never happened, audit F3); bumps the
+// epoch, emits lock_released_stale (and anomaly when the balance is unclear).
 ```
 
 Callbacks now carry the lock they belong to. `on_claim` gets the lock's `since_block`; `nft_resolve_transfer` gets an extra `lock_block`. A callback whose lock is gone (released as stale) changes no balance and no owner: `on_claim` only emits an `anomaly` (`late_claim_callback`), `nft_resolve_transfer` returns true. See THREAT_MODEL T36.
@@ -752,7 +757,7 @@ A share registered by anyone other than the work's `registered_by` is pending (c
 - L8: `pay_share` needs at least `MIN_GROUP_PAYMENT`, like a group payment.
 - L9: `refund_unallocated(group, receiver, amount, doc_hash)`, 1y, registrar, only for a Void work, receiver not the registrar: sends unallocated escrow out (debit first, restored by `on_unallocated_refunded` if the transfer fails). Emits `unallocated_refunded`.
 - L2: the agent window also counts the bucket of the hour 24 hours back (`l2t:<agent>`), so it is 24 to 25 hours. `grant_role` writes the slot, so the organisation pays its storage.
-- M1: `release_stale_mint(token_id)`, anyone, once a share has been Pending for `STALE_MINT_NS` (20 minutes): fails the share and frees its bps; `on_vault_created` and `on_vault_ready` do nothing (emit `anomaly` `late_mint_callback`) when the share is no longer Pending. `GAS_FORWARD_CB` is 10 Tgas (was 5); measured use about 2.2 Tgas. Audit F1: with `GAS_FT_TRANSFER` at 8 Tgas a 16-share payment needed 298 Tgas inside `ft_on_transfer` and was refused at 300 Tgas; `GAS_FT_TRANSFER` is now 5 Tgas (measured 1.7), and a compile-time check in `lib.rs` requires `MAX_SHARES_PER_GROUP` forwards plus a 10 Tgas base and a 40 Tgas payment overhead to fit in 300 Tgas. A lost `on_forward` is not recoverable by a method (THREAT_MODEL T19).
+- M1: `release_stale_mint(token_id)`, anyone, once a share has been Pending for `STALE_MINT_NS` (20 minutes): fails the share and frees its bps; `on_vault_created` and `on_vault_ready` do nothing (emit `anomaly` `late_mint_callback`) when the share is no longer Pending. `GAS_FORWARD_CB` is 10 Tgas (was 5); measured use about 2.2 Tgas. Audit F1: with `GAS_FT_TRANSFER` at 8 Tgas a 16-share payment needed 298 Tgas inside `ft_on_transfer` and was refused at 300 Tgas; `GAS_FT_TRANSFER` is now 5 Tgas (measured 1.7), and a compile-time check in `lib.rs` requires `MAX_SHARES_PER_GROUP` forwards plus a 10 Tgas base and a 40 Tgas payment overhead to fit in 300 Tgas. A lost `on_forward` is recovered by `release_stale_forward` (final fixes, THREAT_MODEL T19b).
 
 ### Sizes
 

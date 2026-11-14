@@ -293,6 +293,16 @@ pub struct Dispute {
     pub status: DisputeStatus,
 }
 
+/// Returned by `get_forward_watch`. Not stored by the registry state.
+#[near(serializers = [json])]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ForwardWatchView {
+    pub since_block: U64,
+    pub amount: U128,
+    pub count: u32,
+    pub released_through: U64,
+}
+
 #[near(serializers = [json])]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Accounting {

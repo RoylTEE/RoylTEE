@@ -20,6 +20,7 @@ use near_sdk::{
 mod agents;
 mod approval;
 mod disputes;
+mod forwards;
 mod holder;
 pub mod logic;
 mod membership;
@@ -87,7 +88,7 @@ pub const GAS_CLAIM_CB: Gas = Gas::from_tgas(10);
 /// can send it again.
 pub const GAS_FT_TRANSFER: Gas = Gas::from_tgas(5);
 /// Measured use about 2.2 Tgas (2.151 in sandbox tests r03 and a04); raised from 5 for margin.
-/// Kept at 10 because a lost `on_forward` is not recoverable (THREAT_MODEL T19).
+/// A lost `on_forward` is recovered by `release_stale_forward` (THREAT_MODEL T19b).
 pub const GAS_FORWARD_CB: Gas = Gas::from_tgas(10);
 /// Gas reserved once per payment on top of the per-forward reservations.
 pub const GAS_FORWARD_BASE: Gas = Gas::from_tgas(10);
@@ -107,6 +108,8 @@ const _: () = assert!(
 );
 pub const GAS_FT_BALANCE: Gas = Gas::from_tgas(5);
 pub const GAS_SYNC_CB: Gas = Gas::from_tgas(5);
+/// Callback of `release_stale_forward` and of the stale payout read.
+pub const GAS_RELEASE_FORWARD_CB: Gas = Gas::from_tgas(10);
 pub const GAS_NFT_ON_TRANSFER_MIN: Gas = Gas::from_tgas(25);
 pub const GAS_RESOLVE_TRANSFER: Gas = Gas::from_tgas(10);
 

@@ -241,3 +241,188 @@ async fn u01_testnet_wasm_upgrades_in_place_without_migration() -> anyhow::Resul
     }
     e.assert_solvent().await
 }
+
+// ---------- final fixes: upgrade from the registry deployed after audit F1 ----------
+
+/// Code hash (base58 sha256) of the registry on `reg.royltee-dev.testnet`
+/// after the audit F1 redeploy. The fixture is that build, made from commit
+/// a409be2 with scripts/build-wasm.sh (sha256 423e3799...).
+const DEPLOYED_REGISTRY_CODE_HASH: &str = "5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo";
+
+fn deployed_registry_wasm() -> Vec<u8> {
+    let path = format!(
+        "{}/fixtures/registry-deployed-423e3799.wasm",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    std::fs::read(&path).unwrap_or_else(|_| panic!("missing {path}"))
+}
+
+/// Borsh `Ledger` as stored: five u128, inbound_pending u32, two empty
+/// lock options, epoch u64.
+const LEDGER_LEN: usize = 5 * 16 + 4 + 1 + 1 + 8;
+
+fn ledger_key(token_id: &str) -> Vec<u8> {
+    // `Key::Ledgers` is the ninth variant of the storage key enum.
+    let mut k = vec![8u8];
+    k.extend_from_slice(&(token_id.len() as u32).to_le_bytes());
+    k.extend_from_slice(token_id.as_bytes());
+    k
+}
+
+#[tokio::test]
+async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_recovered() -> anyhow::Result<()>
+{
+    let e = setup_with_registry(&deployed_registry_wasm()).await?;
+    assert_eq!(
+        code_hash(&e, e.reg.id()).await?,
+        ContractState::LocalHash(DEPLOYED_REGISTRY_CODE_HASH.parse()?),
+        "the fixture is the registry wasm deployed on testnet"
+    );
+
+    // State built with the deployed code.
+    let w0 = e.register_work("USRC12600001").await?;
+    let s1 = e.mint(w0, e.writer_a.id(), 5_000).await?;
+    let s2 = e.mint(w0, e.writer_b.id(), 5_000).await?;
+    check(e.pay_work(w0, 1_000_000).await?);
+    check(e.claim(&e.writer_a, &s1).await?);
+    check(e.transfer(&e.writer_b, e.buyer.id(), &s2).await?);
+    let w1 = e.register_work("USRC12600002").await?;
+    let s3 = e.mint(w1, e.writer_a.id(), 10_000).await?;
+    e.assert_solvent().await?;
+
+    let acct_before: Value = e.reg.view("get_accounting").await?.json()?;
+    let mut before = vec![];
+    for t in [&s1, &s2, &s3] {
+        before.push(e.ledger(t).await?);
+    }
+
+    // In-place redeploy with the branch wasm. No migration call.
+    let new_wasm = wasm("registry");
+    e.reg.as_account().deploy(&new_wasm).await?.into_result()?;
+    assert_eq!(e.worker.view_code(e.reg.id()).await?, new_wasm);
+    let acct_after: Value = e.reg.view("get_accounting").await?.json()?;
+    assert_eq!(acct_before, acct_after, "counters unchanged");
+    for (i, t) in [&s1, &s2, &s3].iter().enumerate() {
+        assert_eq!(before[i], e.ledger(t).await?, "{t} ledger unchanged");
+    }
+    assert_eq!(e.owner(&s2).await?, e.buyer.id().to_string());
+    let watch: Value = e
+        .reg
+        .view("get_forward_watch")
+        .args_json(json!({ "token_id": s3 }))
+        .await?
+        .json()?;
+    assert!(
+        watch.is_null(),
+        "no watch for state from before the upgrade"
+    );
+
+    // A payment after the upgrade is watched and settles as usual.
+    check(e.pay_share(&s3, 80_000).await?);
+    let l = e.ledger(&s3).await?;
+    assert_eq!(
+        (num(&l["known_balance"]), l["inbound_pending"].as_u64()),
+        (80_000, Some(0))
+    );
+    let watch: Value = e
+        .reg
+        .view("get_forward_watch")
+        .args_json(json!({ "token_id": s3 }))
+        .await?
+        .json()?;
+    assert!(watch.is_null(), "the watch ends with the settled forward");
+
+    // Nothing to release, nothing stale.
+    for method in ["release_stale_forward", "release_stale_lock"] {
+        let r = e
+            .outsider
+            .call(e.reg.id(), method)
+            .args_json(json!({ "token_id": s3 }))
+            .max_gas()
+            .transact()
+            .await?;
+        assert!(r.is_failure(), "{method} with nothing to release");
+    }
+
+    // Lost callback. A real node never loses it here, so the state a lost
+    // callback leaves is written by hand: the ledger as it was while the
+    // forward was out (nothing credited, one forward pending), the counter
+    // for it, and the watch entry. The vault really holds the 80000.
+    let key = ledger_key(&s3);
+    let state = e.worker.view_state(e.reg.id()).await?;
+    let mut raw = state.get(&key).expect("ledger entry").clone();
+    assert_eq!(raw.len(), LEDGER_LEN, "ledger layout as expected");
+    raw[0..16].copy_from_slice(&0u128.to_le_bytes()); // known_balance
+    raw[32..48].copy_from_slice(&0u128.to_le_bytes()); // total_routed_in
+    raw[80..84].copy_from_slice(&1u32.to_le_bytes()); // inbound_pending
+    e.worker.patch_state(e.reg.id(), &key, &raw).await?;
+    let mut root = state.get(&b"STATE"[..]).expect("root state").clone();
+    let n = root.len();
+    root[n - 40..n - 24].copy_from_slice(&80_000u128.to_le_bytes()); // forwards_in_flight_total
+    e.worker.patch_state(e.reg.id(), b"STATE", &root).await?;
+    let since = e.worker.view_block().await?.height();
+    let mut watch_raw = vec![];
+    watch_raw.extend_from_slice(&since.to_le_bytes());
+    watch_raw.extend_from_slice(&80_000u128.to_le_bytes());
+    watch_raw.extend_from_slice(&1u32.to_le_bytes());
+    watch_raw.extend_from_slice(&0u64.to_le_bytes());
+    let mut watch_key = b"fwd:".to_vec();
+    watch_key.extend_from_slice(s3.as_bytes());
+    e.worker
+        .patch_state(e.reg.id(), &watch_key, &watch_raw)
+        .await?;
+    let l = e.ledger(&s3).await?;
+    assert_eq!(
+        (num(&l["known_balance"]), l["inbound_pending"].as_u64()),
+        (0, Some(1))
+    );
+    assert_eq!(
+        num(&e.reg.view("get_accounting").await?.json::<Value>()?["forwards_in_flight_total"]),
+        80_000
+    );
+    // sync is refused, as the audit reported.
+    assert!(e
+        .writer_a
+        .call(e.reg.id(), "sync")
+        .args_json(json!({ "token_id": s3 }))
+        .max_gas()
+        .transact()
+        .await?
+        .is_failure());
+    // Too early.
+    assert!(e
+        .outsider
+        .call(e.reg.id(), "release_stale_forward")
+        .args_json(json!({ "token_id": s3 }))
+        .max_gas()
+        .transact()
+        .await?
+        .is_failure());
+    e.worker.fast_forward(1_300).await?;
+    let r = ok(e
+        .outsider
+        .call(e.reg.id(), "release_stale_forward")
+        .args_json(json!({ "token_id": s3 }))
+        .max_gas()
+        .transact()
+        .await?);
+    let ev = event(&r, "forward_released_stale");
+    assert_eq!(ev["delivered"], "80000");
+    assert_eq!(ev["undelivered"], "0");
+    let l = e.ledger(&s3).await?;
+    assert_eq!(
+        (
+            num(&l["known_balance"]),
+            num(&l["total_routed_in"]),
+            l["inbound_pending"].as_u64()
+        ),
+        (80_000, 80_000, Some(0))
+    );
+    let acct: Value = e.reg.view("get_accounting").await?.json()?;
+    assert_eq!(num(&acct["forwards_in_flight_total"]), 0);
+    e.assert_solvent().await?;
+    // The holder can claim what the vault holds.
+    check(e.claim(&e.writer_a, &s3).await?);
+    assert_eq!(e.balance(&e.vault(&s3)).await?, 0);
+    e.assert_solvent().await
+}
