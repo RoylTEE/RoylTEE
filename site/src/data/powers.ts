@@ -31,7 +31,7 @@ export const POWERS: Power[] = [
   { method: 'resolve', who: 'registrar', what: 'Decide a dispute with a document hash', ui: null },
   { method: 'release_unallocated', who: 'registrar', what: 'Release money that reached the registry for no share, within fixed rules', ui: null },
   { method: 'registrar_transfer', who: 'registrar', what: 'Move the share of a suspended member, with a document hash', ui: null },
-  { method: 'resolve_written_off, resolve_stale_payout', who: 'registrar', what: 'Settle a quarantined payment forward or a stale payout lock from the public receipt outcome, with a document hash', ui: null },
-  { method: 'release_stale_lock, release_stale_forward, retry_forward', who: 'anyone', what: 'Unstick a lock, or quarantine a forward that did not settle (it credits and resends nothing)', ui: null },
+  { method: 'resolve_written_off, resolve_stale_payout', who: 'registrar', what: 'Settle a quarantined payment forward (a delivered and a failed amount) or a stale payout lock from the final public receipt outcome, with a document hash', ui: null },
+  { method: 'release_stale_lock, release_stale_forward, retry_forward', who: 'anyone', what: 'Release a stale transfer lock, ask for a vault balance report on a stale payout lock (it changes nothing), or quarantine a forward that did not settle (it credits and resends nothing)', ui: null },
 ];
 export const powersFor = (who: Power['who']) => POWERS.filter((p) => p.who === who);

@@ -329,7 +329,33 @@ Same commands as step 15, with the wasm built from branch `fix/audit` (local sha
 
 ### Step 15c. Redeploy the registry in place with the final contract fixes (DRAFT, not run, needs the owner's yes)
 
-Precondition, read-only: `npm run check:quiescent` must print `QUIET: SAFE TO REDEPLOY`. It fails unless every ledger has `inbound_pending` 0 and no payout or transfer lock, and `forwards_in_flight_total` is 0. A forward or lock in flight at the deploy has no watch record and recovery for it is not supported (THREAT_MODEL T19b). Then build (`bash scripts/build-wasm.sh`, twice, same sha256), check the registry balance covers the larger code, deploy with the same command as step 15 (`without-init-call`), compare the on-chain code hash with the local build, and read back `get_accounting`, `nft_tokens` and one `get_ledger`. Rehearsed in the sandbox from the exact registry deployed before (fixture `registry-deployed-423e3799.wasm`) by `u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_and_resolved`. After the deploy, update `deployments/testnet.json` and run `npm run verify:testnet`.
+This is the last change of contract code while the full-access key exists. Order:
+
+1. Precheck, read-only: `npm run check:quiescent` must print `SNAPSHOT QUIET at block N: SAFE TO REDEPLOY`. It pins one block and reads every ledger, `forwards_in_flight_total` and the raw storage prefix `fwd:` at that block. It fails unless every ledger has `inbound_pending` 0, no payout or transfer lock, `forwards_in_flight_total` is 0 and there is NO `fwd:` watch entry. The last check keeps the watch formats apart (36 bytes in the first branch build, 60 in the second, 68 now): the deployed code never writes a watch, so on the live registry there must be none (checked on 2026-11-14 with `view_state` and prefix `fwd:`: no values). If it fails, wait for the callbacks and run it again.
+2. Build: `bash scripts/build-wasm.sh` twice, same sha256. Check the registry balance covers the larger code.
+3. Deploy and check in ONE transaction. The quiet check on chain is the barrier, not the script above (a payment can land between the script and the deploy). Actions of one transaction on one account run in order and are atomic, so if `assert_quiescent` panics the deploy is rolled back too:
+
+```bash
+near contract deploy $REG use-file contracts/res/registry.wasm with-init-call assert_quiescent json-args '{}' prepaid-gas '100 Tgas' attached-deposit '0 NEAR' $NET $SIGN
+```
+
+`assert_quiescent` is a `#[private]` method of the new code (it changes nothing). It panics unless every ledger has `inbound_pending` 0 and no lock, nothing is quarantined or watched, and `forwards_in_flight_total` is 0. It loops over all tokens: measured about 0.21 Tgas per token in the sandbox (2.6 Tgas at 2 tokens, 3.4 at 6), so the 13 tokens on testnet need about 4 Tgas and 100 Tgas is far more than enough; the loop would not fit one call at several hundred tokens. near-cli-rs 0.31.1 accepts any function name after `with-init-call` (`near contract deploy --help` shows `with-init-call [FUNCTION_NAME] json-args ... prepaid-gas ... attached-deposit`; the command above was not sent). If the transaction fails with `not quiet`, nothing changed: the old code is still deployed. Wait and retry.
+4. Read back: compare the on-chain code hash with the local build, then `get_accounting`, `nft_tokens` and one `get_ledger`.
+5. Run `npm run check:quiescent` again. It must still pass (a payment that came in between can make it fail on a watch entry, which then is normal and not a fault; read the output).
+6. Update `deployments/testnet.json` and run `npm run verify:testnet`.
+
+Rehearsed in the sandbox from the exact registry deployed before (fixture `registry-deployed-423e3799.wasm`): `u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_and_resolved` (state kept, quarantine, resolve) and `u03_deploy_and_assert_quiescent_in_one_transaction_roll_back_when_busy` (the same one-transaction batch fails with a forward in flight and with a payout lock, the code hash stays the old one and the state is untouched, then passes on a quiet state and the new code is live; an outsider cannot call the method). The same sandbox test does not exercise the near-cli binary itself, only the same two actions in one batch (UNVERIFIED for the binary until it is sent).
+
+### Registrar procedure for `resolve_written_off` and `resolve_stale_payout`
+
+After the key is deleted the registrar is the only way to settle a quarantined forward or a stale payout lock that no real callback settled (THREAT_MODEL T12, T19, T19b). A decision moves money, so it follows these rules and no others.
+
+1. Evidence is the final outcome of the original receipt on chain, found with the transaction hash of the payment (forward) or of the claim (payout): the receipt of the token `ft_transfer` the registry or the vault sent. Only a final outcome counts: success (the transfer happened) or failure (it did not). A receipt that is missing, still pending, or that you cannot find is NOT evidence. Wait, or leave it stuck. Never decide from a balance, from who owns the share, or from elapsed time.
+2. The `doc_hash` is the sha256 (64 lowercase hex characters) of the receipt id text (base58 as the explorer shows it, no spaces or newline) that the decision cites. Keep a note with the transaction hash, the receipt id, the outcome and the block next to it. One call, one receipt id.
+3. `resolve_written_off(token_id, delivered_amount, failed_amount, doc_hash)`: set `delivered_amount` to what that receipt delivered and `failed_amount` to what it failed to deliver (u128 strings). Their sum must be at most `written_off` (`get_forward_watch`); what you do not name stays quarantined, and you settle it with a later call that cites its own receipt. After any call the callbacks of that quarantine are ignored (event `late_forward_callback_fenced`), so the remainder is settled only by the registrar.
+4. A delivered amount for a share that is disputed or waiting for approval is refused. Settle the dispute or the approval first, or settle the failed part alone.
+5. `resolve_stale_payout(token_id, paid, doc_hash)` needs a lock older than 1200 blocks. `paid` is true only if the withdraw receipt succeeded. The balance shown in `payout_uncertain` is a hint, never the evidence.
+6. Each call needs 1 yoctoNEAR (a full-access key of the registrar) and is public with its `doc_hash`. A wrong decision can pay a share twice or credit it more than its vault holds, up to the quarantined or locked amount (T12).
 
 ### Step 16. Split sheet demo (DRAFT, not run, needs the owner's yes; about 7 transactions)
 
