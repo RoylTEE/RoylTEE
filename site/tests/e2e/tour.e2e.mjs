@@ -17,6 +17,8 @@ const ORIGIN = new URL(BASE).origin;
 const VIEWPORTS = [{ name: 'desktop', width: 1280, height: 800 }, { name: 'mobile', width: 390, height: 844 }];
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 
+/** Chain answers fetched once per run: the same view call gets the same answer, so the walk is repeatable. */
+const cache = new Map();
 let browser;
 before(async () => { browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] }); });
 after(async () => { await browser?.close(); });
@@ -26,6 +28,25 @@ const stepsFor = (vp) => TOUR.filter((s) => !s.viewport || (s.viewport === 'wide
 /** A fresh page that records console errors, page errors and failed or error responses from our own origin. */
 async function open(vp) {
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: 1 });
+  // Both public RPC hosts are fetched from Node, which gives real chain data on every run. The fastnear host refuses a
+  // local browser origin and the other one is slow and rate limited, which would make the walk depend on the network mood.
+  const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': '*', 'access-control-allow-methods': 'POST, OPTIONS' };
+  await ctx.route(/^https:\/\/(test\.rpc\.fastnear\.com|rpc\.testnet\.near\.org)\//, async (route) => {
+    const req = route.request();
+    if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: cors });
+    const key = req.postData() ?? '';
+    if (cache.has(key)) return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body: cache.get(key) });
+    let last = 'no attempt';
+    for (let k = 0; k < 5; k++) {
+      try {
+        const r = await fetch('https://test.rpc.fastnear.com', { method: 'POST', headers: { 'content-type': 'application/json' }, body: req.postData() ?? '' });
+        if (r.ok) { const body = await r.text(); cache.set(key, body); return route.fulfill({ status: 200, headers: { ...cors, 'content-type': 'application/json' }, body }); }
+        last = `status ${r.status}`;
+      } catch (err) { last = String(err); }
+      await new Promise((res) => setTimeout(res, 300 * (k + 1)));
+    }
+    return route.fulfill({ status: 502, headers: cors, body: last });
+  });
   const page = await ctx.newPage();
   const problems = [];
   page.on('pageerror', (e) => problems.push(`pageerror ${e.message}`));
@@ -37,7 +58,7 @@ async function open(vp) {
     if (!fetched && m.location().url && !m.location().url.startsWith(ORIGIN)) return;
     problems.push(`console ${m.text()} ${m.location().url ?? ''}`);
   });
-  page.on('requestfailed', (r) => { if (r.url().startsWith(ORIGIN)) problems.push(`requestfailed ${r.url()} ${r.failure()?.errorText}`); });
+  page.on('requestfailed', (r) => { if (r.url().startsWith(ORIGIN) && r.failure()?.errorText !== 'net::ERR_ABORTED') problems.push(`requestfailed ${r.url()} ${r.failure()?.errorText}`); });
   page.on('response', (r) => { if (r.url().startsWith(ORIGIN) && r.status() >= 400) problems.push(`status ${r.status()} ${r.url()}`); });
   return { ctx, page, problems };
 }
@@ -70,14 +91,21 @@ async function checkStep(page, s, list, vp) {
       const el = document.elementFromPoint((clipped.l + clipped.r) / 2, (clipped.t + clipped.b) / 2);
       hit = el ? { inTarget: target.contains(el) || el.contains(target), cls: el.className || el.outerHTML.slice(0, 120) } : null;
     }
+    const inView = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.bottom > 0 && r.top < vh && r.right > 0 && r.left < vw; };
+    const loadingText = /Reading |Not read yet/;
+    // Your shares reads nothing until an account is chosen, so its stamp legitimately says Not read yet.
+    const stillLoading = [...document.querySelectorAll(document.querySelector('[data-member]') ? 'main .loading' : 'main .loading, [data-stamp]')].filter((e) => inView(e) && loadingText.test(e.textContent)).map((e) => e.textContent.trim());
+    const targetText = target ? target.textContent : '';
     const active = document.activeElement;
-    return { vw, vh, found: !!target, tr, clipped, card: rect(cardEl), ring: rect(ring), hit, count: document.querySelector('[data-tour-count]').textContent,
+    return { stillLoading, targetLoading: loadingText.test(targetText), vw, vh, found: !!target, tr, clipped, card: rect(cardEl), ring: rect(ring), hit, count: document.querySelector('[data-tour-count]').textContent,
       role: cardEl.getAttribute('role'), modal: cardEl.getAttribute('aria-modal'), labelled: cardEl.getAttribute('aria-labelledby'), focusInCard: cardEl.contains(active), placement: document.querySelector('[data-tour]').dataset.placement,
       hint: document.querySelector('[data-tour-hint]').hidden ? '' : document.querySelector('[data-tour-hint]').textContent, nextHidden: document.querySelector('[data-tour-next]').hidden,
       nextLabel: document.querySelector('[data-tour-next]').textContent, backDisabled: document.querySelector('[data-tour-back]').disabled, skipLabel: document.querySelector('[data-tour-skip]').textContent, body: document.querySelector('#tour-body').textContent };
   }, s.target);
   const w = `${vp.name} step ${n + 1} (${s.id})`;
   assert.ok(info.found, `${w}: target exists and is visible`);
+  assert.ok(!info.targetLoading, `${w}: the highlighted target has finished loading (no Reading or Not read yet text)`);
+  assert.deepEqual(info.stillLoading, [], `${w}: nothing on screen still says it is reading`);
   const c = info.card;
   assert.ok(c.l >= 0 && c.t >= 0 && c.r <= info.vw && c.b <= info.vh, `${w}: popout inside the viewport ${JSON.stringify(c)}`);
   const k = info.clipped;

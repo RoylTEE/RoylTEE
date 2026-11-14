@@ -9,7 +9,6 @@ import { TOUR, type TourStep } from '../data/tour';
 const STATE_KEY = 'royltee-tour';
 const DONE_KEY = 'royltee-tour-done';
 const WAIT_MS = 15000;
-const READ_MS = 8000;
 const FIXED = '.app-top, .area-tabs, .side, .menu-btn';
 const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -157,9 +156,10 @@ async function show(id: string, dir: 1 | -1) {
   ui.card.hidden = true;
   document.addEventListener('keydown', onKey, true); window.addEventListener('resize', onViewport); window.addEventListener('scroll', onViewport, true);
   const start = Date.now(); let target: HTMLElement | null = null;
-  // Wait for the target, then for the reads inside it to finish, so the popout describes what is on screen.
-  const reading = (t: HTMLElement | null) => !!t && (t.matches('.loading') || !!t.querySelector('.loading'));
-  while ((!(target = findTarget(s)) || (reading(target) && Date.now() - start < READ_MS)) && Date.now() - start < WAIT_MS) { await new Promise((r) => setTimeout(r, 120)); if (mine !== token) return; }
+  // Wait for the target, then for the page's reads to finish (loading text gone, stamp set; Your shares reads nothing until an account is chosen), so the popout describes what is on screen.
+  // After about 15 seconds the step is shown anyway with whatever the page has.
+  const reading = () => !!document.querySelector('main .loading') || (!document.querySelector('[data-member]') && document.querySelector('[data-stamp]')?.textContent === 'Not read yet');
+  while ((!(target = findTarget(s)) || reading()) && Date.now() - start < WAIT_MS) { await new Promise((r) => setTimeout(r, 120)); if (mine !== token) return; }
   if (mine !== token) return;
   if (!target) { // Missing target: skip this step instead of breaking the tour.
     const j = i + dir; if (j < 0 || j >= list.length) { if (dir === 1) finish(); else open(list[Math.min(i + 1, list.length - 1)], 1); return; }
