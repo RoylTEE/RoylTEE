@@ -64,14 +64,14 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 
 ## The registry pages
 
-- The registry is an app with a menu by purpose. Registry: Overview (statement since mint and what needs attention), Catalog (works and rights, split sheets), Shares (ledger, share accounts with their live keys and NEAR against the storage minimum, claims), Activity (the recorded demo, filterable), Verify (code hashes against the deploy record, keyless share accounts, the full access keys still on the registry and Mock USDC accounts). Oversight: Governance (agents, disputes, registrar). You: Your shares. Support: Help (chat, support, docs, whitepaper). Balances, owners, keys and code hashes are read live from NEAR testnet with view calls; Activity, the Registrar log, share holders and history, and the landing split sheet are the recorded demo.
+- The registry is an app with a menu by purpose. Registry: Overview (statement since mint and what needs attention), Catalog (works and rights, split sheets), Shares (ledger, share accounts with their live keys and NEAR against the storage minimum, claims), Activity (the recorded demo, filterable), Verify (code hashes against the deploy record, keyless share accounts, the full access keys still on the registry and Mock USDC accounts), Auction (a read only page for the one sealed-bid sale that ran in a TEE, with its timeline, transactions and attestation proof). Oversight: Governance (agents, disputes, registrar). You: Your shares. Support: Help (chat, support, docs, whitepaper). Balances, owners, keys and code hashes are read live from NEAR testnet with view calls; Activity, the Registrar log, share holders and history, and the landing split sheet are the recorded demo.
 - Your shares: look up any account read only, or connect a testnet wallet. A connected holder can claim, a work registrant can approve or reject a pending share (on the deployed build), and a member can draft a split sheet with a review step before signing. Sending these from the site has not been run on testnet yet, so it is UNVERIFIED.
 - Statements on these pages use Opening balance, activity and Closing balance since mint. A view by statement period needs an event indexer, which is roadmap.
 
 ## Not built
 
 - TEE: the registry build does not use a trusted execution environment. TEE attestation of statements is roadmap. The help chat can report a provider TEE flag from NEAR AI Cloud when a reply's signature has signature_kind provider_tee. Attestation is not verified by this app.
-- TEE auction: not built into this app. A sealed bid share auction ran on testnet as a separate contract (share s10 was sold in it), but this app has no auction screen and does not list, bid or settle.
+- TEE auction: the app has a read only Auction page (/auction) for one real sale. A sealed bid share auction ran on testnet as a separate contract (share s10 was sold in it, the settle ran in OutLayer's TEE and outlayer-verify passed all 5 checks), but this app does not list, bid or settle, and the registry itself does not use a TEE.
 - Licenses: not built in the current code. Sync licenses were planned and cut first.
 - The amend_split method is not built; a split only changes through a dispute ruling.
 - No mainnet deploy, no real money, no public sale.
@@ -110,6 +110,7 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 - [Your shares](/member)
 - [Look up a code, share or account](/catalog/lookup/)
 - [Verify the deployment](/verify)
+- [Sealed-bid auction](/auction)
 - [Docs](/docs)
 - [Whitepaper placeholder](/whitepaper)
 - [Help chat](/help#chat)

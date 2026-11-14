@@ -1,0 +1,101 @@
+---
+import App from '../layouts/App.astro';
+import { txUrl, accountUrl } from '../data/testnet';
+import { AUCTION, AUCTION_ACCOUNT, EVIDENCE_FILE, REPO_FILE_BASE, STAGES, TIMELINE, WHAT_TEE, musdc, utc } from '../data/auction';
+const a = AUCTION.auction;
+const v = AUCTION.verify;
+const stage = (k: string) => STAGES.find((s) => s.key === k)!;
+const short = (h: string) => `${h.slice(0, 8)}...`;
+---
+<App area="auction" title="Sealed-bid auction" intro="One real sale of a share NFT on NEAR testnet: sealed bids, a second price opened inside a TEE, and every step with its transaction. Read only: this page does not list, bid or settle." period={false}>
+  <section class="panel" aria-labelledby="what-h">
+    <div class="panel-head"><h2 id="what-h">How the auction works</h2><span class="badge sim">Simulated money</span></div>
+    <div class="panel-body">
+      <ol class="three">
+        <li><strong>Sealed bids.</strong> Each bidder encrypts an amount so that only the TEE can read it. The contract holds the ciphertext and a deposit, and nobody sees the bids while the auction is open.</li>
+        <li><strong>Second price.</strong> After the end time a program inside the TEE opens the bids. The highest bidder wins the share but pays the second highest bid, so bidding your true value is the best plan.</li>
+        <li><strong>Proof.</strong> The TEE prints only the winner and the price. The contract moves the share and the money, and anyone can check the attestation that this answer came from the approved code.</li>
+      </ol>
+      <p class="caption">All mock USDC (mUSDC) on this page is Simulated: a testnet token with no value, not Circle USDC. The registry itself does not use a TEE; only this settle step does.</p>
+    </div>
+  </section>
+
+  <section class="figures kpi" aria-label="Result of the recorded auction">
+    <div class="figure"><span class="label">Share sold</span><span class="value">{a.token}</span><span class="note">listed by {a.seller.split('.')[0]}</span></div>
+    <div class="figure"><span class="label">Winner</span><span class="value" style="font-size:var(--fs-22)">{a.winner.split('.')[0]}</span><span class="note">now owns {a.token}</span></div>
+    <div class="figure"><span class="label">Price (second price)</span><span class="value">{musdc(a.price)}<small>mUSDC</small></span><span class="note">Simulated money</span></div>
+    <div class="figure"><span class="label">Attestation checks</span><span class="value">{v.checks.filter((c) => c.verdict === 'PASS').length}/{v.checks.length}<small>PASS</small></span><span class="note">outlayer-verify</span></div>
+  </section>
+
+  <section class="panel" aria-labelledby="tl-h">
+    <div class="panel-head"><h2 id="tl-h">Timeline of the real run</h2><span class="caption">{utc(AUCTION.times['17i'][0].at)} to {utc(AUCTION.times['17m'][0].at)}. Auction contract <a class="acct-link" href={accountUrl(AUCTION_ACCOUNT)} target="_blank" rel="noopener">{AUCTION_ACCOUNT}</a></span></div>
+    <ol class="timeline">
+      {TIMELINE.map((k) => { const s = stage(k); return (
+        <li class="tl-item" data-stage={s.key}>
+          <div class="tl-top"><h3>{s.title}</h3><span class={`badge ${s.key === 'refused' ? 'ok' : 'info'}`}>{s.badge}</span></div>
+          {s.lines.map((l) => <p>{l}</p>)}
+          <p class="tl-tx">{s.txs.map((x) => <a class="acct-link" href={txUrl(x.hash)} target="_blank" rel="noopener" title={x.label}>{short(x.hash)} <span class="caption">{x.label}</span></a>)}</p>
+        </li>
+      ); })}
+    </ol>
+    <p class="panel-foot">Times are UTC, from the block timestamps in the deploy record. The listing ended {utc(a.endsAtUtc)}; settle ran after that. Full record: <a class="link" href={`${REPO_FILE_BASE}deployments/auction-testnet.json`} target="_blank" rel="noopener">deployments/auction-testnet.json</a>.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="att-h" id="attestation">
+    <div class="panel-head"><h2 id="att-h">Attestation proof</h2><span class="badge ok">{v.proven ? 'PROVEN' : 'NOT PROVEN'}</span><span class="caption">outlayer-verify {AUCTION.verifier.rev}, run on the settle transaction</span></div>
+    <ul class="checks">
+      {v.checks.map((c) => (
+        <li class="check" data-check={c.name}>
+          <p><strong>{c.name}</strong> <span class="caption">{c.question}</span></p><span class={`badge ${c.verdict === 'PASS' ? 'ok' : 'bad'}`}>{c.verdict}</span>
+        </li>
+      ))}
+    </ul>
+    <div class="panel-body">
+      <dl class="kv">
+        <dt>Module hash</dt><dd class="hash">{v.wasmSha256}</dd>
+        <dt>Task</dt><dd>{v.taskId}, executed {utc(v.executedAt!)}, Intel TCB {v.tcbStatus}</dd>
+        <dt>Input to output</dt><dd class="hash">{v.inputSha256}<br />to {v.outputSha256}</dd>
+        <dt>Secret access rule</dt><dd class="hash">{AUCTION.accessRule}</dd>
+        <dt>Re-run it</dt><dd class="hash">{v.command} --network testnet --api https://testnet-api.outlayer.ai</dd>
+        <dt>Evidence file</dt><dd><a class="link mono hash" href={`${REPO_FILE_BASE}${EVIDENCE_FILE}`} target="_blank" rel="noopener">{EVIDENCE_FILE}</a></dd>
+      </dl>
+    </div>
+    <p class="panel-foot">This proves that this input produced this output inside genuine Intel TDX hardware running the approved build. It does not prove the auction rules were followed; fairness still rests on the executor.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="tee-h" id="tee">
+    <div class="panel-head"><h2 id="tee-h">What runs in the TEE and what does not</h2></div>
+    <div class="panel-body two">
+      <div>
+        <h3 class="sub">Inside the TEE</h3>
+        <ul>{WHAT_TEE.inside.map((x) => <li>{x}</li>)}</ul>
+      </div>
+      <div>
+        <h3 class="sub">Outside the TEE</h3>
+        <ul>{WHAT_TEE.outside.map((x) => <li>{x}</li>)}</ul>
+      </div>
+    </div>
+    <p class="panel-foot">Prototype with explicit operator and executor trust. Do not put real value in it. Not run on testnet: the recovery calls (not needed) and deleting the auction key (kept on purpose). Mock USDC balances after the run (Simulated, mUSDC): {Object.entries(AUCTION.balancesAfter).map(([k, x]) => `${k.split('.')[0]} ${musdc(x as string)}`).join(', ')}.</p>
+  </section>
+
+  <p class="actions"><a class="btn" href="/verify">Verify the deployment</a><a class="btn" href="/activity#sale">Recorded activity</a><a class="btn" href="/docs">Docs</a></p>
+</App>
+<style is:global>
+  .three { margin: 0; padding-left: 1.25rem; display: grid; gap: var(--s3); }
+  .timeline { list-style: none; margin: 0; padding: 0; }
+  .tl-item { padding: var(--s4) var(--s5); border-top: 1px solid var(--rule); display: grid; gap: var(--s2); position: relative; }
+  .tl-item:first-child { border-top: 0; }
+  .tl-top { display: flex; gap: var(--s3); align-items: center; flex-wrap: wrap; }
+  .tl-top h3 { font-size: var(--fs-16); margin: 0; }
+  .tl-item p { margin: 0; }
+  .tl-tx { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5); }
+  .panel-body.two { grid-template-columns: 1fr 1fr; align-items: start; }
+  .panel-body.two ul { margin: 0; padding-left: 1.1rem; display: grid; gap: var(--s2); }
+  .checks { list-style: none; margin: 0; padding: 0; }
+  .check { display: flex; justify-content: space-between; align-items: center; gap: var(--s4); padding: var(--s3) var(--s5); border-top: 1px solid var(--rule); }
+  .check:first-child { border-top: 0; }
+  .check p { margin: 0; }
+  .hash { font-family: var(--mono); font-size: var(--fs-12); overflow-wrap: anywhere; }
+  .sub { font-size: var(--fs-14); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 var(--s2); }
+  @media (max-width: 767px) { .panel-body.two { grid-template-columns: 1fr; } }
+</style>

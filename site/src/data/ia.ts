@@ -30,6 +30,7 @@ export const AREAS: Area[] = [
     { key: 'dispute', label: 'Dispute', href: '/activity#dispute' },
     { key: 'refused', label: 'Refused', href: '/activity#refused' },
   ] },
+  { key: 'auction', label: 'Auction', group: 'Registry', purpose: 'Sealed-bid sale run in a TEE', href: '/auction', tabs: [] },
   { key: 'verify', label: 'Verify', group: 'Registry', purpose: 'Code hashes, keyless vaults, keys left', href: '/verify', tabs: [] },
   { key: 'agents', label: 'Agents', group: 'Oversight', purpose: 'Roles, limits and keys', href: '/agents', tabs: [] },
   { key: 'disputes', label: 'Disputes', group: 'Oversight', purpose: 'Frozen money and outcomes', href: '/disputes', tabs: [] },

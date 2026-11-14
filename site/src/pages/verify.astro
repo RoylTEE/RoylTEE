@@ -33,7 +33,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
         </li>
       ))}
     </ul>
-    <p class="panel-foot">Live checks use read-only view calls to a public testnet node. A pass means the chain matches the claim now. The test names are in contracts/ and site/tests; the repository test <span class="mono">tests/claims.test.ts</span> fails if a name here does not exist. Rows marked Recorded on chain show their transactions from the deploy record but run no live check here, so they are not counted in the live total. A row marked Pending deploy would have nothing on chain yet.</p>
+    <p class="panel-foot">Live checks use read-only view calls to a public testnet node. A pass means the chain matches the claim now. The test names are in contracts/ and site/tests; the repository test <span class="mono">tests/claims.test.ts</span> fails if a name here does not exist. Rows marked Recorded on chain show their transactions from the deploy record but run no live check here, so they are not counted in the live total. A row marked Pending deploy would have nothing on chain yet. The sealed-bid auction run has its own page with a timeline and the attestation proof: <a class="link" href="/auction">Auction</a>.</p>
   </section>
   <section class="panel" aria-labelledby="br-h" id="break">
     <div class="panel-head"><h2 id="br-h">Try to break it</h2><span class="caption">Attack, what the contract does, proof</span></div>

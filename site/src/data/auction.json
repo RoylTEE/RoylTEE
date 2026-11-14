@@ -1,0 +1,187 @@
+{
+  "writtenFrom": "deployments/auction-testnet.json",
+  "recordWrittenAtUtc": "2026-11-14T11:30:00Z",
+  "contract": {
+    "account": "auction.royltee-dev.testnet",
+    "codeSha256": "48d32c71de83d94a4225502a726b80bd678ac3dfb1471952c93c4c16595a8d09",
+    "codeHashBase58": "5uH7oSKPQqGs83CfHfuuqLJA4b3tgoJnaLATkVf683ma",
+    "secretsAccount": "royltee-admin.testnet",
+    "keyCount": 1
+  },
+  "wasi": {
+    "sha256": "c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e",
+    "buildTarget": "wasm32-wasip1"
+  },
+  "accessRule": "Logic And[WasmHash(c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e), Predecessor Whitelist[auction.royltee-dev.testnet]]",
+  "verifier": {
+    "tool": "outlayer-verify",
+    "rev": "90c27d9",
+    "evidenceFile": "deployments/auction-settle-verify.txt"
+  },
+  "auction": {
+    "id": 0,
+    "token": "s10",
+    "seller": "writer-a.royltee-dev.testnet",
+    "reserve": "20000000",
+    "maxDeposit": "100000000",
+    "endsAtUtc": "2026-11-14T10:38:50Z",
+    "status": "sold",
+    "winner": "buyer-pub.royltee-dev.testnet",
+    "price": "70000000",
+    "tokenOwnerAfter": "buyer-pub.royltee-dev.testnet",
+    "listedTx": "Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR",
+    "settledTx": "CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW",
+    "withdrawnTx": "2PMK4vf1dKsPNhZwtNkWL2xninc7ZNRN515HiwndQdVY",
+    "bids": [
+      {
+        "bidder": "writer-b.royltee-dev.testnet",
+        "tx": "GHCfH4PhhcNCG4mmDCZXKmy9WvDucEnhCmerYVSjNm1v",
+        "deposit": "100000000"
+      },
+      {
+        "bidder": "buyer-pub.royltee-dev.testnet",
+        "tx": "AK88NkPkXsik1xPbTNDNZB6VCCRi2rKhxeVbap9bHkSc",
+        "deposit": "100000000"
+      }
+    ],
+    "events": [
+      "winner_chosen",
+      "nft_transfer",
+      "share_transfer",
+      "auction_sold"
+    ]
+  },
+  "times": {
+    "17i": [
+      {
+        "hash": "Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR",
+        "signer": "writer-a.royltee-dev.testnet",
+        "at": "2026-11-14T10:18:51.696Z",
+        "success": true
+      }
+    ],
+    "17j": [
+      {
+        "hash": "GHCfH4PhhcNCG4mmDCZXKmy9WvDucEnhCmerYVSjNm1v",
+        "signer": "writer-b.royltee-dev.testnet",
+        "at": "2026-11-14T10:27:57.489Z",
+        "success": true
+      },
+      {
+        "hash": "AK88NkPkXsik1xPbTNDNZB6VCCRi2rKhxeVbap9bHkSc",
+        "signer": "buyer-pub.royltee-dev.testnet",
+        "at": "2026-11-14T10:29:06.612Z",
+        "success": true
+      }
+    ],
+    "17k": [
+      {
+        "hash": "CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW",
+        "signer": "royltee-dev.testnet",
+        "at": "2026-11-14T10:39:05.132Z",
+        "success": true
+      }
+    ],
+    "17m": [
+      {
+        "hash": "2PMK4vf1dKsPNhZwtNkWL2xninc7ZNRN515HiwndQdVY",
+        "signer": "royltee-dev.testnet",
+        "at": "2026-11-14T10:46:17.548Z",
+        "success": true
+      }
+    ],
+    "17g": [
+      {
+        "hash": "EaHtbQ54aAyZUgakGc4EkrYNLPMafboWStyC4rfQ9BvM",
+        "signer": "outsider.royltee-dev.testnet",
+        "at": "2026-11-14T10:08:27.184Z",
+        "success": true
+      },
+      {
+        "hash": "57tzs8NbCKhhC9guscGE1NbgqZWxNLXsTF4mZgyFXtqP",
+        "signer": "outsider.royltee-dev.testnet",
+        "at": "2026-11-14T10:13:15.084Z",
+        "success": true
+      }
+    ]
+  },
+  "outlayerRequests": [
+    {
+      "step": "17f",
+      "requestId": 44227,
+      "task": null,
+      "chargedNear": "0.0011308003",
+      "refundedNear": null
+    },
+    {
+      "step": "17g1",
+      "requestId": 44242,
+      "task": null,
+      "chargedNear": "0.001",
+      "refundedNear": "0.019"
+    },
+    {
+      "step": "17g2",
+      "requestId": 44261,
+      "task": null,
+      "chargedNear": "0.001",
+      "refundedNear": "0.019"
+    },
+    {
+      "step": "17k",
+      "requestId": 44422,
+      "task": 106286,
+      "chargedNear": "0.0010383018",
+      "refundedNear": "0.0189616982"
+    }
+  ],
+  "balancesAfter": {
+    "writer-a.royltee-dev.testnet": "70500000",
+    "writer-b.royltee-dev.testnet": "200000000",
+    "buyer-pub.royltee-dev.testnet": "131000000",
+    "auction.royltee-dev.testnet": "0"
+  },
+  "accountingAfter": {
+    "owedTotal": "0",
+    "pendingTotal": "0",
+    "escrowTotal": "0",
+    "openAuctions": 0
+  },
+  "verify": {
+    "checks": [
+      {
+        "name": "Authenticity",
+        "verdict": "PASS",
+        "question": "is this a genuine Intel TDX quote?"
+      },
+      {
+        "name": "Identity",
+        "verdict": "PASS",
+        "question": "is this code approved on chain?"
+      },
+      {
+        "name": "Binding",
+        "verdict": "PASS",
+        "question": "does the quote cover this execution?"
+      },
+      {
+        "name": "Input",
+        "verdict": "PASS",
+        "question": "do the request bytes match what was attested?"
+      },
+      {
+        "name": "Output",
+        "verdict": "PASS",
+        "question": "do the response bytes match what was attested?"
+      }
+    ],
+    "proven": true,
+    "taskId": "106286",
+    "executedAt": "2026-11-14T10:41:00Z",
+    "wasmSha256": "c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e",
+    "inputSha256": "57db3418754baa4ac82f26c8f98a651f99ca31480a05c7a6847bc084b362d83e",
+    "outputSha256": "b6e6e75b37b94e4a239d0361ccbb9988cac8e0e530daa779252ca5f9179677f6",
+    "tcbStatus": "UpToDate",
+    "command": "outlayer-verify tx CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW"
+  }
+}
