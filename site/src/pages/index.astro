@@ -174,7 +174,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
             <tbody>{real.map(([a, b]) => <tr><td class="p-wrap">{a}</td><td class="m wrap"><span class="only-narrow">Simulated: </span>{b}</td></tr>)}</tbody>
           </table>
         </div>
-        <div class="panel-foot">The registrar is a trusted role: every registrar action that moves a share or money carries a document hash and emits an event. The registry and token accounts still hold one full access key each, so the registry itself is not keyless yet. The contracts use no trusted execution environment.</div>
+        <div class="panel-foot">The registrar is a trusted role: every registrar action that moves a share or money carries a document hash and emits an event. The registry and token accounts still hold one full access key each, so the registry itself is not keyless (kept on testnet by decision, so late fixes stay possible). The contracts use no trusted execution environment.</div>
       </div>
     </div>
   </section>
@@ -187,7 +187,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
         <p class="lead">Ask a public testnet node for the access keys of the share account that was sold. The answer is an empty list.</p>
       </div>
       <pre class="code"><code>{curl}</code></pre>
-      <p class="muted">From a clone of the repository, <code class="mono">npm run verify:testnet</code> checks all 13 share accounts, the code hashes and the balances.</p>
+      <p class="muted">From a clone of the repository, <code class="mono">npm run verify:testnet</code> checks all 15 share accounts, the code hashes and the balances.</p>
       <p class="muted">The <a class="link" href="/verify">Verify page</a> lists every claim with its code, its test and its transaction, runs the live checks in your browser, and shows what happens when someone tries to break it.</p>
     </div>
   </section>

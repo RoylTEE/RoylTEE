@@ -1,7 +1,7 @@
 /**
  * Public facts about the NEAR testnet deployment, copied from the repository README and
  * deployments/testnet.json. Live values on the registry pages come from view calls, not from here.
- * The scene list is the recorded on-chain demo (all on 2026-11-13 UTC). The rows from 'Pay' with line-sale-2 on
+ * The scene list is the recorded on-chain demo (2026-11-13 UTC, plus the split sheet and auction scenes of 2026-11-14 UTC). The rows from 'Pay' with line-sale-2 on
  * ran on the registry build with the contract review fixes (deployed 2026-11-13 18:54 UTC).
  */
 export const NETWORK = 'testnet';
@@ -50,6 +50,12 @@ export const SCENES: Scene[] = [
   { step: 'Agent', what: 'Agent tries to pay 0.100001 mUSDC, over its per transaction limit of 0.1', shows: 'Refused: over per-transaction limit', txs: ['7Vu5wRDqx7dj487LAk3e69wFt6FmH8bMNfzpL8E2LuaW'], tokens: [], result: 'refused', agent: true },
   { step: 'Register', what: 'writer-a registers work 5 (ZZRYL2600007) with a metadata link that tells agents to pay outsider instead, and shares s12 and s13', shows: 'Metadata text is stored, never obeyed', txs: ['ryAcUUtRGdxyzsraWZjJE3SnytCbZzpsmZNNCmNFq3y', 'GJopxb2zVGHNEgSUq9RKFHA3wmBYjcyM4wVmhZH5NcKd', 'FR5SZZWyr9dfQdpkxDTQamQXXoRKG6SPTPwK7NU21W1P'], tokens: ['s12', 's13'], result: 'ok' },
   { step: 'Agent', what: 'Agent pays work 5, 0.1 mUSDC, line agent-line-3, with extra payee and receiver_id arguments naming outsider', shows: 'The extra arguments are ignored: s12 0.05, s13 0.05, outsider 0', txs: ['CUW8qssJVCJZuUgzzWHf9bdEyNCkFXpQjUKrJeWXeVPS'], tokens: ['s12', 's13'], result: 'ok', agent: true },
+  { step: 'Register', what: 'writer-a registers work 6 (ZZRYL2600004) and its own 50 percent share s14 (split sheet scene)', shows: 'The registrant of the work registers its own share, so it is approved at once', txs: ['EMdw5gBJg8LAeuZ96n767iYiV6zyYhAgqmQ1Gf89W2sy', '9aUzpdgBPrdJ3XaSn3YdKu19yjaBjKZj1S9wzowL9Nwt'], tokens: ['s14'], result: 'ok' },
+  { step: 'Register', what: 'writer-b registers the other 50 percent of work 6 as share s15 (split sheet scene)', shows: 'writer-b did not register the work, so s15 is pending: nothing is paid to it until writer-a signs', txs: ['5xYY2sWQQrZL7XCiQ8CVKhw27pUWDRhnN5k3doqjsgjB'], tokens: ['s15'], result: 'ok' },
+  { step: 'Pay', what: 'Payer pays work 6, 1.0 mUSDC, line line-4 (Simulated money). s14 gets 0.5 at once, the 0.5 for pending s15 goes to escrow', shows: 'The pending half is held, not paid: s14 vault 0.5, s15 vault 0, s15 held 0.5 awaiting approval', txs: ['8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL'], tokens: ['s14', 's15'], result: 'ok', simulated: true },
+  { step: 'Approve', what: 'writer-a signs approve_share on s15 (Simulated money)', shows: 'share_approved event: the held 0.5 mUSDC is released to the s15 vault, which now holds 0.5', txs: ['5dgncSm1CyDuiEKRzeUpZJTWrBnHzNuuEP6k51RNseGa'], tokens: ['s15'], result: 'ok' },
+  { step: 'Auction', what: 'writer-a lists share s10 in a sealed-bid auction on a separate auction contract (auction.royltee-dev.testnet), reserve 20 mUSDC', shows: 'nft_transfer_call moves s10 to the auction contract, which holds it for the sale', txs: ['Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR'], tokens: ['s10'], result: 'ok' },
+  { step: 'Auction', what: 'The auction settles through the OutLayer TEE: buyer-pub wins s10 at the second price, 70 mUSDC (Simulated money)', shows: 's10 moves from the auction contract to buyer-pub; the vault of s10 keeps 0 keys', txs: ['CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW'], tokens: ['s10'], result: 'ok' },
 ];
 
 /** Activity filters for a recorded scene. A row can sit in more than one. */
@@ -65,9 +71,9 @@ export function categoriesOf(s: Scene): string[] {
   return [...c];
 }
 
-/** Code hashes from deployments/testnet.json in the contracts repository (resynced 2026-11-14 02:50 UTC, after the audit redeploy). */
+/** Code hashes from deployments/testnet.json in the contracts repository (updated 2026-11-14 09:30 UTC, after the final contract fixes redeploy). */
 export const DEPLOY_RECORD = {
-  registry: { account: 'reg.royltee-dev.testnet', codeHash: '5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo', sha256: '423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a' },
+  registry: { account: 'reg.royltee-dev.testnet', codeHash: '5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG', sha256: '4378568f0459560130cdb56fa05152f9946116d3332d6c3f7f53e939005dc271' },
   mockUsdc: { account: 'usdc.royltee-dev.testnet', codeHash: '47ybTZxhaJ9ZW3FC9jwaDdLfwgkJ59cCrnkSn5oop67t', sha256: '2e5c896b2ead7d1bd12a2944971d6a393902084cf47616c54d18e7a577efc0bb' },
   vault: { codeHash: 'BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP', sha256: '9e9ef97840a3a3e6967565b43a9c2a467c1925153ea8c5577d666c9b16966cda' },
   /**
@@ -79,7 +85,7 @@ export const DEPLOY_RECORD = {
   earlierVaultCodeHashes: ['BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU'] as readonly string[],
 } as const;
 
-/** register_share transactions that minted each share (deployments/testnet.json, steps 9 and 13 and demo writes W5 to W14). */
+/** register_share transactions that minted each share (deployments/testnet.json, steps 9, 13 and 16 and demo writes W5 to W14). */
 export const MINTS: Record<string, { tx: string; at: string }> = {
   s1: { tx: '7wxZ7Bmstzu9qTUayrvzbGP97tcD6GRLMaZo7pTVAqzh', at: '2026-11-13T05:49:49Z' },
   s2: { tx: '5w2dvQS54div1eWYPrfFBteYK541cQiCxfvfKhEYw51c', at: '2026-11-13T05:49:56Z' },
@@ -94,10 +100,14 @@ export const MINTS: Record<string, { tx: string; at: string }> = {
   s11: { tx: 'vhe6Vgoc9btbQia4ArgcsbygYiECAmbSm58hqTy1qph', at: '2026-11-13T21:30:18Z' },
   s12: { tx: 'GJopxb2zVGHNEgSUq9RKFHA3wmBYjcyM4wVmhZH5NcKd', at: '2026-11-13T21:35:29Z' },
   s13: { tx: 'FR5SZZWyr9dfQdpkxDTQamQXXoRKG6SPTPwK7NU21W1P', at: '2026-11-13T21:36:11Z' },
+  s14: { tx: '9aUzpdgBPrdJ3XaSn3YdKu19yjaBjKZj1S9wzowL9Nwt', at: '2026-11-14T10:55:21Z' },
+  s15: { tx: '5xYY2sWQQrZL7XCiQ8CVKhw27pUWDRhnN5k3doqjsgjB', at: '2026-11-14T10:56:13Z' },
 };
 /** nft_transfer transactions in the record. Each emits an nft_transfer event. */
 export const TRANSFERS: { token: string; from: string; to: string; tx: string; at: string; what: string }[] = [
   { token: 's2', from: 'writer-b.royltee-dev.testnet', to: 'buyer-pub.royltee-dev.testnet', tx: 'HZ9pD2kLbqbjmKqC68ao6KBTUpQmQstyd2Tro8hWwYPy', at: '2026-11-13T05:59:22Z', what: 'Catalog sale' },
+  { token: 's10', from: 'writer-a.royltee-dev.testnet', to: 'auction.royltee-dev.testnet', tx: 'Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR', at: '2026-11-14T10:18:51Z', what: 'Listed in the sealed-bid auction' },
+  { token: 's10', from: 'auction.royltee-dev.testnet', to: 'buyer-pub.royltee-dev.testnet', tx: 'CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW', at: '2026-11-14T10:39:05Z', what: 'Sealed-bid auction sale' },
 ];
 
 /**

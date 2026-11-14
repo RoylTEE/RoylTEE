@@ -407,6 +407,127 @@
       "method": "DEPLOY_CONTRACT",
       "success": true,
       "at": "2026-11-14T02:43:52.041Z"
+    },
+    "52jp95BVJCk6a9bUGyYtYEQq99R56Xiz5zxJ1vCHBJrD": {
+      "step": "final contract fixes redeploy (atomic deploy and assert_quiescent)",
+      "method": "DEPLOY_CONTRACT",
+      "success": true,
+      "at": "2026-11-14T09:09:40.509Z"
+    },
+    "6c1KYbcDcNvYqzLUMTyiPWWoouSLprQhViPrtoY4punJ": {
+      "step": "auction 17a",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-14T09:33:49.715Z"
+    },
+    "4c4xPqRuuhfcmj949aMzDB8VuvxGYFNiWK6B5cxMBrG1": {
+      "step": "auction 17b",
+      "method": "__fastdata_fastfs",
+      "success": false,
+      "error": null,
+      "at": "2026-11-14T09:38:41.342Z"
+    },
+    "EWWMu3chsa56hBybTpZ5hgiM6bazXRBekESv7KzpWYEt": {
+      "step": "auction 17c",
+      "method": "DEPLOY_CONTRACT",
+      "success": true,
+      "at": "2026-11-14T09:41:36.715Z"
+    },
+    "2zysmt9BZCbFs3bcVQSdwQPouPNgtt4W1DH7RHMw4eeG": {
+      "step": "auction 17d",
+      "method": "grant_credential",
+      "success": true,
+      "at": "2026-11-14T09:45:29.023Z"
+    },
+    "7TLqoWrnBbTupg3PLccuc2eXgbquXACtYZqGDNgV58fq": {
+      "step": "auction 17f",
+      "method": "publish_key",
+      "success": true,
+      "at": "2026-11-14T10:06:25.390Z"
+    },
+    "EaHtbQ54aAyZUgakGc4EkrYNLPMafboWStyC4rfQ9BvM": {
+      "step": "auction 17g part 1",
+      "method": "request_execution",
+      "success": true,
+      "at": "2026-11-14T10:08:27.184Z"
+    },
+    "57tzs8NbCKhhC9guscGE1NbgqZWxNLXsTF4mZgyFXtqP": {
+      "step": "auction 17g part 2",
+      "method": "request_execution",
+      "success": true,
+      "at": "2026-11-14T10:13:15.084Z"
+    },
+    "9kwufV5FfUjXbZVwN662kawt2Q9RDRz9Hb6WiYt4vZY": {
+      "step": "auction 17h",
+      "method": "mint",
+      "success": true,
+      "at": "2026-11-14T10:15:50.611Z"
+    },
+    "6KZx5zga2jSAtWV1PPfucAra6RfECaSmWzx1v2wBnTmj": {
+      "step": "auction 17h",
+      "method": "mint",
+      "success": true,
+      "at": "2026-11-14T10:16:26.866Z"
+    },
+    "Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR": {
+      "step": "auction 17i",
+      "method": "nft_transfer_call",
+      "success": true,
+      "at": "2026-11-14T10:18:51.696Z"
+    },
+    "GHCfH4PhhcNCG4mmDCZXKmy9WvDucEnhCmerYVSjNm1v": {
+      "step": "auction 17j",
+      "method": "ft_transfer_call",
+      "success": true,
+      "at": "2026-11-14T10:27:57.489Z"
+    },
+    "AK88NkPkXsik1xPbTNDNZB6VCCRi2rKhxeVbap9bHkSc": {
+      "step": "auction 17j",
+      "method": "ft_transfer_call",
+      "success": true,
+      "at": "2026-11-14T10:29:06.612Z"
+    },
+    "CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW": {
+      "step": "auction 17k",
+      "method": "settle",
+      "success": true,
+      "at": "2026-11-14T10:39:05.132Z"
+    },
+    "2PMK4vf1dKsPNhZwtNkWL2xninc7ZNRN515HiwndQdVY": {
+      "step": "auction 17m",
+      "method": "withdraw",
+      "success": true,
+      "at": "2026-11-14T10:46:17.548Z"
+    },
+    "EMdw5gBJg8LAeuZ96n767iYiV6zyYhAgqmQ1Gf89W2sy": {
+      "step": "step 16.1",
+      "method": "register_work",
+      "success": true,
+      "at": "2026-11-14T10:54:52.548Z"
+    },
+    "9aUzpdgBPrdJ3XaSn3YdKu19yjaBjKZj1S9wzowL9Nwt": {
+      "step": "step 16.2",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-14T10:55:21.711Z"
+    },
+    "5xYY2sWQQrZL7XCiQ8CVKhw27pUWDRhnN5k3doqjsgjB": {
+      "step": "step 16.3",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-14T10:56:13.828Z"
+    },
+    "8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL": {
+      "step": "step 16.4",
+      "method": "ft_transfer_call",
+      "success": true,
+      "at": "2026-11-14T10:56:46.545Z"
+    },
+    "5dgncSm1CyDuiEKRzeUpZJTWrBnHzNuuEP6k51RNseGa": {
+      "step": "step 16.5",
+      "method": "approve_share",
+      "success": true,
+      "at": "2026-11-14T10:57:44.625Z"
     }
   },
   "tokenOwners": {
@@ -419,10 +540,12 @@
     "s7": "writer-b.royltee-dev.testnet",
     "s8": "writer-a.royltee-dev.testnet",
     "s9": "writer-b.royltee-dev.testnet",
-    "s10": "writer-a.royltee-dev.testnet",
+    "s10": "buyer-pub.royltee-dev.testnet",
     "s11": "writer-b.royltee-dev.testnet",
     "s12": "writer-a.royltee-dev.testnet",
-    "s13": "writer-b.royltee-dev.testnet"
+    "s13": "writer-b.royltee-dev.testnet",
+    "s14": "writer-a.royltee-dev.testnet",
+    "s15": "writer-b.royltee-dev.testnet"
   },
   "vaults": [
     {
@@ -475,6 +598,14 @@
     },
     {
       "account": "s13.reg.royltee-dev.testnet",
+      "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
+    },
+    {
+      "account": "s14.reg.royltee-dev.testnet",
+      "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
+    },
+    {
+      "account": "s15.reg.royltee-dev.testnet",
       "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
     }
   ],

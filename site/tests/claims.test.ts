@@ -30,7 +30,7 @@ describe('claims data: tests, code and transactions are real', () => {
     if (!haveRepo) return;
     for (const c of CLAIMS) for (const r of c.code) {
       const f = join(repoRoot, r.file);
-      if (c.status === 'pending' && !existsSync(f)) continue; // the auction contract lives on another branch until merged
+      if (!existsSync(f) && r.file.startsWith('contracts/auction/')) continue; // the auction contract lives on branch feat/tee-auction until merged
       expect(existsSync(f), r.file).toBe(true);
       expect(new RegExp(`fn ${r.fn}\\b`).test(readFileSync(f, 'utf8')), `${r.file} ${r.fn}`).toBe(true);
     }
@@ -40,7 +40,7 @@ describe('claims data: tests, code and transactions are real', () => {
     const rec = JSON.parse(readFileSync(recordUrl, 'utf8'));
     const hashes = new Set<string>(rec.transactions.map((t: { transaction_hash?: string }) => t.transaction_hash).filter(Boolean));
     const accounts = new Set<string>(Object.values(rec.accounts).map((a) => (a as { account_id: string }).account_id));
-    const shown = [...CLAIMS.flatMap((c) => c.evidence), ...ATTACKS.filter((a) => a.tx).map((a) => ({ tx: a.tx! }))];
+    const shown = [...CLAIMS.flatMap((c) => c.evidence), ...ATTACKS.flatMap((a) => [...(a.tx ? [a.tx] : []), ...(a.more ?? [])]).map((tx) => ({ tx }))];
     expect(shown.length).toBeGreaterThan(25);
     for (const e of shown) {
       if ('tx' in e) { expect(hashes.has(e.tx), e.tx).toBe(true); expect(TXS[e.tx], e.tx).toBeDefined(); }
@@ -54,7 +54,7 @@ describe('claims data: tests, code and transactions are real', () => {
     expect(buildEvidence(JSON.parse(readFileSync(recordUrl, 'utf8')))).toEqual(evidence);
   });
   it('a refused row points at a failed transaction and a succeeded row at a successful one', () => {
-    for (const a of ATTACKS) if (a.tx) expect(TXS[a.tx].success, a.id).toBe(a.status !== 'refused');
+    for (const a of ATTACKS) for (const t of [...(a.tx ? [a.tx] : []), ...(a.more ?? [])]) expect(TXS[t].success, a.id).toBe(a.status !== 'refused');
     for (const c of CLAIMS) for (const e of c.evidence) if ('tx' in e) {
       const refused = /refus/.test(e.what);
       expect(TXS[e.tx].success, `${c.id} ${e.tx}`).toBe(!refused);
@@ -62,19 +62,22 @@ describe('claims data: tests, code and transactions are real', () => {
     expect(txOutcome('7wxZ7Bmstzu9qTUayrvzbGP97tcD6GRLMaZo7pTVAqzh')).toBe('register_share, succeeded');
     expect(txOutcome('GvcHLtG7vLQXihNgbH6cmGSnG8QWhsNgzYGFQ2URwAVB')).toBe('claim, refused: only the current holder can claim');
   });
-  it('pending rows hold no tests and no evidence, live rows hold both', () => {
-    const pending = CLAIMS.filter((c) => c.status === 'pending');
-    expect(pending.map((c) => c.id)).toEqual(['registry-redeploy', 'tee-auction']);
-    for (const c of pending) { expect(c.tests).toEqual([]); expect(c.evidence).toEqual([]); expect(c.check).toBeUndefined(); }
+  it('no row waits for a deploy now; recorded rows hold transactions and no live check, live rows hold tests, evidence and a check', () => {
+    expect(CLAIMS.filter((c) => c.status === 'pending')).toEqual([]);
+    const recorded = CLAIMS.filter((c) => c.status === 'recorded');
+    expect(recorded.map((c) => c.id)).toEqual(['registry-redeploy', 'split-sheet', 'tee-auction']);
+    for (const c of recorded) { expect(c.evidence.some((e) => 'tx' in e), c.id).toBe(true); expect(c.check).toBeUndefined(); }
     for (const c of CLAIMS.filter((x) => x.status === 'live')) { expect(c.tests.length, c.id).toBeGreaterThan(0); expect(c.evidence.length, c.id).toBeGreaterThan(0); expect(c.check, c.id).toBeTruthy(); }
-    expect(ATTACKS.filter((a) => a.status === 'pending').map((a) => a.id)).toEqual(['auction-outsider']);
+    expect(ATTACKS.filter((a) => a.status === 'pending')).toEqual([]);
+    const outsider = ATTACKS.find((a) => a.id === 'auction-outsider')!;
+    expect([outsider.tx, ...(outsider.more ?? [])]).toEqual(['EaHtbQ54aAyZUgakGc4EkrYNLPMafboWStyC4rfQ9BvM', '57tzs8NbCKhhC9guscGE1NbgqZWxNLXsTF4mZgyFXtqP']);
   });
   it('the README tables show every test name and transaction the page shows', () => {
     const readme = join(repoRoot, 'README.md');
     if (!haveRepo || !existsSync(readme)) return;
     const text = readFileSync(readme, 'utf8');
     for (const n of names) expect(text.includes(`\`${n}\``), n).toBe(true);
-    for (const e of [...CLAIMS.flatMap((c) => c.evidence), ...ATTACKS.filter((a) => a.tx).map((a) => ({ tx: a.tx! }))]) if ('tx' in e) expect(text.includes(`txns/${e.tx}`), e.tx).toBe(true);
+    for (const e of [...CLAIMS.flatMap((c) => c.evidence), ...ATTACKS.flatMap((a) => [...(a.tx ? [a.tx] : []), ...(a.more ?? [])]).map((tx) => ({ tx }))]) if ('tx' in e) expect(text.includes(`txns/${e.tx}`), e.tx).toBe(true);
   });
   it('uses plain words: no em or en dashes in any text', () => {
     const all = JSON.stringify([CLAIMS, ATTACKS]);
@@ -82,6 +85,7 @@ describe('claims data: tests, code and transactions are real', () => {
   });
   it('the record keeps the recorded owner of s2 and the single function call key of the agent', () => {
     expect(TOKEN_OWNERS.s2).toBe('buyer-pub.royltee-dev.testnet');
+    expect(TOKEN_OWNERS.s10).toBe('buyer-pub.royltee-dev.testnet');
     expect(AGENT_KEYS).toEqual([{ permission: 'function_call', contract: 'reg.royltee-dev.testnet', methods: ['pay_from_allowance', 'report'] }]);
   });
 });
@@ -89,7 +93,7 @@ describe('claims data: tests, code and transactions are real', () => {
 describe('verify page live checks', () => {
   const REG = 'reg.royltee-dev.testnet';
   const good = (): Facts => ({
-    vaultKeyCounts: Array(13).fill(0),
+    vaultKeyCounts: Array(15).fill(0),
     ledgerS1: { total_routed_in: '1000000' }, ledgerS2: { total_routed_in: '1000000' },
     accounting: { allowance_total: '200000', unallocated_total: '0', escrow_total: '0', undelivered_total: '0', forwards_in_flight_total: '0' },
     registryMusdc: '200000', s2Owner: 'buyer-pub.royltee-dev.testnet', recordedS2Owner: 'buyer-pub.royltee-dev.testnet',

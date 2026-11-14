@@ -10,8 +10,8 @@ import evidence from './evidence.json';
 export type CodeRef = { file: string; fn: string };
 export type Ev = { tx: string; what: string } | { account: string; what: string };
 export type LiveCheckId = 'vault-keys' | 'split' | 'owner-s2' | 'agent-key' | 'agent-limits' | 'dispute' | 'credential' | 'usdc';
-/** live: a read-only check the page runs now. test: no on-chain artifact exists, the test is the proof. pending: waits for a chain write. */
-export type Status = 'live' | 'test' | 'pending';
+/** live: a read-only check the page runs now. recorded: on-chain evidence is shown with its transactions, the page runs no live check for it. test: no on-chain artifact exists, the test is the proof. pending: waits for a chain write. */
+export type Status = 'live' | 'recorded' | 'test' | 'pending';
 export type Claim = { id: string; claim: string; code: CodeRef[]; tests: string[]; evidence: Ev[]; check?: LiveCheckId; status: Status; note?: string };
 
 const REG = 'contracts/registry/src';
@@ -107,22 +107,48 @@ export const CLAIMS: Claim[] = [
     ],
   },
   {
-    id: 'registry-redeploy', status: 'pending',
-    claim: 'PENDING DEPLOY. The registry redeploy that carries the post-audit fixes. Its code hash and a read-back of every share fill this row.',
-    code: [{ file: 'contracts/registry/src/lib.rs', fn: 'get_vault_code_hash' }],
-    tests: [],
-    evidence: [],
+    id: 'registry-redeploy', status: 'recorded',
+    claim: 'The registry was redeployed in place on 2026-11-14 (09:09 UTC) with the final contract fixes. The deploy and a quiescence check ran in one transaction, so a busy registry would have rolled the deploy back. The code hash on chain is 5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG, and every share was read back afterwards (npm run verify:testnet, 2026-11-14 UTC: ALL CHECKS PASSED, 69 checks).',
+    code: [{ file: `${REG}/lib.rs`, fn: 'get_vault_code_hash' }],
+    tests: ['a03_stranger_cannot_initialise_a_fresh_deploy'],
+    evidence: [
+      { tx: '52jp95BVJCk6a9bUGyYtYEQq99R56Xiz5zxJ1vCHBJrD', what: 'deploy of the final registry build and the quiescence check, one transaction (block 277636549)' },
+      { account: 'reg.royltee-dev.testnet', what: 'code hash read from chain, equal to the deploy record' },
+    ],
+    note: 'The source of that build is branch fix/final-contract at 4508c0e. The test named here is on this branch; the sandbox tests of the final fixes (contracts/tests/tests/final.rs) arrive with that branch. The registry keeps its full access key on testnet by decision, so upgrades stay possible; on mainnet it would be deleted or handed to a multisig or DAO.',
   },
   {
-    id: 'tee-auction', status: 'pending',
-    claim: 'PENDING DEPLOY. A sealed-bid auction of a share: bids are encrypted, a module in a TEE opens them, and the contract moves the share and the money. The code is on branch feat/tee-auction and is not deployed.',
+    id: 'split-sheet', status: 'recorded',
+    claim: 'A share that someone other than the work registrant registers waits for the registrant to sign, and its money waits in escrow. On testnet (work 6, Simulated money): share s14, registered by the registrant, was approved at once. Share s15, registered by the other writer, was pending, so its half of one mUSDC stayed in escrow with reason awaiting_approval and its vault held 0. After the registrant signed approve_share, the event share_approved released the money to the s15 vault.',
+    code: [{ file: `${REG}/approval.rs`, fn: 'approve_share' }],
+    tests: ['m2_share_by_non_registrant_is_held_until_approved', 'm2_registrant_shares_and_old_shares_are_approved'],
+    evidence: [
+      { tx: 'EMdw5gBJg8LAeuZ96n767iYiV6zyYhAgqmQ1Gf89W2sy', what: 'the registrant registers work 6' },
+      { tx: '9aUzpdgBPrdJ3XaSn3YdKu19yjaBjKZj1S9wzowL9Nwt', what: 'the registrant registers its own 50 percent share s14, approved at once' },
+      { tx: '5xYY2sWQQrZL7XCiQ8CVKhw27pUWDRhnN5k3doqjsgjB', what: 'the other writer registers the other 50 percent, share s15, pending' },
+      { tx: '8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL', what: 'one mUSDC paid to work 6: s14 got 0.5 at once, the s15 half was held in escrow' },
+      { tx: '5dgncSm1CyDuiEKRzeUpZJTWrBnHzNuuEP6k51RNseGa', what: 'the registrant signs approve_share on s15, the held 0.5 goes to its vault' },
+      { account: 's15.reg.royltee-dev.testnet', what: 'the vault of the approved share, with no access keys' },
+    ],
+  },
+  {
+    id: 'tee-auction', status: 'recorded',
+    claim: 'A sealed-bid auction of a share ran on testnet. Bids were encrypted, a module in a TEE opened them through the real OutLayer, and the contract moved the share and the money. On 2026-11-14 (10:39 UTC) share s10 sold to buyer-pub at the second price, 70 mUSDC (Simulated). outlayer-verify passed all 5 checks on the settle transaction: Authenticity (Intel TDX), Identity, Binding, Input and Output.',
     code: [{ file: 'contracts/auction/src/settle.rs', fn: 'settle' }],
     tests: [],
-    evidence: [],
+    evidence: [
+      { tx: 'EWWMu3chsa56hBybTpZ5hgiM6bazXRBekESv7KzpWYEt', what: 'deploy and init of the auction contract, code sha256 48d32c71de83d94a4225502a726b80bd678ac3dfb1471952c93c4c16595a8d09' },
+      { tx: 'Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR', what: 'the seller lists share s10 (auction 0)' },
+      { tx: 'GHCfH4PhhcNCG4mmDCZXKmy9WvDucEnhCmerYVSjNm1v', what: 'sealed bid 1, ciphertext only on chain' },
+      { tx: 'AK88NkPkXsik1xPbTNDNZB6VCCRi2rKhxeVbap9bHkSc', what: 'sealed bid 2, ciphertext only on chain' },
+      { tx: 'CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW', what: 'settle through the real OutLayer TEE (request 44422): sold to buyer-pub at 70 mUSDC, s10 moved' },
+      { tx: '2PMK4vf1dKsPNhZwtNkWL2xninc7ZNRN515HiwndQdVY', what: 'withdraw: seller paid, losing and winning deposits returned, owed total 0' },
+    ],
+    note: 'The outlayer-verify output is deployments/auction-settle-verify.txt (verifier git 90c27d9). That check proves this input produced this output in genuine TEE hardware running the approved build; it does not prove the auction rules were followed, which stay with the executor. The auction code and its tests (68 contract, 14 module, 18 Node, 15 sandbox) are on branch feat/tee-auction and are not on this branch. The auction account keeps its full access key on testnet by decision.',
   },
 ];
 
-export type Attack = { id: string; attack: string; result: string; tests: string[]; tx?: string; status: 'refused' | 'contained' | 'test' | 'pending'; note?: string };
+export type Attack = { id: string; attack: string; result: string; tests: string[]; tx?: string; more?: string[]; status: 'refused' | 'contained' | 'test' | 'pending'; note?: string };
 /** refused: the contract refused it on chain (transaction shown). contained: the call went through and the contract limited its effect. test: sandbox or unit test only. pending: waits for a chain write. */
 export const ATTACKS: Attack[] = [
   { id: 'seller-claims', attack: 'The seller of s2 claims it after the sale.', result: 'Refused: only the current holder can claim.', tests: ['t03_owner_claims_non_owner_fails'], tx: 'EYDV3Tsv7Q1ZFPnJzmVdk6D4Rtosqpn8fYNY71ofVWJU', status: 'refused' },
@@ -140,7 +166,8 @@ export const ATTACKS: Attack[] = [
   { id: 'outsider-sync', attack: 'A stranger calls sync on a share.', result: 'Refused on the current build: holder or registrar only.', tests: ['r01_h1_outsider_cannot_sync_and_new_vaults_keep_transfer_call'], status: 'test', note: 'On the first build this call succeeded (transaction 2Jsht1EatGqZfeVrZePKyVMQPyqyeqTCpEcoaHWK44LY). The fix is on testnet since the step 15 redeploy and has no refusal transaction.' },
   { id: 'vault-by-parent', attack: 'The registry tries to delete, redeploy or add a key to an existing vault.', result: 'Impossible: the registry has no such call, and the sandbox shows the vault stays keyless.', tests: ['t21_parent_cannot_delete_redeploy_or_key_a_vault'], status: 'test' },
   { id: 're-init', attack: 'A stranger initialises a freshly deployed registry.', result: 'Refused: only the registry account itself can initialise.', tests: ['a03_stranger_cannot_initialise_a_fresh_deploy', 'only_the_registry_account_itself_can_initialise'], status: 'test' },
-  { id: 'auction-outsider', attack: 'An outsider asks the TEE to open live auction bids directly, not through the auction contract.', result: 'PENDING DEPLOY. Expected: refused (DEPLOY_PLAN step 17g on branch feat/tee-auction).', tests: [], status: 'pending' },
+  { id: 'auction-outsider', attack: 'An outsider asks the TEE to open live auction bids directly, not through the auction contract.', result: 'Refused by the OutLayer keystore: Access denied by access condition. No instructions ran and the answer was null, so no bid was opened. Tried twice: once naming the auction as the contract, once naming the outsider itself. The transactions succeed because they only queue the request; the refusal is in the answer.', tests: [], tx: 'EaHtbQ54aAyZUgakGc4EkrYNLPMafboWStyC4rfQ9BvM', more: ['57tzs8NbCKhhC9guscGE1NbgqZWxNLXsTF4mZgyFXtqP'], status: 'contained', note: 'Run on testnet on 2026-11-14 before any share was listed (OutLayer requests 44242 and 44261). The tests of the module and contract checks are on branch feat/tee-auction.' },
+  { id: 'split-sheet-early-money', attack: 'A writer registers a share on a work they did not register and tries to receive money before the registrant signs.', result: 'Held: the share is pending, so its half of the payment stayed in escrow with reason awaiting_approval and the vault held 0, until the registrant signed.', tests: ['m2_share_by_non_registrant_is_held_until_approved'], tx: '8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL', status: 'contained' },
 ];
 
 /** Outcome text for a transaction from the build-time copy of deployments/testnet.json. */

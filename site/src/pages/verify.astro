@@ -3,7 +3,7 @@ import App from '../layouts/App.astro';
 import { CLAIMS, ATTACKS, txOutcome } from '../data/claims';
 import { txUrl, accountUrl } from '../data/testnet';
 const REPO = 'https://github.com/RoylTEE/RoylTEE/blob/main/';
-const statusText = { live: 'Reading', test: 'Test only', pending: 'Pending deploy' } as const;
+const statusText = { live: 'Reading', recorded: 'Recorded on chain', test: 'Test only', pending: 'Pending deploy' } as const;
 const attackText = { refused: 'Refused on chain', contained: 'Contained on chain', test: 'Test only', pending: 'Pending deploy' } as const;
 const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \\
   -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"s2.reg.royltee-dev.testnet"}}'`;
@@ -18,7 +18,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
         <li class="proof" data-claim={c.id} data-check={c.check ?? ''} data-status={c.status}>
           <div class="proof-top">
             <p class="proof-claim">{c.claim}</p>
-            <div class="proof-result" data-result><span class={`badge ${c.status === 'pending' ? 'warn' : c.status === 'test' ? 'plain' : 'info'}`}>{statusText[c.status]}</span><div class="caption" data-detail></div></div>
+            <div class="proof-result" data-result><span class={`badge ${c.status === 'pending' ? 'warn' : c.status === 'test' ? 'plain' : c.status === 'recorded' ? 'ok' : 'info'}`}>{statusText[c.status]}</span><div class="caption" data-detail></div></div>
           </div>
           {c.note && <p class="caption">{c.note}</p>}
           <dl class="proof-grid">
@@ -33,7 +33,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
         </li>
       ))}
     </ul>
-    <p class="panel-foot">Live checks use read-only view calls to a public testnet node. A pass means the chain matches the claim now. The test names are in contracts/ and site/tests; the repository test <span class="mono">tests/claims.test.ts</span> fails if a name here does not exist. Rows marked Pending deploy have nothing on chain yet and are not counted as passing.</p>
+    <p class="panel-foot">Live checks use read-only view calls to a public testnet node. A pass means the chain matches the claim now. The test names are in contracts/ and site/tests; the repository test <span class="mono">tests/claims.test.ts</span> fails if a name here does not exist. Rows marked Recorded on chain show their transactions from the deploy record but run no live check here, so they are not counted in the live total. A row marked Pending deploy would have nothing on chain yet.</p>
   </section>
   <section class="panel" aria-labelledby="br-h" id="break">
     <div class="panel-head"><h2 id="br-h">Try to break it</h2><span class="caption">Attack, what the contract does, proof</span></div>
@@ -42,7 +42,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
         <li class="proof" data-attack={a.id}>
           <div class="proof-top">
             <p class="proof-claim">{a.attack}</p>
-            <div class="proof-result">{a.tx && <a class="acct-link" href={txUrl(a.tx)} target="_blank" rel="noopener">{a.tx.slice(0, 8)}</a>} <span class={`badge ${a.status === 'refused' ? 'ok' : a.status === 'pending' ? 'warn' : a.status === 'contained' ? 'info' : 'plain'}`}>{attackText[a.status]}</span></div>
+            <div class="proof-result">{a.tx && <a class="acct-link" href={txUrl(a.tx)} target="_blank" rel="noopener">{a.tx.slice(0, 8)}</a>} {(a.more ?? []).map((t) => <a class="acct-link" href={txUrl(t)} target="_blank" rel="noopener">{t.slice(0, 8)}</a>)} <span class={`badge ${a.status === 'refused' ? 'ok' : a.status === 'pending' ? 'warn' : a.status === 'contained' ? 'info' : 'plain'}`}>{attackText[a.status]}</span></div>
           </div>
           <p class="proof-does">{a.result}</p>
           {a.note && <p class="caption">{a.note}</p>}
@@ -64,12 +64,12 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
   <section class="panel" aria-labelledby="k-h">
     <div class="panel-head"><h2 id="k-h">Keys still on contract accounts</h2></div>
     <div class="table-wrap" data-keys><p class="loading panel-body">Reading keys</p></div>
-    <p class="panel-foot">The registry and the Mock USDC contract each keep one full access key; both registry updates were deployed in place with it. Deleting them is planned after that update (roadmap), once the code is final. Until then the registry itself is not keyless; the share accounts are.</p>
+    <p class="panel-foot">The registry and the Mock USDC contract each keep one full access key; both registry updates were deployed in place with it. They stay on testnet by decision, so late fixes remain possible. On mainnet both keys would be deleted after the final deploy (or upgrades handed to a multisig or DAO), and the same zero-keys check the share accounts pass would prove it. Until then the registry itself is not keyless; the share accounts are.</p>
   </section>
   <section class="panel" aria-labelledby="cmd-h">
     <div class="panel-head"><h2 id="cmd-h">From your own machine</h2><span class="caption">No wallet needed</span></div>
     <div class="panel-body">
-      <p class="small">From a clone of the repository, this checks all 13 share accounts, the code hashes and the balances against the deploy record:</p>
+      <p class="small">From a clone of the repository, this checks all 15 share accounts, the code hashes and the balances against the deploy record:</p>
       <pre class="code"><code>npm run verify:testnet</code></pre>
       <p class="small">Or ask a public testnet node for the keys of the share account that was sold. The answer is an empty list:</p>
       <pre class="code"><code>{curl}</code></pre>

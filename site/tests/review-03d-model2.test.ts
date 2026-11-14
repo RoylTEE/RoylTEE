@@ -113,9 +113,9 @@ describe('second reviewer 03d item 7: Keyless means zero keys', () => {
     expect(s.text).not.toBe('Keyless');
     expect(s.detail[0]).toMatch(/function call to reg\.royltee-dev\.testnet, grant_role/);
   });
-  it('zero keys is Keyless, a full access key is deletion planned', () => {
+  it('zero keys is Keyless, a full access key is kept on testnet by decision', () => {
     expect(keyStatus([]).text).toBe('Keyless');
-    expect(keyStatus([fa, fc]).text).toBe('Deletion planned');
+    expect(keyStatus([fa, fc]).text).toBe('Kept on testnet');
   });
 });
 

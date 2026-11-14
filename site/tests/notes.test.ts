@@ -9,7 +9,7 @@ describe('grounding notes', () => {
     'reg.royltee-dev.testnet', 'symbol ROYLT', 'usdc.royltee-dev.testnet', '"Mock USDC (testnet)"', 'symbol mUSDC', '6 decimals',
     'Testnet only', 'not an investment product', 'no keys', 'only the current holder can claim', 'moves with the token', 'active credential',
     'does not use a trusted execution environment', 'Attestation is not verified by this app', 'TEE auction: not built', 'Licenses: not built', 'scripted Node agent, not an AI model',
-    '13 shares s1 to s13', 'The dispute scene is on chain too', 'split sheet (approve or reject a share) is on the deployed build', 'still hold one full access key', 'Simulated', 'NEP-413', 'deleted 30 days after they close', 'never on chain and never in logs',
+    '15 shares s1 to s15', 'The dispute scene is on chain too', 'split sheet (approve or reject a share) is on the deployed build', 'still hold one full access key', 'Simulated', 'NEP-413', 'deleted 30 days after they close', 'never on chain and never in logs',
     'are read live from NEAR testnet with view calls', 'are the recorded demo', 'so it is UNVERIFIED', 'needs an event indexer, which is roadmap',
   ])('states %s', fact => expect(notes).toContain(fact));
   it('every link resolves to a real route and anchor', () => {
