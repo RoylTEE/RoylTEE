@@ -1,6 +1,6 @@
 # Testnet deploy plan (block 5)
 
-Status: steps 1 to 5 and 7 to 13 were run on testnet on 2026-11-13 (UTC). Accounts, public keys, wasm hashes and transaction ids are in `deployments/testnet.json`. Step 6 (delete the full-access keys of the registry and mock USDC) is parked until the owner says go, so those keys are still present and in-place upgrades remain possible. Steps 15 and 16 (redeploy with the contract review fixes, and the split sheet demo) are drafts, NOT run. Every remaining step that creates an account, deploys, calls a change method, deletes a key or moves NEAR still needs the owner's explicit yes first (BUILD_PROMPT block 5). Testnet only. No mainnet, no real money.
+Status: steps 1 to 5 and 7 to 13 were run on testnet on 2026-11-13 (UTC). Accounts, public keys, wasm hashes and transaction ids are in `deployments/testnet.json`. Step 6 (delete the full-access keys of the registry and mock USDC) is parked until the owner says go, so those keys are still present and in-place upgrades remain possible. Steps 15, 15b and 15c (the three in-place registry redeploys) were run (see each step). Step 16 (the split sheet demo) is a draft, NOT run. Every remaining step that creates an account, deploys, calls a change method, deletes a key or moves NEAR still needs the owner's explicit yes first (BUILD_PROMPT block 5). Testnet only. No mainnet, no real money.
 
 ## Key handling rules
 
@@ -327,7 +327,9 @@ Proves: the deployed state reads back unchanged under the new code. The same upg
 
 Same commands as step 15, with the wasm built from branch `fix/audit` (local sha256 `423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a`, 712958 bytes; vault unchanged, `9e9ef97840a3a3e6967565b43a9c2a467c1925153ea8c5577d666c9b16966cda`). Transaction `BGBUJDTnnjpevSUZkdmfeVASxbKHn1FQDAZqj75kH5rU`, fee 0.0051480829649394 NEAR, code hash `5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo`. Read back after: accounting, owners and approvals unchanged; `deployments/testnet.json` was resynced and `npm run verify:testnet` passed. The upgrade from the step 15 build was not rehearsed in the sandbox (UNVERIFIED there).
 
-### Step 15c. Redeploy the registry in place with the final contract fixes (DRAFT, not run, needs the owner's yes)
+### Step 15c. Redeploy the registry in place with the final contract fixes (run on 2026-11-14 at 09:09 UTC, decision 114)
+
+Status: DONE. Transaction `52jp95BVJCk6a9bUGyYtYEQq99R56Xiz5zxJ1vCHBJrD` (block 277636549, 59.0 Tgas, fee 0.0058702528822306 NEAR): the deploy action and the `assert_quiescent` call in one transaction, which succeeded. The pre-deploy `npm run check:quiescent` printed SNAPSHOT QUIET at block 277636451. On chain sha256 `4378568f0459560130cdb56fa05152f9946116d3332d6c3f7f53e939005dc271` equals the local build (748115 bytes), code hash `5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG`, storage 731332 to 766489 bytes. `AFTER_DEPLOY=1 npm run check:quiescent` passes after it. `deployments/testnet.json` was updated to the new hash and transaction and `npm run verify:testnet` then reads 0 failures. The text below is the plan as it was run.
 
 This is the last change of contract code while the full-access key exists. Order:
 
