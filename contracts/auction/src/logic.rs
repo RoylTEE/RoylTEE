@@ -1,0 +1,109 @@
+//! Pure helpers, unit tested on the host.
+use crate::types::Bid;
+use near_sdk::env;
+
+pub fn is_hash64(s: &str) -> bool {
+    s.len() == 64
+        && s.bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+pub fn is_pubkey_hex(s: &str) -> bool {
+    is_hash64(s)
+}
+
+/// Base64 alphabet check only (standard alphabet, optional `=` padding at the end).
+pub fn looks_like_base64(s: &str) -> bool {
+    let t = s.trim_end_matches('=');
+    s.len() - t.len() <= 2
+        && !t.is_empty()
+        && t.bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/')
+}
+
+pub fn hex(bytes: &[u8]) -> String {
+    const H: &[u8; 16] = b"0123456789abcdef";
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for b in bytes {
+        s.push(H[(b >> 4) as usize] as char);
+        s.push(H[(b & 15) as usize] as char);
+    }
+    s
+}
+
+/// Canonical text the TEE module and this contract both hash. Must match
+/// `bids_hash` in `tee/auction-wasi/src/lib.rs`.
+pub fn bids_text(auction_id: &str, bids: &[Bid]) -> String {
+    let mut t = String::new();
+    t.push_str("royltee-auction-bids-v1\n");
+    t.push_str(auction_id);
+    t.push('\n');
+    for b in bids {
+        t.push_str(b.bidder.as_str());
+        t.push('\n');
+        t.push_str(&b.ciphertext);
+        t.push('\n');
+    }
+    t
+}
+
+pub fn bids_hash(auction_id: &str, bids: &[Bid]) -> String {
+    hex(&env::sha256(bids_text(auction_id, bids).as_bytes()))
+}
+
+/// What the TEE module answered for a settle request.
+#[derive(Debug, PartialEq)]
+pub enum Outcome {
+    /// Winner and price (micro mUSDC).
+    Sale(String, u128),
+    /// No valid bid at or above the reserve.
+    NoSale,
+}
+
+/// Reads the OutLayer answer for a settle request. Accepts the guest JSON as
+/// returned today and the older `{success, result}` wrapper. Every check is
+/// strict: a wrong auction id or bid list hash is an error, never a sale.
+pub fn parse_settle_output(
+    raw: &[u8],
+    auction_id: &str,
+    expected_hash: &str,
+) -> Result<Outcome, String> {
+    use near_sdk::serde_json::{self, Value};
+    let mut v: Value = serde_json::from_slice(raw).map_err(|_| "answer is not JSON".to_string())?;
+    if v.is_null() {
+        return Err("null answer: the run failed or printed nothing".into());
+    }
+    if v.get("ok").is_none() {
+        if let (Some(success), Some(result)) =
+            (v.get("success").and_then(Value::as_bool), v.get("result"))
+        {
+            if !success {
+                return Err("OutLayer reported a failed run".into());
+            }
+            v = result.clone();
+        }
+    }
+    if v.get("ok").and_then(Value::as_bool) != Some(true) {
+        return Err("module reported ok=false".into());
+    }
+    if v.get("v").and_then(Value::as_u64) != Some(1) {
+        return Err("unknown answer version".into());
+    }
+    if v.get("auction").and_then(Value::as_str) != Some(auction_id) {
+        return Err("answer is for another auction".into());
+    }
+    if v.get("bids_hash").and_then(Value::as_str) != Some(expected_hash) {
+        return Err("answer covers a different bid list".into());
+    }
+    match (v.get("winner"), v.get("price")) {
+        (Some(Value::Null), Some(Value::Null)) => Ok(Outcome::NoSale),
+        (Some(Value::String(w)), Some(Value::String(p))) => {
+            if p.is_empty() || p.len() > 38 || !p.bytes().all(|b| b.is_ascii_digit()) {
+                return Err("price is not a decimal string".into());
+            }
+            let price: u128 = p.parse().map_err(|_| "price out of range".to_string())?;
+            Ok(Outcome::Sale(w.clone(), price))
+        }
+        _ => Err("winner and price are malformed".into()),
+    }
+}

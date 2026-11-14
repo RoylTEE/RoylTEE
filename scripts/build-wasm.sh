@@ -25,10 +25,17 @@ mkdir -p contracts/res
 cargo build -p vault --target "$TARGET" --release --target-dir target/wasm
 cp "$OUT/vault.wasm" contracts/res/vault.wasm
 
-cargo build -p mock_usdc -p registry -p test_receiver --target "$TARGET" --release --target-dir target/wasm
-for c in mock_usdc registry test_receiver; do
+cargo build -p mock_usdc -p registry -p test_receiver -p auction --target "$TARGET" --release --target-dir target/wasm
+for c in mock_usdc registry test_receiver auction; do
   cp "$OUT/$c.wasm" "contracts/res/$c.wasm"
 done
+
+# The auction's WASI module (run by OutLayer, not a NEAR contract) is its own
+# workspace with its own lock file. It imports the WASI Preview 1 functions
+# it needs itself, so the installed wasm32-unknown-unknown target is enough.
+cargo build --manifest-path tee/auction-wasi/Cargo.toml --target "$TARGET" --release --locked \
+  --target-dir tee/auction-wasi/target
+cp "tee/auction-wasi/target/$TARGET/release/auction_wasi.wasm" contracts/res/auction_wasi.wasm
 
 # Fail if a machine path is still in any built wasm. A pattern that is empty
 # or just "/" (for example HOME=/ in a container) is skipped, since it would
