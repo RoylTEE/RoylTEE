@@ -69,6 +69,13 @@ describe('claims data: tests, code and transactions are real', () => {
     for (const c of CLAIMS.filter((x) => x.status === 'live')) { expect(c.tests.length, c.id).toBeGreaterThan(0); expect(c.evidence.length, c.id).toBeGreaterThan(0); expect(c.check, c.id).toBeTruthy(); }
     expect(ATTACKS.filter((a) => a.status === 'pending').map((a) => a.id)).toEqual(['auction-outsider']);
   });
+  it('the README tables show every test name and transaction the page shows', () => {
+    const readme = join(repoRoot, 'README.md');
+    if (!haveRepo || !existsSync(readme)) return;
+    const text = readFileSync(readme, 'utf8');
+    for (const n of names) expect(text.includes(`\`${n}\``), n).toBe(true);
+    for (const e of [...CLAIMS.flatMap((c) => c.evidence), ...ATTACKS.filter((a) => a.tx).map((a) => ({ tx: a.tx! }))]) if ('tx' in e) expect(text.includes(`txns/${e.tx}`), e.tx).toBe(true);
+  });
   it('uses plain words: no em or en dashes in any text', () => {
     const all = JSON.stringify([CLAIMS, ATTACKS]);
     expect(all).not.toMatch(/[\u2013\u2014]/);

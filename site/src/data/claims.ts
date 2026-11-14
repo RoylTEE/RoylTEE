@@ -116,7 +116,7 @@ export const CLAIMS: Claim[] = [
   {
     id: 'tee-auction', status: 'pending',
     claim: 'PENDING DEPLOY. A sealed-bid auction of a share: bids are encrypted, a module in a TEE opens them, and the contract moves the share and the money. The code is on branch feat/tee-auction and is not deployed.',
-    code: [{ file: 'contracts/auction/src/lib.rs', fn: 'settle' }],
+    code: [{ file: 'contracts/auction/src/settle.rs', fn: 'settle' }],
     tests: [],
     evidence: [],
   },

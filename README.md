@@ -4,6 +4,17 @@
 
 The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.
 
+## Judges, start here
+
+Track: NFTs That Do Something (`nfts`). Testnet only, no real money. No wallet and no keys are needed for anything below.
+
+1. **Open the check page:** https://royltee.vercel.app/verify. It reads NEAR testnet live in your browser (view calls only) and lists every claim with its code, its test and its transaction.
+2. **Or run one command** (Node 18 or newer, no install, read only): `git clone https://github.com/RoylTEE/RoylTEE.git && cd RoylTEE && npm run verify:testnet`
+3. **What you should see.** The command prints one `PASS` line per check and ends with `ALL CHECKS PASSED`: 13 share vaults with `0 access keys`, every code hash equal to `deployments/testnet.json`, the recorded owner of every share, and the solvency line. The page shows `3/3` code hashes matching, `13/13` vaults keyless and `8/8` claims passing a live check. Two rows say Pending deploy; they are not counted as passing.
+4. **Then read:** [Every claim, checked](#every-claim-checked), [Try to break it](#try-to-break-it) and [The track brief, item by item](#the-track-brief-item-by-item).
+
+UNVERIFIED (pre-submission item): on 2026-11-14 08:07 UTC the hosted site answered with a redirect to a Vercel login page. Open the project to the public, check the `/verify` link in a private window, then delete this note.
+
 RoylTEE is a permissioned, business to business registry of music rights shares on NEAR testnet. Each rights share is an NEP-171 NFT. Each share NFT controls its own NEAR sub-account (a "vault") that receives that share's royalty money. The vault has zero access keys. Only the registry contract can move money out of it, and only to whoever holds the NFT at that moment, with one registrar exception for rejected shares (branch code; see [Who can hold a token](#who-can-hold-a-token)). On testnet today the registry account itself still holds one full access key (deletion is planned, see [Live testnet deployment](#live-testnet-deployment)), so whoever holds that key could replace the registry code and with it these rules; the guarantee is only as strong as that key until it is deleted.
 
 - Built at NEAR HACKATHON, track "NFTs That Do Something" (track id `nfts`).
@@ -14,22 +25,25 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 ## Contents
 
 1. [Try it: do X, see Y](#try-it-do-x-see-y)
-2. [The problem](#the-problem)
-3. [How it works](#how-it-works)
-4. [How control passes on transfer](#how-control-passes-on-transfer)
-5. [Holder powers and agent powers](#holder-powers-and-agent-powers)
-6. [Who can hold a token](#who-can-hold-a-token)
-7. [Human, AI-assisted and fully AI music](#human-ai-assisted-and-fully-ai-music)
-8. [Threat model and tests](#threat-model-and-tests)
-9. [Live testnet deployment](#live-testnet-deployment)
-10. [Website and help chat](#website-and-help-chat)
-11. [Simulated vs real](#simulated-vs-real)
-12. [What the token legally is](#what-the-token-legally-is)
-13. [Roadmap](#roadmap)
-14. [Known limits](#known-limits)
-15. [Libraries, templates and AI-written code](#libraries-templates-and-ai-written-code)
-16. [Repository layout](#repository-layout)
-17. [Built at NEAR HACKATHON](#built-at-near-hackathon)
+2. [Every claim, checked](#every-claim-checked)
+3. [Try to break it](#try-to-break-it)
+4. [The track brief, item by item](#the-track-brief-item-by-item)
+5. [The problem](#the-problem)
+6. [How it works](#how-it-works)
+7. [How control passes on transfer](#how-control-passes-on-transfer)
+8. [Holder powers and agent powers](#holder-powers-and-agent-powers)
+9. [Who can hold a token](#who-can-hold-a-token)
+10. [Human, AI-assisted and fully AI music](#human-ai-assisted-and-fully-ai-music)
+11. [Threat model and tests](#threat-model-and-tests)
+12. [Live testnet deployment](#live-testnet-deployment)
+13. [Website and help chat](#website-and-help-chat)
+14. [Simulated vs real](#simulated-vs-real)
+15. [What the token legally is](#what-the-token-legally-is)
+16. [Roadmap](#roadmap)
+17. [Known limits](#known-limits)
+18. [Libraries, templates and AI-written code](#libraries-templates-and-ai-written-code)
+19. [Repository layout](#repository-layout)
+20. [Built at NEAR HACKATHON](#built-at-near-hackathon)
 
 ## Try it: do X, see Y
 
@@ -46,7 +60,7 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 | # | Do | See |
 |---|---|---|
 | 1 | `git clone https://github.com/RoylTEE/RoylTEE.git royltee && cd royltee && git checkout <submission revision>` (pre-submission item: the submission revision is the merged `main` commit, to be written here once the branches are merged; until then the default branch does not yet contain every part described here) | The files listed under [Repository layout](#repository-layout). |
-| 2 | `npm run verify:testnet` (read only, about one minute, no install needed) | One `PASS` line per check and `ALL CHECKS PASSED` at the end: 7 share vaults `s1` to `s7` with `0 access keys`, every code hash equal to `deployments/testnet.json`, token `s2` owned by `buyer-pub.royltee-dev.testnet` (the catalog sale), the registry and mock USDC keys equal to the record (`access keys match the record: full_access`), the payment agent's single function call key scoped to the registry with `pay_from_allowance` and `report`, `nft_tokens read to the end: 7 token(s)`, and the solvency line, which needs all five accounting counters. `npm run test:verify` runs the checker's own 8 tests against a local fake RPC (no network). |
+| 2 | `npm run verify:testnet` (read only, no install needed; it took about two minutes on 2026-11-14) | One `PASS` line per check and `ALL CHECKS PASSED` at the end: 13 share vaults `s1` to `s13` with `0 access keys`, every code hash equal to `deployments/testnet.json`, token `s2` owned by `buyer-pub.royltee-dev.testnet` (the catalog sale), the registry and mock USDC keys equal to the record (`access keys match the record: full_access`), the payment agent's single function call key scoped to the registry with `pay_from_allowance` and `report`, `nft_tokens read to the end: 13 token(s)`, and the solvency line, which needs all five accounting counters. `npm run test:verify` runs the checker's own tests and the tests of the claim table checker against a local fake RPC (no network). `npm run check:claims` checks that every test name, function and transaction in the claim tables exists (offline). |
 | 3 | `npm run test:unit` | Rust unit tests: `test result: ok. 4 passed` (mock USDC), `101 passed` (registry), `5 passed` (vault). 110 in total. No wasm build is needed: the registry embeds the vault wasm only when it is compiled to wasm. |
 | 4 | `npm test` | Builds all contracts to wasm, prints the size and sha256 of each file in `contracts/res/`, then runs every unit test and the near-workspaces sandbox tests: `9 passed` (agents), `4 passed` (disputes), `3 passed` (limits), `4 passed` (review), `11 passed` (sandbox), `1 passed` (upgrade). 32 sandbox tests, 142 in total. Takes a few minutes. |
 | 5 | Optional: `npm run lint` | `cargo fmt --check`, then `cargo clippy -D warnings` for the host and wasm targets; ends with `Finished` and exit code 0. |
@@ -59,6 +73,76 @@ Hosted site: https://royltee.vercel.app (UNVERIFIED: which commit it runs, its l
 The contract numbers above (steps 2 to 5) come from running these commands on 2026-11-13 (UTC) on branch code that is NOT yet deployed (see [Live testnet deployment](#live-testnet-deployment)). Steps 7 and 8 were run on the merged tree (contract, server and UI branches) on 2026-11-13 (UTC): 219 site tests in 18 files; on the local dev server every page answered 200, `/admin` answered 401, and the chat and ticket API answered 503 without server secrets.
 
 Demo scripts: there are no separate `seed-demo`, `simulated-payer` or `scripted-agent` scripts. The on-chain demo (seed accounts and works, the Simulated payer's payments, the scripted agent's calls) was run as the `near` CLI commands written out step by step in [DEPLOY_PLAN.md](DEPLOY_PLAN.md), steps 1 to 13, and every resulting transaction id is in `deployments/testnet.json`. The key check (zero keys on every vault, the registry and mock USDC keys equal to the record, the agent's single scoped function call key) is `npm run verify:testnet` (`scripts/verify-testnet.mjs`), not a separate `verify-keys` script.
+
+## Every claim, checked
+
+Each row gives the claim, the code that implements it (file and function), the exact test name, and the evidence on NEAR testnet. Transaction links come from [deployments/testnet.json](deployments/testnet.json). The same rows, with a live check per claim, are on the hosted `/verify` page. `npm run check:claims` and the site test `site/tests/claims.test.ts` fail if a test name, function or transaction in these tables does not exist.
+
+| Claim | Code | Test | On-chain evidence |
+|---|---|---|---|
+| Each share vault is a NEAR account with zero access keys. Only the registry can move money out of it. | [`registration.rs`](contracts/registry/src/registration.rs) `register_share`<br>[`lib.rs`](contracts/vault/src/lib.rs) `withdraw` | `t01_mint_creates_keyless_registered_vault`<br>`t21_parent_cannot_delete_redeploy_or_key_a_vault` | [`7wxZ7Bms...`](https://testnet.nearblocks.io/txns/7wxZ7Bmstzu9qTUayrvzbGP97tcD6GRLMaZo7pTVAqzh) mint of share s1, vault created with no key (register_share, succeeded)<br>[`FGrwBa58...`](https://testnet.nearblocks.io/txns/FGrwBa58Empz2zW1Yj2BTHPvaSw9ZjsrVrDT6PrbN4gf) mint of share s8 on the current registry build (register_share, succeeded)<br>[`s2.reg.royltee-dev.testnet`](https://testnet.nearblocks.io/address/s2.reg.royltee-dev.testnet) view_access_key_list returns an empty list |
+| One payment to the registry is split by basis points to the share vaults, exact to the last unit. | [`money.rs`](contracts/registry/src/money.rs) `ft_on_transfer`<br>[`logic.rs`](contracts/registry/src/logic.rs) `split` | `t13_allowance_work_payment_splits_exactly`<br>`t16b_split_sums_to_payment_exactly`<br>`awkward_amounts_always_sum_exactly` | [`HBzKi5pt...`](https://testnet.nearblocks.io/txns/HBzKi5ptr5sGvPSgwWQSUNMKBRJksNCp3tAeT4xByo8u) work 0 paid 1.0 mUSDC, 0.5 into each of s1 and s2 (ft_transfer_call, succeeded)<br>[`2aAgWtca...`](https://testnet.nearblocks.io/txns/2aAgWtcaEC1RinbQvVS1AoLpZn7zQeEmzAGW3FshXHQA) work 0 paid again after the sale of s2 (ft_transfer_call, succeeded) |
+| Selling the NFT moves control of its vault and the unclaimed money. The seller keeps nothing. | [`nft.rs`](contracts/registry/src/nft.rs) `nft_transfer`<br>[`money.rs`](contracts/registry/src/money.rs) `claim` | `t03_owner_claims_non_owner_fails`<br>`t04_catalog_sale_balance_travels_with_token`<br>`t06_transfer_during_inflight_payout_fails`<br>`t07_transfer_call_bounce_cannot_claim` | [`HZ9pD2kL...`](https://testnet.nearblocks.io/txns/HZ9pD2kLbqbjmKqC68ao6KBTUpQmQstyd2Tro8hWwYPy) writer-b sells s2 to buyer-pub (nft_transfer, succeeded)<br>[`M4pWDbEg...`](https://testnet.nearblocks.io/txns/M4pWDbEgnUfz4TiJA8ZZdNVCnwV9vzsBnnEqRgALDrp) buyer-pub claims the 0.5 paid before the sale (claim, succeeded)<br>[`EYDV3Tsv...`](https://testnet.nearblocks.io/txns/EYDV3Tsv7Q1ZFPnJzmVdk6D4Rtosqpn8fYNY71ofVWJU) the seller tries to claim and is refused (claim, refused: only the current holder can claim) |
+| Holder powers and agent powers are separate. An agent key holds two methods and cannot claim, transfer or grant. | [`money.rs`](contracts/registry/src/money.rs) `claim`<br>[`agents.rs`](contracts/registry/src/agents.rs) `pay_from_allowance`<br>[`agents.rs`](contracts/registry/src/agents.rs) `report` | `t08_agent_key_cannot_reach_owner_methods`<br>`agent_cannot_use_owner_methods`<br>`note_is_holder_only_and_never_changes_payouts` | [`GvcHLtG7...`](https://testnet.nearblocks.io/txns/GvcHLtG7vLQXihNgbH6cmGSnG8QWhsNgzYGFQ2URwAVB) outsider tries to claim s1 and is refused (claim, refused: only the current holder can claim)<br>[`CmRvd9ZN...`](https://testnet.nearblocks.io/txns/CmRvd9ZNcfsR5EnMsc3VJ6YYncE3mQgLWqF21YhS1w5G) agent report signed with its function call key (report, succeeded)<br>[`7Bwi9rmQ...`](https://testnet.nearblocks.io/txns/7Bwi9rmQk4R4iApdVTXMWLkGjMgDnh2qZiVEfGPY5NAH) the agent full access key is deleted (DELETE_KEY, succeeded)<br>[`pay-agent.buyer-pub.royltee-dev.testnet`](https://testnet.nearblocks.io/address/pay-agent.buyer-pub.royltee-dev.testnet) one function call key, scoped to the registry |
+| An agent is held to a per-transaction limit, a daily limit and one payment per statement line, and a revoked role stops at the next call. Revocation has no transaction on testnet. The sandbox test is its only proof. | [`agents.rs`](contracts/registry/src/agents.rs) `pay_from_allowance`<br>[`agents.rs`](contracts/registry/src/agents.rs) `revoke_role` | `t09_payment_over_limits_fails`<br>`t10_revoked_agent_next_call_fails`<br>`t12_same_statement_line_pays_once`<br>`t11_injected_payee_changes_nothing` | [`7Vu5wRDq...`](https://testnet.nearblocks.io/txns/7Vu5wRDqx7dj487LAk3e69wFt6FmH8bMNfzpL8E2LuaW) one unit over the per-transaction limit is refused (pay_from_allowance, refused: over per-transaction limit)<br>[`2547uRUD...`](https://testnet.nearblocks.io/txns/2547uRUDcHokGMabzgLXdHZVfuG1VzDyxBc2X1rxmFb3) a second payment for the same statement line is refused (pay_from_allowance, refused: statement line already paid)<br>[`CUW8qssJ...`](https://testnet.nearblocks.io/txns/CUW8qssJVCJZuUgzzWHf9bdEyNCkFXpQjUKrJeWXeVPS) extra payee arguments naming outsider are ignored (pay_from_allowance, succeeded) |
+| A claim that pushes a right over 100 percent opens a dispute. Only the contested share is frozen, the new money waits in escrow, and the registrar resolves it. | [`registration.rs`](contracts/registry/src/registration.rs) `register_share`<br>[`disputes.rs`](contracts/registry/src/disputes.rs) `resolve` | `t14_over_allocation_dispute_freezes_only_contested_fraction`<br>`t14b_uphold_existing_voids_claimant`<br>`h2_one_bps_claim_freezes_only_one_named_share` | [`3uKby5aP...`](https://testnet.nearblocks.io/txns/3uKby5aP5pN6sMEp1EJSWn7xDEzyH2nASNzS7ccstJba) a 20 percent claim on work 2 opens dispute 0 (register_share, succeeded)<br>[`C8H28Nx1...`](https://testnet.nearblocks.io/txns/C8H28Nx1MZ5Pjb13uzkvheAh7S6Jf5mdqqHqmM1n7Mu) work 2 paid: s6 gets 0.3, the 0.7 for s5 goes to escrow (ft_transfer_call, succeeded)<br>[`7wvLcnuB...`](https://testnet.nearblocks.io/txns/7wvLcnuB5L6w3rh3tBL2Jgg7yTMErD9QduC1XLSAYUVi) registrar resolves: claimant void, 0.7 released to s5 (resolve, succeeded) |
+| Only members with an active credential can receive a share. The registrar grants credentials and cannot hold one. A refused transfer to a non-member has no transaction on testnet. The sandbox test is its proof. | [`membership.rs`](contracts/registry/src/membership.rs) `grant_credential`<br>[`nft.rs`](contracts/registry/src/nft.rs) `nft_transfer` | `t05_transfer_to_outsider_fails`<br>`suspended_holder_accrues_but_cannot_claim_send_or_receive`<br>`h3_registrar_cannot_hold_a_credential` | [`Bv7cDUgG...`](https://testnet.nearblocks.io/txns/Bv7cDUgGrGxgqaXr5FJnGpauqw1DcLpJmUuTMnrydFa6) registrar grants a credential (grant_credential, succeeded)<br>[`8QffMekU...`](https://testnet.nearblocks.io/txns/8QffMekUyzGzF6UvPX256tUBBBcXsjhy5M6GTHibUjkB) registrar grants a credential (grant_credential, succeeded)<br>[`3dqBCz6Q...`](https://testnet.nearblocks.io/txns/3dqBCz6QkbdbDqkZFSqvmfzHjuZHRkVt45A5kbAvg6Vq) registrar grants a credential (grant_credential, succeeded)<br>[`outsider.royltee-dev.testnet`](https://testnet.nearblocks.io/address/outsider.royltee-dev.testnet) is_active_member returns false |
+| The payment token is labeled Mock USDC (testnet), symbol mUSDC, 6 decimals, with no value. It is not Circle USDC. | [`lib.rs`](contracts/mock-usdc/src/lib.rs) `ft_metadata` | `metadata_is_labeled_mock_with_six_decimals` | [`usdc.royltee-dev.testnet`](https://testnet.nearblocks.io/address/usdc.royltee-dev.testnet) ft_metadata returns the name and symbol<br>[`D1kHgerP...`](https://testnet.nearblocks.io/txns/D1kHgerP4xVj7jmCp8JoGUSvHZE8grp19U7XcBHCh8Hs) the only mint: 1000 mUSDC to the Simulated payer (mint, succeeded) |
+| PENDING DEPLOY. The registry redeploy that carries the post-audit fixes. Its code hash and a read-back of every share fill this row. | [`lib.rs`](contracts/registry/src/lib.rs) `get_vault_code_hash` | pending deploy | pending deploy |
+| PENDING DEPLOY. A sealed-bid auction of a share: bids are encrypted, a module in a TEE opens them, and the contract moves the share and the money. The code is on branch feat/tee-auction and is not deployed. | `contracts/auction/src/settle.rs` `settle` (branch `feat/tee-auction`, not merged yet) | pending deploy | pending deploy |
+
+Rows marked pending deploy have nothing on chain yet. The registry row is filled after the next registry redeploy, the auction row after DEPLOY_PLAN step 17 on branch `feat/tee-auction`. Until then they are not claims that hold today.
+
+## Try to break it
+
+Each row is an attack, what the contract does about it, the test, and the transaction where one exists on testnet. "Test only" means no transaction exists: the refusal was shown in the sandbox, not on chain. Open a linked transaction in the explorer to read the contract's own error text.
+
+| Attack | What the contract does | Test | Proof |
+|---|---|---|---|
+| The seller of s2 claims it after the sale. | Refused: only the current holder can claim. | `t03_owner_claims_non_owner_fails` | [`EYDV3Tsv...`](https://testnet.nearblocks.io/txns/EYDV3Tsv7Q1ZFPnJzmVdk6D4Rtosqpn8fYNY71ofVWJU) refused on chain |
+| An account with no credential claims s1. | Refused: only the current holder can claim. | `t03_owner_claims_non_owner_fails` | [`GvcHLtG7...`](https://testnet.nearblocks.io/txns/GvcHLtG7vLQXihNgbH6cmGSnG8QWhsNgzYGFQ2URwAVB) refused on chain |
+| The agent pays one unit over its per-transaction limit. | Refused: over per-transaction limit. | `t09_payment_over_limits_fails` | [`7Vu5wRDq...`](https://testnet.nearblocks.io/txns/7Vu5wRDqx7dj487LAk3e69wFt6FmH8bMNfzpL8E2LuaW) refused on chain |
+| The agent sends the same statement line twice. | Refused: statement line already paid. | `t12_same_statement_line_pays_once` | [`2547uRUD...`](https://testnet.nearblocks.io/txns/2547uRUDcHokGMabzgLXdHZVfuG1VzDyxBc2X1rxmFb3) refused on chain |
+| Work metadata and extra arguments tell the agent to pay outsider. | Ignored: the contract resolves payees from the registry. s12 and s13 got 0.05 each, outsider got 0. | `t11_injected_payee_changes_nothing` | [`CUW8qssJ...`](https://testnet.nearblocks.io/txns/CUW8qssJVCJZuUgzzWHf9bdEyNCkFXpQjUKrJeWXeVPS) went through, effect contained |
+| The agent key tries claim with 1 yoctoNEAR attached. | Refused by the protocol before any transaction: a function call key cannot attach a deposit. The contract also checks the holder. No transaction exists. The CLI error text is in deployments/testnet.json, step 12. | `t08_agent_key_cannot_reach_owner_methods` | test only |
+| A member registers a 20 percent share on a work that is already full. | A dispute opens. Only the named share is frozen, its new money goes to escrow, the rest keeps being paid. | `t14_over_allocation_dispute_freezes_only_contested_fraction` | [`3uKby5aP...`](https://testnet.nearblocks.io/txns/3uKby5aP5pN6sMEp1EJSWn7xDEzyH2nASNzS7ccstJba) went through, effect contained |
+| A holder transfers a share to an account with no credential. | Refused: receiver has no active credential. | `t05_transfer_to_outsider_fails` | test only |
+| A holder starts a claim and sells the share while the payout is in flight. | Refused: payout in flight, transfer after it settles. | `t06_transfer_during_inflight_payout_fails` | test only |
+| A receiver of nft_transfer_call claims during the call, then returns the token. | Refused: claims wait until the transfer resolves. | `t07_transfer_call_bounce_cannot_claim` | test only |
+| A marketplace approval is used to move or claim a share. | Refused: approvals are disabled. | `t16_approvals_are_disabled` | test only |
+| A revoked agent calls again. | Refused at the next call. | `t10_revoked_agent_next_call_fails` | test only |
+| A stranger calls sync on a share. | Refused on the current build: holder or registrar only. On the first build this call succeeded (transaction 2Jsht1EatGqZfeVrZePKyVMQPyqyeqTCpEcoaHWK44LY). The fix is on testnet since the step 15 redeploy and has no refusal transaction. | `r01_h1_outsider_cannot_sync_and_new_vaults_keep_transfer_call` | test only |
+| The registry tries to delete, redeploy or add a key to an existing vault. | Impossible: the registry has no such call, and the sandbox shows the vault stays keyless. | `t21_parent_cannot_delete_redeploy_or_key_a_vault` | test only |
+| A stranger initialises a freshly deployed registry. | Refused: only the registry account itself can initialise. | `a03_stranger_cannot_initialise_a_fresh_deploy`<br>`only_the_registry_account_itself_can_initialise` | test only |
+| An outsider asks the TEE to open live auction bids directly, not through the auction contract. | PENDING DEPLOY. Expected: refused (DEPLOY_PLAN step 17g on branch feat/tee-auction). | pending deploy | pending deploy |
+
+The full threat model, 39 rows with the owner's trust rows, is in [THREAT_MODEL.md](THREAT_MODEL.md).
+
+## The track brief, item by item
+
+The brief for the `nfts` track in [HACKATHON.md](https://nearhackathon.com/HACKATHON.md): "Build NFTs as accounts: assets that own money, earn royalties, hold inventory, carry credentials, memberships or access rights. Ownership with behavior." Hints: dynamic NFTs, NEP-171, sub-accounts. The track also has an example prompt ([tracks/10-nfts.md](https://github.com/nearai/near-hackathon-prompt-examples/blob/main/tracks/10-nfts.md)), a starting point and not a requirement. Each item below says what is built, where, and what is not.
+
+| Brief item | In RoylTEE | Where |
+|---|---|---|
+| NFTs as accounts | Each share NFT controls its own NEAR sub-account, the vault `s<N>.reg.royltee-dev.testnet`, created with zero access keys. | [How it works](#how-it-works); `/share?id=s2`; claim "vault zero keys" above |
+| Assets that own money | The vault holds the share's Mock USDC. `earned`, `paid out` and `claimable` are live fields of the token. | [How it works](#how-it-works); `/shares/accounts` |
+| Earn royalties | A payer pays a work once and the registry splits it by basis points into the share vaults, exact to the last unit. | claim "auto-split payment" above; transactions `HBzKi5pt...`, `2aAgWtca...` |
+| Hold inventory | Not built. A vault holds Mock USDC only. Other NEP-141 tokens sent to a new vault are kept and cannot be claimed (see [Known limits](#known-limits)). | none |
+| Carry credentials, memberships or access rights | Partly. The share is a rights share: whoever holds it controls the payout stream. Membership is a credential per organisation, kept as a registry record and not as an NFT; only credentialed members can hold a share. | [Who can hold a token](#who-can-hold-a-token); claim "credential gating" above |
+| Dynamic NFTs | `nft_token` metadata changes with the money and the locks: earned, paid out, claimable, status, evidence tier, approval. | [How it works](#how-it-works); `nft_token_carries_live_fields` in `contracts/registry/src/tests.rs` |
+| NEP-171 (with NEP-177 and NEP-181) | Implemented by the registry. NEP-178 approvals are disabled on purpose, so a listing cannot move a share. | `contracts/registry/src/nft.rs`; test `t16_approvals_are_disabled` |
+| Sub-accounts | The registry creates each vault as its own sub-account at mint and deploys the vault code in the same batch. | `register_share` in `contracts/registry/src/registration.rs`; test `t01_mint_creates_keyless_registered_vault` |
+
+The example prompt, point by point:
+
+| Example prompt item | In RoylTEE | Where |
+|---|---|---|
+| An NEP-171 contract plus the logic that ties each token to its sub-account | Done. The token id `sN` names its vault `sN.reg...`. | [How it works](#how-it-works) |
+| Explain exactly how control passes on transfer and what stops the old owner | Done. Nothing is handed over: every owner action reads the current owner at call time. | [How control passes on transfer](#how-control-passes-on-transfer) |
+| A gated page that only current holders can open | Not built as a page gate. The pages are public read only. The holder rule is enforced in the contract: `claim` pays only the current holder, and `/member` signs with the holder's wallet. | `/member`; claim "transfer passes control" above |
+| A history view per NFT: earned, paid out, who held it | Done for earned, paid out and the recorded moves (mint, transfers, claims). The page reads the live token and lists its recorded transactions. | `/share?id=s2` |
+| Tests for the transfer path, including a sale in the middle of a payout | Done. | `t06_transfer_during_inflight_payout_fails`, `t04_catalog_sale_balance_travels_with_token`, `t07_transfer_call_bounce_cannot_claim` |
+| A threat model for the transfer, every way a seller could try to keep the money | Done. | [THREAT_MODEL.md](THREAT_MODEL.md); the table under [How control passes on transfer](#how-control-passes-on-transfer) |
 
 ## The problem
 
