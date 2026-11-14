@@ -3,3 +3,10 @@ ace5138b25032c3cc594d86d5f66c2806f71202c:deployments/testnet.json:generic-api-ke
 ace5138b25032c3cc594d86d5f66c2806f71202c:deployments/testnet.json:generic-api-key:1421
 ace5138b25032c3cc594d86d5f66c2806f71202c:deployments/testnet.json:generic-api-key:1531
 ace5138b25032c3cc594d86d5f66c2806f71202c:deployments/testnet.json:generic-api-key:1553
+# Public TEE auction key (64 hex, the pubkey field) in the auction deployment record, its settle check and a contract test fixture. Public, not a secret.
+b38292b6d4508f2e48a896d204892e0037ac948d:deployments/auction-settle-verify.txt:generic-api-key:82
+b38292b6d4508f2e48a896d204892e0037ac948d:deployments/auction-testnet.json:generic-api-key:60
+b5d13749cef0df88b845b0678321675ec4b937b3:deployments/auction-settle-verify.txt:generic-api-key:82
+b5d13749cef0df88b845b0678321675ec4b937b3:deployments/auction-testnet.json:generic-api-key:60
+2be543fbc39fc88170021173dafc5bf6cbaea598:contracts/auction/src/tests.rs:generic-api-key:1016
+e3275ab0933c673916c6a7988a1d140f8a55635c:contracts/auction/src/tests.rs:generic-api-key:939
