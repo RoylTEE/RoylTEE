@@ -22,7 +22,7 @@ export const ROLE_OF: Record<string, string> = {
   'writer-b.royltee-dev.testnet': 'Writer B',
   'buyer-pub.royltee-dev.testnet': 'Buyer publisher',
   'pay-agent.buyer-pub.royltee-dev.testnet': 'Payment agent',
-  'payer.royltee-dev.testnet': 'Payer (Simulated)',
+  'payer.royltee-dev.testnet': 'Payer (test account)',
   'outsider.royltee-dev.testnet': 'Outsider, no credential',
   'registrar.royltee-dev.testnet': 'Registrar',
 };
@@ -52,10 +52,10 @@ export const SCENES: Scene[] = [
   { step: 'Agent', what: 'Agent pays work 5, 0.1 mUSDC, line agent-line-3, with extra payee and receiver_id arguments naming outsider', shows: 'The extra arguments are ignored: s12 0.05, s13 0.05, outsider 0', txs: ['CUW8qssJVCJZuUgzzWHf9bdEyNCkFXpQjUKrJeWXeVPS'], tokens: ['s12', 's13'], result: 'ok', agent: true },
   { step: 'Register', what: 'writer-a registers work 6 (ZZRYL2600004) and its own 50 percent share s14 (split sheet scene)', shows: 'The registrant of the work registers its own share, so it is approved at once', txs: ['EMdw5gBJg8LAeuZ96n767iYiV6zyYhAgqmQ1Gf89W2sy', '9aUzpdgBPrdJ3XaSn3YdKu19yjaBjKZj1S9wzowL9Nwt'], tokens: ['s14'], result: 'ok' },
   { step: 'Register', what: 'writer-b registers the other 50 percent of work 6 as share s15 (split sheet scene)', shows: 'writer-b did not register the work, so s15 is pending: nothing is paid to it until writer-a signs', txs: ['5xYY2sWQQrZL7XCiQ8CVKhw27pUWDRhnN5k3doqjsgjB'], tokens: ['s15'], result: 'ok' },
-  { step: 'Pay', what: 'Payer pays work 6, 1.0 mUSDC, line line-4 (Simulated money). s14 gets 0.5 at once, the 0.5 for pending s15 goes to escrow', shows: 'The pending half is held, not paid: s14 vault 0.5, s15 vault 0, s15 held 0.5 awaiting approval', txs: ['8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL'], tokens: ['s14', 's15'], result: 'ok', simulated: true },
-  { step: 'Approve', what: 'writer-a signs approve_share on s15 (Simulated money)', shows: 'share_approved event: the held 0.5 mUSDC is released to the s15 vault, which now holds 0.5', txs: ['5dgncSm1CyDuiEKRzeUpZJTWrBnHzNuuEP6k51RNseGa'], tokens: ['s15'], result: 'ok' },
+  { step: 'Pay', what: 'Payer pays work 6, 1.0 mUSDC, line line-4. s14 gets 0.5 at once, the 0.5 for pending s15 goes to escrow', shows: 'The pending half is held, not paid: s14 vault 0.5, s15 vault 0, s15 held 0.5 awaiting approval', txs: ['8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL'], tokens: ['s14', 's15'], result: 'ok', simulated: true },
+  { step: 'Approve', what: 'writer-a signs approve_share on s15', shows: 'share_approved event: the held 0.5 mUSDC is released to the s15 vault, which now holds 0.5', txs: ['5dgncSm1CyDuiEKRzeUpZJTWrBnHzNuuEP6k51RNseGa'], tokens: ['s15'], result: 'ok' },
   { step: 'Auction', what: 'writer-a lists share s10 in a sealed-bid auction on a separate auction contract (auction.royltee-dev.testnet), reserve 20 mUSDC', shows: 'nft_transfer_call moves s10 to the auction contract, which holds it for the sale', txs: ['Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR'], tokens: ['s10'], result: 'ok' },
-  { step: 'Auction', what: 'The auction settles through the OutLayer TEE: buyer-pub wins s10 at the second price, 70 mUSDC (Simulated money)', shows: 's10 moves from the auction contract to buyer-pub; the vault of s10 keeps 0 keys', txs: ['CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW'], tokens: ['s10'], result: 'ok' },
+  { step: 'Auction', what: 'The auction settles through the OutLayer TEE: buyer-pub wins s10 at the second price, 70 mUSDC', shows: 's10 moves from the auction contract to buyer-pub; the vault of s10 keeps 0 keys', txs: ['CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW'], tokens: ['s10'], result: 'ok' },
 ];
 
 /** Activity filters for a recorded scene. A row can sit in more than one. */

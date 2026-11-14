@@ -4,11 +4,11 @@ import PowerTable from '../components/PowerTable.astro';
 import { REGISTRY, TOKEN, REGISTRAR, AGENTS, PAYER, ROLE_OF, accountUrl } from '../data/testnet';
 const accounts: [string, string][] = [
   [REGISTRY, 'Registry contract: works, share NFTs, ledger, roles, disputes'],
-  [TOKEN, 'Mock USDC (testnet), 6 decimals, no value'],
+  [TOKEN, 'Mock USDC, 6 decimals'],
   [REGISTRAR, 'Registrar, a trusted role'],
   ...['writer-a', 'writer-b', 'buyer-pub'].map((a): [string, string] => [`${a}.royltee-dev.testnet`, `${ROLE_OF[`${a}.royltee-dev.testnet`]}, verified member`]),
   [AGENTS[0], 'Payment agent, function call key only'],
-  [PAYER, 'Payer (Simulated)'],
+  [PAYER, 'Payer, a test account'],
   ['s1.reg.royltee-dev.testnet to s15', 'One share account per share NFT, zero access keys'],
   ['auction.royltee-dev.testnet', 'Sealed-bid share auction contract, settled through a TEE once on testnet'],
 ];
@@ -18,7 +18,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
 ---
 <App area="docs" tab="docs" title="Docs" intro="The accounts, the contract methods these pages read, and how to check the demo without a wallet." period={false}>
   <section class="panel" aria-labelledby="acc-h">
-    <div class="panel-head"><h2 id="acc-h">Accounts on NEAR testnet</h2></div>
+    <div class="panel-head"><h2 id="acc-h">Accounts</h2></div>
     <div class="table-wrap"><table class="ledger rows-sm">
       <thead><tr><th>Account</th><th>What it is</th></tr></thead>
       <tbody>{accounts.map(([a, w]) => <tr><td class="p">{a.includes(' ') ? <span class="mono small">{a}</span> : <a class="acct-link" href={accountUrl(a)} target="_blank" rel="noopener">{a}</a>}</td><td class="m wrap">{w}</td></tr>)}</tbody>

@@ -58,7 +58,7 @@ describe('registrar log', () => {
   });
   it('labels placeholder hashes, lists kinds with no events, and has a Members check', () => {
     const page = readFileSync(new URL('../src/pages/registrar.astro', import.meta.url), 'utf8');
-    expect(page).toMatch(/placeholder test values, not hashes of real documents \(Simulated\)/);
+    expect(page).toMatch(/placeholder test values, not hashes of real documents/);
     expect(page).toMatch(/Not in the record/);
     const ui = readFileSync(new URL('../src/scripts/registrar.ts', import.meta.url), 'utf8');
     expect(ui).toMatch(/'get_credential'/); expect(ui).toMatch(/'is_active_member'/);

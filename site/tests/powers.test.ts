@@ -23,8 +23,8 @@ describe('every power has a screen or says it is CLI only', () => {
     expect(src('pages/registrar.astro')).toMatch(/<PowerTable who="registrar" \/>/);
     expect(src('pages/docs.astro')).toMatch(/<PowerTable who="payer" \/>/);
   });
-  it('payer powers stay labeled Simulated and the draft stays UNVERIFIED', () => {
-    for (const p of POWERS.filter((x) => x.who === 'payer')) expect(p.note).toBe('Simulated payer');
+  it('payer powers carry no repeated Simulated label and the draft stays UNVERIFIED', () => {
+    for (const p of POWERS.filter((x) => x.who === 'payer')) expect(p.note).toBeUndefined();
     expect(POWERS.find((x) => x.method === 'register_share')!.note).toBe('UNVERIFIED');
   });
 });

@@ -7,25 +7,25 @@ const v = AUCTION.verify;
 const stage = (k: string) => STAGES.find((s) => s.key === k)!;
 const short = (h: string) => `${h.slice(0, 8)}...`;
 ---
-<App area="auction" title="Sealed-bid auction" intro="One real sale of a share NFT on NEAR testnet: sealed bids, a second price opened inside a TEE, and every step with its transaction. Read only: this page does not list, bid or settle." period={false}>
+<App area="auction" title="Sealed-bid auction" intro="One real sale of a share NFT on NEAR: sealed bids, a second price opened inside a TEE, and every step with its transaction. Read only: this page does not list, bid or settle." period={false}>
   <figure class="aban"><img src="/art/hdr-auction.webp" width="1584" height="672" alt="Flat retro illustration: a record turntable with a sealed box on it and envelopes floating above in a beam of light." decoding="async" /></figure>
 
   <section class="panel" aria-labelledby="what-h">
-    <div class="panel-head"><h2 id="what-h">How the auction works</h2><span class="badge sim">Simulated money</span></div>
+    <div class="panel-head"><h2 id="what-h">How the auction works</h2></div>
     <div class="panel-body">
       <ol class="three">
         <li><strong>Sealed bids.</strong> Each bidder encrypts an amount so that only the TEE can read it. The contract holds the ciphertext and a deposit, and nobody sees the bids while the auction is open.</li>
         <li><strong>Second price.</strong> After the end time a program inside the TEE opens the bids. The highest bidder wins the share but pays the second highest bid, so bidding your true value is the best plan.</li>
         <li><strong>Proof.</strong> The TEE prints only the winner and the price. The contract moves the share and the money, and anyone can check the attestation that this answer came from the approved code.</li>
       </ol>
-      <p class="caption">All mock USDC (mUSDC) on this page is Simulated: a testnet token with no value, not Circle USDC. The registry itself does not use a TEE; only this settle step does.</p>
+      <p class="caption">The registry itself does not use a TEE; only this settle step does.</p>
     </div>
   </section>
 
   <section class="figures kpi" aria-label="Result of the recorded auction">
     <div class="figure"><span class="label">Share sold</span><span class="value">{a.token}</span><span class="note">listed by {a.seller.split('.')[0]}</span></div>
     <div class="figure"><span class="label">Winner</span><span class="value" style="font-size:var(--fs-22)">{a.winner.split('.')[0]}</span><span class="note">now owns {a.token}</span></div>
-    <div class="figure"><span class="label">Price (second price)</span><span class="value">{musdc(a.price)}<small>mUSDC</small></span><span class="note">Simulated money</span></div>
+    <div class="figure"><span class="label">Price (second price)</span><span class="value">{musdc(a.price)}<small>mUSDC</small></span></div>
     <div class="figure"><span class="label">Attestation checks</span><span class="value">{v.checks.filter((c) => c.verdict === 'PASS').length}/{v.checks.length}<small>PASS</small></span><span class="note">outlayer-verify</span></div>
   </section>
 
@@ -77,7 +77,7 @@ const short = (h: string) => `${h.slice(0, 8)}...`;
         <ul>{WHAT_TEE.outside.map((x) => <li>{x}</li>)}</ul>
       </div>
     </div>
-    <p class="panel-foot">Prototype with explicit operator and executor trust. Do not put real value in it. Not run on testnet: the recovery calls (not needed) and deleting the auction key (kept on purpose). Mock USDC balances after the run (Simulated, mUSDC): {Object.entries(AUCTION.balancesAfter).map(([k, x]) => `${k.split('.')[0]} ${musdc(x as string)}`).join(', ')}.</p>
+    <p class="panel-foot">Prototype with explicit operator and executor trust. Do not put real value in it. Not run on testnet: the recovery calls (not needed) and deleting the auction key (kept on purpose). Balances after the run (mUSDC): {Object.entries(AUCTION.balancesAfter).map(([k, x]) => `${k.split('.')[0]} ${musdc(x as string)}`).join(', ')}.</p>
   </section>
 
   <p class="actions"><a class="btn" href="/verify">Verify the deployment</a><a class="btn" href="/activity#sale">Recorded activity</a><a class="btn" href="/docs">Docs</a></p>

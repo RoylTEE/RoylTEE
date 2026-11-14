@@ -3,7 +3,7 @@ import App from '../layouts/App.astro';
 /* Rendered per request so the wallet selector gets a fresh CSP nonce (src/middleware.ts). */
 export const prerender = false;
 ---
-<App area="help" tab="chat" title="Help" intro="Ask the guide about shares, share accounts, payments and the testnet demo. For anything about your account, open a support ticket." period={false} description="Ask the help guide or contact support with a NEAR testnet wallet.">
+<App area="help" tab="chat" title="Help" intro="Ask the guide about shares, share accounts, payments and the demo. For anything about your account, open a support ticket." period={false} description="Ask the help guide or contact support with a NEAR testnet wallet.">
     <section class="panel" id="chat" data-tab-panel aria-labelledby="chat-h">
       <div class="panel-head"><h2 id="chat-h">Help chat</h2><div class="end"><button type="button" class="btn sm" data-chat-reset>New chat</button></div></div>
       <div class="panel-body">
@@ -21,7 +21,7 @@ export const prerender = false;
     <section class="panel" id="support" data-tab-panel data-support data-state="out" aria-labelledby="sup-h">
       <div class="panel-head"><h2 id="sup-h">Contact support</h2></div>
       <div class="panel-body">
-        <p class="small">Sign in with a NEAR testnet wallet to open a ticket. No email and no personal data. Your wallet signs a message, never a transaction. A sign in lasts 15 minutes.</p>
+        <p class="small">Sign in with a NEAR wallet to open a ticket. No email and no personal data. Your wallet signs a message, never a transaction. A sign in lasts 15 minutes.</p>
         <div class="out-only"><button type="button" class="btn primary" data-sign-in>Sign in with NEAR wallet</button></div>
         <div class="in-only stack">
           <div class="actions"><span class="mono small" data-who></span><button type="button" class="btn sm" data-sign-out>Sign out</button></div>

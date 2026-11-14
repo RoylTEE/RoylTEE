@@ -78,7 +78,7 @@ export function shareParts(d: ShareData) {
     ['Last transfer effective', utc(d.share.last_effective_from)],
   ]);
   const account = nodes([h('p', {}, acct(e.vault)), keysBlock(d), minBalance(d),
-    h('p', { class: 'caption', text: `Mock USDC (testnet) held by the account: ${musdc(d.vaultToken)} mUSDC.` })]);
+    h('p', { class: 'caption', text: `Held by the account: ${musdc(d.vaultToken)} mUSDC.` })]);
   return { head, summary, statement: statement(d.ledger), account };
 }
 

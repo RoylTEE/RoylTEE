@@ -50,7 +50,7 @@ async function load() {
     ]);
     const rows: [string, string, string, boolean][] = [
       ['Registry', DEPLOY_RECORD.registry.codeHash, reg.code_hash, reg.code_hash === DEPLOY_RECORD.registry.codeHash],
-      ['Mock USDC (testnet)', DEPLOY_RECORD.mockUsdc.codeHash, usdc.code_hash, usdc.code_hash === DEPLOY_RECORD.mockUsdc.codeHash],
+      ['Mock USDC', DEPLOY_RECORD.mockUsdc.codeHash, usdc.code_hash, usdc.code_hash === DEPLOY_RECORD.mockUsdc.codeHash],
       ['Vault code the registry deploys', DEPLOY_RECORD.vault.sha256, vaultHex, vaultHex === DEPLOY_RECORD.vault.sha256],
     ];
     // Each share account must run a recorded vault build: the current one or one from an earlier deploy (review 03d L5).

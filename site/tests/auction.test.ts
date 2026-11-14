@@ -76,8 +76,8 @@ describe('auction page data', () => {
     expect(musdc('1')).toBe('0.000001');
     expect(musdc('0')).toBe('0');
   });
-  it('the page says Simulated, the TEE box lists what is inside and outside, and the page links its evidence', () => {
-    expect(page).toContain('Simulated');
+  it('the page does not repeat the Simulated label (the top bar and footer carry it), the TEE box lists what is inside and outside, and the page links its evidence', () => {
+    expect(page).not.toContain('Simulated money');
     expect(page).toContain('What runs in the TEE and what does not');
     expect(page).toContain('Attestation proof');
     expect(WHAT_TEE.inside.length).toBeGreaterThan(1);

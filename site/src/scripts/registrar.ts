@@ -21,7 +21,7 @@ async function load() {
       h('dt', { text: 'Registrar in get_config' }), h('dd', {}, acct(config.registrar)),
       h('dt', { text: 'Payment token' }), h('dd', {}, acct(config.usdc)),
       h('dt', { text: 'Registrar access keys' }), h('dd', { text: `${keys.length} (${full} full access)` }),
-      h('dt', { text: 'Payer role' }), h('dd', {}, short(PAYER), ' ', payer ? badge('Payer', 'info') : badge('Not a payer', 'plain'), ' ', badge('Simulated payer', 'sim'))),
+      h('dt', { text: 'Payer role' }), h('dd', {}, short(PAYER), ' ', payer ? badge('Payer', 'info') : badge('Not a payer', 'plain'))),
       h('p', { class: 'small muted', text: 'The registrar signs with an ordinary account key. That is the trust assumption of this demo, and why each action carries a document hash.' }));
     document.querySelector('[data-members]')!.replaceChildren(h('table', { class: 'ledger rows-sm' },
       h('thead', {}, h('tr', {}, ...['Member', 'Role in the demo', 'Credential', 'Granted'].map((x) => h('th', { text: x })))),

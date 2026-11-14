@@ -44,7 +44,7 @@ export const SPLIT_SCENE = {
   steps: [
     { label: 'writer-a registers work 6 and its own share s14, approved at once', txs: ['EMdw5gBJg8LAeuZ96n767iYiV6zyYhAgqmQ1Gf89W2sy', '9aUzpdgBPrdJ3XaSn3YdKu19yjaBjKZj1S9wzowL9Nwt'] },
     { label: 'writer-b registers s15, which stays pending', txs: ['5xYY2sWQQrZL7XCiQ8CVKhw27pUWDRhnN5k3doqjsgjB'] },
-    { label: 'Payer pays 1.0 mUSDC (Simulated): s14 gets 0.5, the 0.5 for s15 goes to escrow', txs: ['8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL'] },
+    { label: 'Payer pays 1.0 mUSDC: s14 gets 0.5, the 0.5 for s15 goes to escrow', txs: ['8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL'] },
     { label: 'writer-a signs approve_share on s15: the held 0.5 mUSDC is released', txs: ['5dgncSm1CyDuiEKRzeUpZJTWrBnHzNuuEP6k51RNseGa'] },
   ],
 } as const;

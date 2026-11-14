@@ -61,7 +61,8 @@ describe('registry pages: no new hosts, no secrets, honest data', () => {
     expect(src('pages/member.astro')).toMatch(/UNVERIFIED/);
     expect(src('components/Footer.astro')).toMatch(/Simulated/);
     expect(src('pages/index.astro')).toMatch(/Simulated/);
-    expect(src('components/ActivityTable.astro')).toMatch(/Simulated payer/);
+    expect(src('layouts/App.astro')).toMatch(/Simulated/);
+    expect(src('components/ActivityTable.astro')).not.toMatch(/Simulated payer/);
     expect(src('pages/dashboard.astro')).toMatch(/<ActivityTable/);
     expect(src('pages/index.astro')).not.toMatch(/deployment to NEAR testnet is planned/i);
   });

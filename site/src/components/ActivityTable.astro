@@ -14,7 +14,7 @@ const rows = (only ? numbered.filter((s) => s.cats.includes(only)) : numbered).s
       {rows.map((s) => (
         <tr data-cat={collapsible ? s.cats.join(' ') : undefined}>
           <td class="num x">{s.n}</td>
-          <td class="p nowrap"><strong>{s.step}</strong>{s.simulated && <span class="badge sim step-sim">Simulated payer</span>}{s.agent && <span class="badge info step-sim">Scripted agent</span>}</td>
+          <td class="p nowrap"><strong>{s.step}</strong>{s.agent && <span class="badge info step-sim">Scripted agent</span>}</td>
           <td class="p-wrap">{s.what}<span class="small muted shows only-wide"><br />{s.shows}</span><span class="near-does"><strong>NEAR does:</strong> {nearDoes(s)}</span></td>
           <td class="m mono">{s.tokens.length ? s.tokens.map((t, i) => <>{i ? ', ' : ''}<a class="link" href={`/share?id=${t}`}>{t}</a></>) : <span class="dim">No share</span>}</td>
           <td class="p-end">{s.result === 'refused' ? <span class="badge bad">Refused</span> : s.result === 'info' ? <span class="badge info">Recorded</span> : <span class="badge ok">Done</span>}</td>

@@ -6,7 +6,7 @@ const controls: [string, string, string, string][] = [
   ['grant_role', 'Give a sub-account a payment role', 'Organisation must be an active member; agent is its direct sub-account with no credential (and not a payer); 0 < per payment <= daily; 1 to 1000 payments a day; expiry in the future', 'The role storage cost, measured in the call; the rest of the deposit buys statement lines at 0.001 NEAR each'],
   ['add_line_credits', 'Prepay statement lines', "Only the agent's organisation; at least one line", '0.001 NEAR per line'],
   ['revoke_role', 'Kill switch, takes effect at once', 'The organisation or the registrar; not already revoked. The allowance stays withdrawable', '1 yoctoNEAR'],
-  ['withdraw_allowance', 'Take unused Mock USDC back', "Only the agent's organisation, not suspended; up to the allowance left", '1 yoctoNEAR'],
+  ['withdraw_allowance', 'Take the unused allowance back', "Only the agent's organisation, not suspended; up to the allowance left", '1 yoctoNEAR'],
 ];
 const n = SCENES.filter((s) => categoriesOf(s).includes('agent')).length;
 ---

@@ -32,11 +32,11 @@ const short = (a: string) => a.replace(/\.royltee-dev\.testnet$/, '');
       <dl class="kv tally">{REGISTRAR_EVENT_KINDS.map(([k, l]) => <><dt>{l}</dt><dd class="mono">{count(k)}</dd></>)}</dl>
       <p class="small">Not in the record: {none.join(', ').toLowerCase()}. None of these happened in the recorded demo.</p>
     </div>
-    <p class="panel-foot">Each row is an EVENT_JSON log (standard share_registry) in the linked transaction. The doc hashes in this demo are placeholder test values, not hashes of real documents (Simulated). Later registrar actions appear in the <a class="link" href={accountUrl(REGISTRAR)} target="_blank" rel="noopener">registrar account history</a> on the explorer.</p>
+    <p class="panel-foot">Each row is an EVENT_JSON log (standard share_registry) in the linked transaction. The doc hashes in this demo are placeholder test values, not hashes of real documents. Later registrar actions appear in the <a class="link" href={accountUrl(REGISTRAR)} target="_blank" rel="noopener">registrar account history</a> on the explorer.</p>
   </section>
 
   <section class="panel" id="members" data-tab-panel aria-labelledby="mem-h">
-    <div class="panel-head"><h2 id="mem-h">Members</h2><span class="caption">Credential status, read live. Identity checks behind them are Simulated.</span></div>
+    <div class="panel-head"><h2 id="mem-h">Members</h2><span class="caption">Credential status, read live.</span></div>
     <div class="table-wrap" data-members><p class="loading panel-body">Reading testnet</p></div>
     <form class="panel-body lookup-form" data-member-check>
       <label for="mc">Check any account: get_credential and is_active_member</label>
