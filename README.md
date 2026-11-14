@@ -170,10 +170,10 @@ Test suites (counts from `npm test` and the site's `npm test` on the merged tree
 | Sandbox: limits and gas | `contracts/tests/tests/limits.rs` | 3 |
 | Sandbox: review fixes | `contracts/tests/tests/review.rs` | 4 |
 | Sandbox: in-place upgrade from the testnet wasm | `contracts/tests/tests/upgrade.rs` | 1 |
-| Auction contract unit tests | `contracts/auction/src/tests.rs` | 38 |
-| Auction WASI module host tests | `tee/auction-wasi/src/lib.rs` | 10 |
-| Auction Node tests (real module under WASI) | `scripts/auction/auction.test.mjs` | 12 |
-| Sandbox: auction (mock OutLayer, real module answers) | `contracts/tests/tests/auction.rs` | 11 |
+| Auction contract unit tests | `contracts/auction/src/tests.rs` | 46 |
+| Auction WASI module host tests | `tee/auction-wasi/src/lib.rs` | 12 |
+| Auction Node tests (real module under WASI) | `scripts/auction/auction.test.mjs` | 15 |
+| Sandbox: auction (mock OutLayer, real module answers) | `contracts/tests/tests/auction.rs` | 14 |
 | Site (help chat, tickets, limits, dashboard) | `site/tests/` | 219 (18 files) |
 
 Brief test list to sandbox tests (every sandbox test ends with a solvency check; tests that touch a vault also check it has zero keys):
@@ -352,27 +352,41 @@ How to rebuild, re-test and re-verify the probe and the echo module, including t
 
 ## Sealed-bid share auction
 
-Status: built and tested locally (unit, sandbox and Node tests), NOT deployed. The deploy commands are a draft in [DEPLOY_PLAN.md](DEPLOY_PLAN.md) step 17 and need the owner's yes.
+Status: built and tested locally (unit, sandbox and Node tests), NOT deployed. The deploy commands are a draft in [DEPLOY_PLAN.md](DEPLOY_PLAN.md) step 17 and need the owner's yes. The auction has been reviewed once by an external reviewer; every finding is mapped to a fix and a test in [THREAT_MODEL.md](THREAT_MODEL.md) (rows T-A1 to T-A21).
 
-What it does: a holder lists one share for a private auction. Bidders send an encrypted bid. After the end time, a WASI module running in OutLayer's TEE opens the bids and prints only the winner and the price. The contract then moves the share and the money. Losing bids are never published.
+What it does: a holder lists one share for a private auction. Bidders send an encrypted bid. After the end time, a WASI module running in OutLayer's TEE opens the bids and prints only the winner and the price. The contract then moves the share and the money. Bids other than the second highest are never published (see "What stays private").
 
 How a sale runs:
 
-1. **List.** The seller calls the registry's `nft_transfer_call` to the auction with `{"reserve","max_deposit","ends_at"}`. The auction keeps the share (it returns `false` from `nft_on_transfer`). It needs no registry change: it is a normal credentialed member at `auction.royltee-dev.testnet`, a sibling of the registry account because the registry blocks system names under `reg`.
-2. **Bid.** A bidder runs `node scripts/auction/encrypt-bid.mjs`, which seals the amount to the TEE public key (X25519, HKDF-SHA256, ChaCha20-Poly1305, bound to the auction id, the contract and the bidder). They send exactly `max_deposit` mock USDC with `ft_transfer_call` and the ciphertext as the message. Every deposit is the same size, so the deposit leaks nothing about the bid. Only active members can bid; at most 8 bids per auction.
-3. **Settle.** After `ends_at`, anyone calls `settle`. The contract calls `request_execution` on `outlayer.testnet` with the module (pinned by sha256). The module prints `{winner, price, bids_hash}`. The price is the second highest valid bid, or the reserve. The contract accepts the answer only if the winner is a bidder, the price is between the reserve and `max_deposit`, and `bids_hash` matches the bid list it sent.
+1. **List.** The seller calls the registry's `nft_transfer_call` to the auction with `{"reserve","max_deposit","ends_at"}`. The auction keeps the share (it returns `false` from `nft_on_transfer`). It needs no registry change: it is a normal credentialed member at `auction.royltee-dev.testnet`, a sibling of the registry account because the registry blocks system names under `reg`. Always list with `nft_transfer_call`: a plain `nft_transfer` to the auction account leaves the share stranded with no auction (T-A16).
+2. **Bid.** A bidder runs `node scripts/auction/encrypt-bid.mjs`, which seals the amount to the TEE public key (X25519, HKDF-SHA256, ChaCha20-Poly1305, bound to the auction id, the contract and the bidder). The amount is zero padded to 38 digits so the ciphertext length leaks nothing, and the script refuses an amount outside the reserve and `max_deposit`. They send exactly `max_deposit` mock USDC with `ft_transfer_call` and the ciphertext as the message. Every deposit is the same size, so the deposit leaks nothing about the bid. Only active members can bid; at most 8 bids per auction.
+3. **Settle.** After `ends_at`, anyone calls `settle` (230 Tgas at least, 0.01 NEAR at least for OutLayer, the rest is refunded). The contract calls `request_execution` on `outlayer.testnet` with the module (pinned by sha256). The module prints `{winner, price, bids_hash}`. The price is the second highest valid bid, or the reserve. The contract accepts the answer only if the winner is a bidder, the price is between the reserve and `max_deposit`, and `bids_hash` matches the bid list it sent.
 4. **Pay.** The share goes to the winner first (the registry re-checks membership). Only then the contract credits the seller the price, the winner the change, and each loser the full deposit. Money leaves with `withdraw`, which debits before it sends and restores the credit if the send fails.
-5. **Failure.** A failed or empty answer reopens settling. A refused delivery, a stale settle (1 hour) or a missed settle (6 hours after `ends_at`) ends in a cancelled auction: every deposit is credited back and the share returns to the seller.
+5. **Failure and recovery.** A failed or empty answer reopens settling. A refused delivery or a stalled settle (1 hour) ends in a cancelled auction: every deposit is credited back and the share returns to the seller. Anyone can also cancel 6 hours after `ends_at` once one settle run has failed, and 7 days after `ends_at` in any case. If a delivery or a share return never reports back (for example the contract was short of NEAR for storage), `reconcile` reads the registry after 15 minutes and finishes the job.
+
+Two layers keep the module from being used as a decryption oracle. All ciphertexts are public, so without them anyone could ask OutLayer to run the module on a crafted request and read a live bid. First, the module fails every request unless `NEAR_PREDECESSOR_ID`, the account that called OutLayer, equals the auction contract named in the request. Second, the OutLayer secret should only be readable by a run of this exact build that arrives through the auction contract (`And[WasmHash, Predecessor{Whitelist[auction]}]`). DEPLOY_PLAN step 17g tests the refusal on chain before any share is listed.
+
+What stays private, and what does not:
+
+- The winner's own top bid and all losing bids except the second highest stay inside the module.
+- The sale price is the second highest valid bid and it is public. With two bidders the price is the loser's exact bid, so it is not true that losing bids are never published.
+- Account names, the deposit and the time of each bid are public.
 
 What you can and cannot trust:
 
-- Real in the tests: the registry, vault and mock USDC wasm, the auction contract, and the WASI module (run under Node's WASI). Simulated in the tests: OutLayer itself (`contracts/mock-outlayer`), and all money is mock USDC.
+- Real in the tests: the registry, vault and mock USDC wasm, the auction contract, and the WASI module (run under Node's WASI). Simulated in the tests: OutLayer itself (`contracts/mock-outlayer`), and all money is mock USDC. The real OutLayer has never been called by this auction. The first real run is a rehearsal on a demo share (DEPLOY_PLAN 17f to 17k).
 - Bid secrecy rests on the TEE and on OutLayer's operators. OutLayer's own docs describe single operator keys today (UNVERIFIED for testnet). A NEAR contract cannot verify an attestation; verification is off chain with `outlayer-verify`.
-- The contract has no admin method. A bug can only be fixed while the auction account's full-access key exists.
+- The contract bounds the answer, it does not verify it. Whoever controls the OutLayer answer can name any bidder as winner at any price between the reserve and `max_deposit`: a winner can be charged the full deposit, or the seller paid only the reserve, and the contract cannot tell. Money is not fully safe against a bad operator; the loss is capped by `max_deposit` per bidder and the share. There is no on-chain fix.
+- The contract has no admin method. A bug can only be fixed while the auction account's full-access key exists, and while the key exists its holder can claim vault money of listed shares and move all escrow. Delete the key only after the rehearsal and any fix.
+- The TEE public key is stored once and is permanent. If the master secret were ever replaced, every bid sealed to the old key would be unreadable.
 - Unclaimed vault money travels with the share, like any registry transfer. Sellers should claim before they list.
-- Not yet proven on testnet (UNVERIFIED): that OutLayer accepts a hash-bound secret for a WasmUrl run, the fee for one settle (the `estimate_execution_cost` view gave 0.0040001 NEAR for the default limits on 2026-11-14 UTC), and that the dashboard can build the tightest access condition.
+- Junk bids with a valid deposit can fill the eight slots; each needs its own credentialed member and the deposit is refunded in full (T-A17).
+- If OutLayer rejects a request up front, the settle deposit stays in the auction balance.
+- Not yet proven on testnet (UNVERIFIED): that the live worker sets `NEAR_PREDECESSOR_ID` for a direct WasmUrl run and the live keystore enforces `Predecessor`; that the dashboard can build the tightest access condition; that OutLayer accepts a hash-bound secret for a WasmUrl run; the fee for one settle (the `estimate_execution_cost` view gave 0.0040001 NEAR for the default limits on 2026-11-14 UTC); the answer shape OutLayer really returns. Verified by a view call on 2026-11-14 UTC: the deployed `outlayer.testnet` accepts and prices an access condition of the target shape.
 
-Tests: 38 contract unit tests, 10 WASI host tests, 12 Node tests, 11 sandbox tests (`contracts/tests/tests/auction.rs`, a01 to a11, including one with eight bids at 300 Tgas). Threat rows T-A1 to T-A12 are in [THREAT_MODEL.md](THREAT_MODEL.md).
+Gas, measured in the sandbox with eight valid bids of the largest size the contract accepts (512 characters each) and 230 Tgas attached: the settle receipt burnt 4.1 Tgas, the answer callback `on_settled` 3.2 Tgas, the delivery callback `on_delivered` 3.9 Tgas, 18.9 Tgas for the whole transaction. The answer callback has 120 Tgas and must leave 85 Tgas for the two promises it creates.
+
+Tests: 46 contract unit tests, 12 WASI host tests, 15 Node tests, 14 sandbox tests (`contracts/tests/tests/auction.rs`, a01 to a14: a11 eight bids at 300 Tgas, a12 eight maximum size ciphertexts at 230 Tgas, a13 a direct request from another caller is refused, a14 a delivery callback that cannot commit is reconciled).
 
 ## Roadmap
 
