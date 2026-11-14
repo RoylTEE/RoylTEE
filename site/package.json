@@ -10,7 +10,8 @@
     "typecheck": "astro check",
     "test:samples": "vitest run tests/samples.test.ts",
     "scan:wording": "node scripts/check-wording.mjs",
-    "sync:evidence": "node scripts/sync-evidence.mjs && node scripts/sync-auction.mjs && node scripts/sync-whitepaper.mjs"
+    "sync:evidence": "node scripts/sync-evidence.mjs && node scripts/sync-auction.mjs && node scripts/sync-whitepaper.mjs",
+    "test:tour": "node tests/e2e/tour.e2e.mjs"
   },
   "keywords": [],
   "author": "RoylTEE Labs <dev@royltee.invalid>",
@@ -25,6 +26,7 @@
     "astro": "^7.4.11",
     "gsap": "^3.15.1",
     "near-api-js": "^7.5.3",
+    "playwright-core": "^1.65.1",
     "typescript": "^6.0.3",
     "vitest": "^5.1.0",
     "wasmoon": "1.16.0"

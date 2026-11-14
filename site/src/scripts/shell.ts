@@ -1,4 +1,4 @@
-export {};
+import { initTour } from './tour.ts';
 /**
  * App shell behaviour, loaded as an external module (no inline scripts):
  * 1. the mobile menu drawer, 2. hash tabs inside an area, 3. "Show all" toggles.
@@ -70,3 +70,6 @@ for (const b of document.querySelectorAll<HTMLButtonElement>('[data-expand]')) {
     b.textContent = open ? 'Show latest 5' : label;
   });
 }
+
+// 4. Guided tour (src/scripts/tour.ts). Last, so the tabs above already answer a hash the tour sets.
+initTour();

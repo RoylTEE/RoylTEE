@@ -7,6 +7,7 @@
 import '@fontsource-variable/hanken-grotesk';
 import '@fontsource-variable/jetbrains-mono';
 import '../styles/global.css';
+import '../styles/tour.css';
 import Logo from '../components/Logo.astro';
 import RegistryHeader from '../components/RegistryHeader.astro';
 import { PROJECT_NAME } from '../consts';
@@ -34,6 +35,7 @@ const cspNonce = Astro.locals.cspNonce;
       <a href="/" class="app-logo" aria-label={`${PROJECT_NAME} home`}><Logo /></a>
       <span class="badge ok app-net">NEAR testnet</span>
       <span class="app-note">Live demo with Mock USDC for payments.</span>
+      <button class="btn sm quiet app-tour" type="button" data-tour-start>Take the tour</button>
       <a class="btn sm app-cta" href="/whitepaper">Whitepaper</a>
     </header>
     <div class="app-body">
@@ -59,6 +61,7 @@ const cspNonce = Astro.locals.cspNonce;
         <div class="side-foot">
           <p class="caption">Registry contract</p>
           <a class="acct-link" href={accountUrl(REGISTRY)} target="_blank" rel="noopener">{REGISTRY}</a>
+          <button class="btn sm quiet side-tour" type="button" data-tour-start>Take the tour</button>
           <a class="side-back" href="/">Back to the project site</a>
         </div>
       </nav>
@@ -82,7 +85,8 @@ const cspNonce = Astro.locals.cspNonce;
   .app-top { position: sticky; top: 0; z-index: 50; height: var(--top); display: flex; align-items: center; gap: var(--s3); padding: 0 var(--s5); background: var(--surface); border-bottom: 1px solid var(--edge); }
   .app-logo { display: inline-flex; align-items: center; min-height: 2.75rem; text-decoration: none; }
   .app-note { font-size: var(--fs-14); color: var(--muted); }
-  .app-cta { margin-left: auto; }
+  .app-tour { margin-left: auto; }
+  .app-cta { margin-left: 0; }
   .app-body { display: grid; grid-template-columns: var(--side) minmax(0, 1fr); min-height: calc(100vh - var(--top)); }
   .side { position: sticky; top: var(--top); align-self: start; height: calc(100vh - var(--top)); overflow-y: auto; background: var(--paper-2); border-right: 1px solid var(--edge); padding: var(--s5) var(--s3) var(--s5); display: flex; flex-direction: column; gap: var(--s5); }
   .side-head { display: none; }
@@ -100,6 +104,7 @@ const cspNonce = Astro.locals.cspNonce;
   .side-foot { margin-top: auto; display: grid; gap: var(--s1); padding: var(--s4) var(--s3) 0; border-top: 1px solid var(--edge); }
   .side-back { display: inline-flex; align-items: center; min-height: 2.75rem; font-size: var(--fs-14); }
   .side-backdrop { display: none; }
+  .side-tour { display: none; justify-self: start; padding-left: 0; }
   .app-main { min-width: 0; display: flex; flex-direction: column; }
   .app-content { padding: var(--s6) var(--s6) var(--s7); display: grid; gap: var(--s5); align-content: start; max-width: 88rem; width: 100%; flex: 1; }
   .app-content h2 { font-size: var(--fs-22); }
@@ -109,10 +114,12 @@ const cspNonce = Astro.locals.cspNonce;
   .bars, .bars::before, .bars::after { position: absolute; left: .8rem; right: .8rem; height: 2px; background: var(--ink); content: ''; }
   .bars { top: 50%; margin-top: -1px; } .bars::before { left: 0; right: 0; top: -6px; } .bars::after { left: 0; right: 0; top: 6px; }
   @media (max-width: 1199px) { .app-note { display: none; } }
+  @media (max-width: 575px) { .app-tour { display: none; } .app-cta { margin-left: auto; } }
   @media (max-width: 991px) {
     body.app { --side: min(20rem, 86vw); }
     .app-top { padding: 0 var(--s3); }
     .menu-btn { display: block; }
+    .side-tour { display: inline-flex; }
     .app-body { grid-template-columns: minmax(0, 1fr); }
     .side { position: fixed; z-index: 70; top: 0; left: 0; bottom: 0; height: 100%; width: var(--side); transform: translateX(-102%); visibility: hidden; transition: transform .2s ease, visibility 0s linear .2s; box-shadow: var(--shadow-2); padding-top: var(--s3); }
     body[data-menu="open"] .side { transform: none; visibility: visible; transition: transform .2s ease; }

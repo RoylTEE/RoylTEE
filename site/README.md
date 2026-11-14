@@ -12,7 +12,10 @@ npm test            # unit and API tests, model and RPC mocked
 npm run typecheck   # astro check
 npm run build       # output in .vercel/output
 npm run scan:wording
+npm run test:tour   # Playwright walk of the guided tour, desktop and phone (start `npm run dev` first)
 ```
+
+The app has a guided tour (`src/data/tour.ts`, `src/scripts/tour.ts`). It starts on the first visit to `/dashboard`, restarts from Take the tour, and only reads: it never connects a wallet or sends a transaction. `npm run test:tour` walks every step at 1280x800 and 390x844 against `TOUR_BASE` (default `http://127.0.0.1:4321`); set `TOUR_SHOTS_DIR` to save a screenshot per step.
 
 Local dev with the API: copy `.env.example` to `.env`, set `STORAGE_MODE=memory`, `ALLOWED_ORIGINS=http://127.0.0.1:4321`, and two random 32+ character values for `CHAT_HMAC_SECRET` and `SESSION_SECRET`, then `npm run dev`. Without `NEARAI_API_KEY` the chat says it is not configured.
 
