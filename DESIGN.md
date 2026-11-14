@@ -708,7 +708,7 @@ Events added: `dispute_opened` (kind overallocation: group, claimant, contested)
 
 The registry wasm is 674336 bytes after block 4 (614394 after block 3), about 6.7 NEAR of code storage at 1e19 yoctoNEAR per byte (UNVERIFIED on testnet). The audit fixes (AUDIT.md M1, L1) bring it to 674606 bytes, about 6.75 NEAR (UNVERIFIED on testnet). The mock USDC wasm is 181587 bytes, about 1.82 NEAR. Sizes are without wasm-opt; DEPLOY_PLAN.md budgets the measured values plus a margin.
 
-## 19. Contract review fixes as built (2026-11-13, branch `fix/contract-review`, not deployed)
+## 19. Contract review fixes as built (2026-11-13, branch `fix/contract-review`, on testnet since step 15)
 
 Every change keeps the stored layout of the root struct and of `Work`, `Share`, `Ledger`, `Group`, `Dispute` and `AgentRole` as it is on testnet. New per-record data lives in raw storage slots with ASCII prefixes, which cannot collide with the collection prefixes or the `STATE` key: every collection prefix is the Borsh index of the `Key` enum, one byte from 0x00 to 0x0D, `NonFungibleToken` builds its inner keys from those same bytes, and its per-owner sets start with the Borsh index of its own small `StorageKey` enum, so every collection key starts with a byte below 0x10, while the raw slots start with `a` (0x61) or `l` (0x6C) (review 03a I3): `apv:<token_id>` (approval) and `l2t:<agent>` (window tail). A missing slot means the old behaviour (approved, no tail), so the registry can be redeployed in place without a migration.
 

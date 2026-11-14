@@ -36,12 +36,15 @@ Testnet only. Real money spent so far: zero, except the two NEAR AI Cloud help-c
 | 2026-11-13 21:35 | Demo write W13. Share `s12` on work 5, 5000 bps, basis `copyright`, holder writer-a (`GJopxb2zVGHNEgSUq9RKFHA3wmBYjcyM4wVmhZH5NcKd`, 0.5 NEAR attached). Fee 0.0088117648705073 NEAR, paid by writer-a. | testnet | 0.5 NEAR attached (net of refunds stays as vault and registry storage); 0.0088117648705073 NEAR fee | 0 | owner |
 | 2026-11-13 21:36 | Demo write W14. Share `s13` on work 5, 5000 bps, basis `copyright`, holder writer-b, registered by writer-a (`FR5SZZWyr9dfQdpkxDTQamQXXoRKG6SPTPwK7NU21W1P`, 0.5 NEAR attached). Fee 0.0086964887749001 NEAR, paid by writer-a. | testnet | 0.5 NEAR attached (net of refunds stays as vault and registry storage); 0.0086964887749001 NEAR fee | 0 | owner |
 | 2026-11-13 21:37 | Demo write W15. The agent paid work 5 with extra `payee` and `receiver_id` arguments naming outsider. The contract ignored them: 50000 to `s12`, 50000 to `s13`, 0 to outsider, line `agent-line-3` (`CUW8qssJVCJZuUgzzWHf9bdEyNCkFXpQjUKrJeWXeVPS`, no deposit). Read back after: `get_role` allowance 200000. Fee 0.0014110227723242 NEAR, paid from the agent key's gas allowance. | testnet | 0.0014110227723242 NEAR fee | 0 | owner |
+| 2026-11-14 02:43 | Audit redeploy. Registry redeployed in place with the audit fix F1 (forward gas budget) on top of the review fixes, no init call (`BGBUJDTnnjpevSUZkdmfeVASxbKHn1FQDAZqj75kH5rU`, block 277597324, signer `reg.royltee-dev.testnet`, full-access key). Code hash now `5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo` (sha256 `423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a`, 712958 bytes). Vault code hash unchanged (`9e9ef978...`). Fee 0.0051480829649394 NEAR, paid by the registry account, read from NEAR RPC `EXPERIMENTAL_tx_status` (sum of `tokens_burnt`). | testnet | 0.0051480829649394 NEAR fee | 0 | owner, 2026-11-14 |
 
-All 50 on-chain transaction ids are in `deployments/testnet.json`. Combined gas fees for steps 1 to 13: 0.1667600075050178 NEAR, of which 0.0213449686125 NEAR was paid by the faucet. Real money: 0, aside from the UNVERIFIED inference estimates above.
+All 67 on-chain transaction ids (steps 1 to 13, step 15, demo writes W1 to W15 and the audit redeploy) are in `deployments/testnet.json`. Combined gas fees for steps 1 to 13: 0.1667600075050178 NEAR, of which 0.0213449686125 NEAR was paid by the faucet. Real money: 0, aside from the UNVERIFIED inference estimates above.
 
-Step 15 and demo writes W1 to W15 (2026-11-13, 18:54 to 21:37 UTC): 16 transactions. Each fee above is the sum of `tokens_burnt` over the transaction outcome and every receipt outcome, read with the RPC method `EXPERIMENTAL_tx_status`. Step 15 fee 0.0051482685683912 NEAR. Demo writes W1 to W15: 0.059206177475603 NEAR in total (writer-a 0.0533113548569173, pay-agent 0.0030603638566265, payer 0.0017066749198462, buyer-pub 0.0009080902076662, writer-b 0.0002196936345468). Together 0.0643544460439942 NEAR. W2 and W11 are refusals by design and still paid gas. These 16 transaction ids are not in `deployments/testnet.json` yet; that record is resynced in a later step.
+Step 15 and demo writes W1 to W15 (2026-11-13, 18:54 to 21:37 UTC): 16 transactions. Each fee above is the sum of `tokens_burnt` over the transaction outcome and every receipt outcome, read with the RPC method `EXPERIMENTAL_tx_status`. Step 15 fee 0.0051482685683912 NEAR. Demo writes W1 to W15: 0.059206177475603 NEAR in total (writer-a 0.0533113548569173, pay-agent 0.0030603638566265, payer 0.0017066749198462, buyer-pub 0.0009080902076662, writer-b 0.0002196936345468). Together 0.0643544460439942 NEAR. W2 and W11 are refusals by design and still paid gas.
 
-Native NEAR balances at the time of this record (RPC `view_account`, 2026-11-13, about 07:55 UTC, block heights 277481803 to 277482071):
+Audit redeploy (2026-11-14 02:43 UTC): 0.0051480829649394 NEAR. With step 15 and the demo writes, 17 transactions since the first record and 0.0695025290089336 NEAR in fees.
+
+Native NEAR balances at the time of the first record (RPC `view_account`, 2026-11-13, about 07:55 UTC, block heights 277481803 to 277482071). The current balances are in the table after this one.
 
 | Account | Balance (NEAR) |
 |---|---|
@@ -64,3 +67,33 @@ Native NEAR balances at the time of this record (RPC `view_account`, 2026-11-13,
 | s5.reg.royltee-dev.testnet | 0.1 |
 | s6.reg.royltee-dev.testnet | 0.1 |
 | s7.reg.royltee-dev.testnet | 0.1 |
+
+Native NEAR balances after the audit redeploy (RPC `view_account`, finality final, read on 2026-11-14 at 02:50 UTC, block heights 277597550 to 277597890). The root account is 2.5092643705036522 NEAR lower than in the first table because of the OutLayer probe spike (2.5 NEAR to create `probe.royltee-dev.testnet`, fees and the OutLayer charge), which is logged on branch `spike/outlayer`, not here.
+
+| Account | Balance (NEAR) |
+|---|---|
+| royltee-dev.testnet | 6.4337710766838478 |
+| royltee-fund-1.testnet | 0.0999553634875 |
+| royltee-fund-2.testnet | 0.0999553634875 |
+| reg.royltee-dev.testnet | 8.315306342985943199999993 |
+| usdc.royltee-dev.testnet | 2.520986807902146000000021 |
+| registrar.royltee-dev.testnet | 0.986350948137074199999999 |
+| writer-a.royltee-dev.testnet | 2.471380728471753499999999 |
+| writer-b.royltee-dev.testnet | 1.372028146699916799999999 |
+| buyer-pub.royltee-dev.testnet | 1.390207925673098399999997 |
+| pay-agent.buyer-pub.royltee-dev.testnet | 0.4949965463330013 |
+| payer.royltee-dev.testnet | 0.991778085500914199999995 |
+| outsider.royltee-dev.testnet | 0.799100726232201 |
+| s1.reg.royltee-dev.testnet | 0.099999999999999999999999 |
+| s2.reg.royltee-dev.testnet | 0.099999999999999999999998 |
+| s3.reg.royltee-dev.testnet | 0.1 |
+| s4.reg.royltee-dev.testnet | 0.1 |
+| s5.reg.royltee-dev.testnet | 0.1 |
+| s6.reg.royltee-dev.testnet | 0.1 |
+| s7.reg.royltee-dev.testnet | 0.1 |
+| s8.reg.royltee-dev.testnet | 0.1 |
+| s9.reg.royltee-dev.testnet | 0.1 |
+| s10.reg.royltee-dev.testnet | 0.1 |
+| s11.reg.royltee-dev.testnet | 0.1 |
+| s12.reg.royltee-dev.testnet | 0.1 |
+| s13.reg.royltee-dev.testnet | 0.1 |
