@@ -24,13 +24,14 @@ function liveKeys(a) {
 function chain(change = {}) {
   const tokenIds = change.tokens || Object.keys(owners);
   const tokens = tokenIds.map((id) => ({ token_id: id, owner_id: owners[id] || 'someone.testnet', metadata: { extra: JSON.stringify({ vault: `${id}.${reg.account_id}`, status: 'active', earned: '0', paid_out: '0' }) } }));
-  const vaultHash = accounts.find((a) => a.variable === 'S1').code_hash_base58;
+  const vaultHash = record.wasm.vault.on_chain_code_hash_base58;
   return {
     keys: (id) => (change.keys && change.keys[id]) || liveKeys(record.accounts[id] || { keys: [] }),
     account: (id) => ({ code_hash: (record.accounts[id] && record.accounts[id].code_hash_base58) || vaultHash }),
     nft_tokens: ({ from_index, limit }) => tokens.slice(Number(from_index), Number(from_index) + limit),
     get_accounting: () => change.accounting || { allowance_total: '0', unallocated_total: '0', escrow_total: '400000', undelivered_total: '0', forwards_in_flight_total: '0' },
     ft_balance_of: () => '400000',
+    get_vault_code_hash: () => change.vaultCode || record.wasm.vault.on_chain_sha256,
   };
 }
 
@@ -71,17 +72,19 @@ test('passes on a chain that matches the record', async () => {
 });
 
 test('fails on a token that is not in the record, and checks its vault', async () => {
-  const r = await run(chain({ tokens: [...Object.keys(owners), 's8'] }));
+  const extra = `s${Object.keys(owners).length + 1}`;
+  const r = await run(chain({ tokens: [...Object.keys(owners), extra] }));
   assert.equal(r.code, 1);
-  assert.match(r.text, /token s8 .*not in token_owners/);
-  assert.match(r.text, /s8\.reg\.royltee-dev\.testnet has 0 access keys \(found through the token/);
+  assert.match(r.text, new RegExp(`token ${extra} .*not in token_owners`));
+  assert.match(r.text, new RegExp(`${extra}\\.reg\\.royltee-dev\\.testnet has 0 access keys \\(found through the token`));
+  assert.match(r.text, new RegExp(`${extra}\\.reg\\.royltee-dev\\.testnet code hash ${record.wasm.vault.on_chain_code_hash_base58} matches`));
 });
 
 test('reads tokens past the first page of 100', async () => {
   const many = [...Object.keys(owners), ...Array.from({ length: 120 }, (_, i) => `x${i}`)];
   const r = await run(chain({ tokens: many }));
   assert.equal(r.code, 1);
-  assert.match(r.text, /nft_tokens read to the end: 127 token/);
+  assert.match(r.text, new RegExp(`nft_tokens read to the end: ${Object.keys(owners).length + 120} token`));
   assert.match(r.text, /token x119 /);
 });
 
@@ -118,4 +121,17 @@ test('fails when the agent key gains a method', async () => {
   const r = await run(chain({ keys: { [a.account_id]: [{ public_key: k.public_key, access_key: { nonce: 1, permission: { FunctionCall: { allowance: '1', receiver_id: k.contract, method_names: [...k.methods, 'claim'] } } } }] } }));
   assert.equal(r.code, 1);
   assert.match(r.text, /pay-agent\.buyer-pub\.royltee-dev\.testnet has key not in the record/);
+});
+
+test('fails when the registry embeds a vault build that is not the recorded one', async () => {
+  const r = await run(chain({ vaultCode: record.wasm.vault.earlier_builds[0].sha256 }));
+  assert.equal(r.code, 1);
+  assert.match(r.text, /get_vault_code_hash 973b2cbd\w+, record wasm\.vault says 9e9ef978/);
+});
+
+test('fails when a vault keeps a code hash other than the recorded one', async () => {
+  const s8 = record.accounts['s8.reg.royltee-dev.testnet'];
+  const r = await run({ ...chain(), account: (id) => ({ code_hash: id === s8.account_id ? record.wasm.vault.earlier_builds[0].on_chain_code_hash_base58 : record.accounts[id].code_hash_base58 }) });
+  assert.equal(r.code, 1);
+  assert.match(r.text, /s8\.reg\.royltee-dev\.testnet code hash BBLu\w+, record says BgC1pQ/);
 });

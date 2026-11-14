@@ -14,7 +14,10 @@
 //     Each token must be in token_owners in the record, name its own vault
 //     s<N>.REG, and have the recorded owner (for example s2 after the catalog
 //     sale). Each recorded token and vault must be found on chain.
-//  5. solvency: all five accounting counters must be present as nonnegative
+//  5. the vault code the registry deploys at mint (get_vault_code_hash) equals
+//     wasm.vault in the record, and the registry code hash in the record agrees
+//     with wasm.registry (T13)
+//  6. solvency: all five accounting counters must be present as nonnegative
 //     integers, and their sum must be <= the registry's mock USDC balance (T31)
 //
 // RPC endpoint: NEAR_RPC_URL, default https://rpc.testnet.near.org.
@@ -36,7 +39,10 @@ const usdc = byVar('USDC');
 const agent = byVar('AGENT');
 const vaults = Object.values(accounts).filter((a) => /^S\d+$/.test(a.variable));
 const owners = (record.token_owners && record.token_owners.owners) || {};
-const vaultCodeHash = vaults.length > 0 ? vaults[0].code_hash_base58 : undefined;
+// A vault that is not in the record was minted by the current registry, so it
+// should carry the vault code that registry embeds.
+const wasmVault = (record.wasm && record.wasm.vault) || {};
+const vaultCodeHash = wasmVault.on_chain_code_hash_base58 || (vaults.length > 0 ? vaults[0].code_hash_base58 : undefined);
 
 let failures = 0;
 const pass = (msg) => console.log(`PASS  ${msg}`);
@@ -110,6 +116,15 @@ for (const c of [reg, usdc]) {
     ? pass(`${c.account_id} code hash ${acc.code_hash} matches the record`)
     : fail(`${c.account_id} code hash ${acc.code_hash}, record says ${c.code_hash_base58}`);
 }
+
+const wasmReg = (record.wasm && record.wasm.registry) || {};
+wasmReg.on_chain_code_hash_base58 === reg.code_hash_base58
+  ? pass(`record agrees with itself: wasm.registry and ${reg.account_id} both say ${reg.code_hash_base58}`)
+  : fail(`record disagrees: wasm.registry says ${wasmReg.on_chain_code_hash_base58}, accounts say ${reg.code_hash_base58}`);
+const embedded = await view(reg.account_id, 'get_vault_code_hash');
+embedded === wasmVault.on_chain_sha256
+  ? pass(`${reg.account_id} get_vault_code_hash ${embedded} matches wasm.vault in the record`)
+  : fail(`${reg.account_id} get_vault_code_hash ${embedded}, record wasm.vault says ${wasmVault.on_chain_sha256}`);
 
 for (const c of [reg, usdc, agent].filter(Boolean)) {
   const live = (await keyList(c.account_id)).map(liveKey).sort();
