@@ -100,7 +100,7 @@ describe('F-16 per-client limits run before shared daily budgets', () => {
     for (let i = 4; i <= 12; i++) expect(await send(`2001:db8:0:7::${i.toString(16)}`)).toBe(429);
     expect(t.modelCalls).toHaveLength(3);
     expect(await t.store.get(`rate:chat:ip:${clientKey('2001:db8:0:7::1', t.config.sessionSecret)}`)).toBe(3);
-    expect(await t.store.get(`rate:chat:global:${today()}`)).toBe(3);
+    expect(await t.store.get(`rate:chat:global:${budgetDay(t.clock.now)}`)).toBe(3);
     expect(await send('2001:db8:0:8::1')).toBe(200);
   });
 });
