@@ -63,6 +63,11 @@ pub struct AuctionRec {
     pub delivering_since: U64,
     /// When the share's return to the seller started (`returning`).
     pub returning_since: U64,
+    /// Id of the delivery attempt in flight or last made (0 before any).
+    /// Callbacks and operator calls must carry it; a stale id is a no-op.
+    pub delivery_op: u64,
+    /// Id of the share return in flight or last made (0 before any).
+    pub return_op: u64,
     /// True while this contract still holds the share.
     pub share_held: bool,
     /// True while a transfer of the share back to the seller is in flight.
@@ -116,6 +121,16 @@ pub struct Accounting {
     pub open_auctions: u32,
     /// NEAR (yocto) the contract must keep free for each open auction.
     pub reserve_per_auction: U128,
+}
+
+/// One page of `get_auctions`: the live auctions found and where to continue.
+#[near(serializers = [json])]
+pub struct AuctionPage {
+    pub items: Vec<AuctionView>,
+    /// Next id to ask for, or null at the end of the list. Ids of deleted
+    /// records are skipped, but at most `MAX_SCAN` ids are looked at per call,
+    /// so a page can hold fewer than `limit` items and still have a cursor.
+    pub next: Option<U64>,
 }
 
 /// A withdrawal that was sent and has not reported back yet. Kept so a lost

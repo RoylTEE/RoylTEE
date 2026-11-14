@@ -78,6 +78,8 @@ pub const STORAGE_RESERVE_BYTES: u64 = 8_000;
 /// key and refuses a settle request that names another version or another
 /// key, so a changed master secret fails loudly instead of ending in no sale.
 pub const KEY_VERSION: u64 = 1;
+/// Most ids `get_auctions` looks at in one call.
+pub const MAX_SCAN: u64 = 200;
 /// Most accounts one `withdraw` call pays.
 pub const MAX_WITHDRAW: usize = 9;
 /// Longest OutLayer answer read in the callback, in bytes.
@@ -140,6 +142,8 @@ pub struct AuctionContract {
     pending: LookupMap<u64, Pending>,
     next_pending: u64,
     pending_total: u128,
+    /// Last operation id handed out (deliveries and returns).
+    next_op: u64,
 }
 
 #[near]
@@ -189,6 +193,7 @@ impl AuctionContract {
             pending: LookupMap::new(StorageKey::Pending),
             next_pending: 0,
             pending_total: 0,
+            next_op: 0,
         }
     }
 
@@ -218,13 +223,24 @@ impl AuctionContract {
         self.auctions.get(&auction_id.0).map(AuctionView::from)
     }
 
-    pub fn get_auctions(&self, from_index: Option<U64>, limit: Option<u64>) -> Vec<AuctionView> {
+    /// Live auctions from `from_index`, at most `limit` (50 at most), looking
+    /// at no more than `MAX_SCAN` ids. Deleted records leave holes in the id
+    /// space, so use `next` to continue, not the page length.
+    pub fn get_auctions(&self, from_index: Option<U64>, limit: Option<u64>) -> AuctionPage {
         let from = from_index.map_or(0, |v| v.0);
-        let limit = limit.unwrap_or(20).min(50);
-        (from..self.next_id)
-            .take(limit as usize)
-            .filter_map(|i| self.auctions.get(&i).map(AuctionView::from))
-            .collect()
+        let limit = limit.unwrap_or(20).clamp(1, 50) as usize;
+        let mut items = Vec::new();
+        let mut i = from;
+        while i < self.next_id && i < from + MAX_SCAN && items.len() < limit {
+            if let Some(a) = self.auctions.get(&i) {
+                items.push(AuctionView::from(a));
+            }
+            i += 1;
+        }
+        AuctionPage {
+            items,
+            next: (i < self.next_id).then_some(U64(i)),
+        }
     }
 
     /// The active auction that holds this share, if any.
@@ -287,6 +303,40 @@ impl AuctionContract {
     pub(crate) fn free_balance(&self) -> NearToken {
         let locked = env::storage_byte_cost().saturating_mul(u128::from(env::storage_usage()));
         env::account_balance().saturating_sub(locked)
+    }
+
+    /// A new operation id (delivery or return), never 0 and never reused.
+    pub(crate) fn new_op(&mut self) -> u64 {
+        self.next_op += 1;
+        self.next_op
+    }
+
+    /// Removes the token index entry only if it still points at this auction
+    /// (a newer auction of the same share must keep its entry).
+    pub(crate) fn release_token(&mut self, token_id: &str, auction_id: u64) {
+        if self.token_auction.get(token_id) == Some(&auction_id) {
+            self.token_auction.remove(token_id);
+        }
+    }
+
+    /// The share is out of this contract's hands for good: stop holding it,
+    /// release its index entry, and drop the record of an auction that never
+    /// had a bid (nothing is owed to anyone, so nothing needs auditing).
+    pub(crate) fn share_out(&mut self, id: u64, event: &str, owner: Option<&str>) {
+        let (token_id, reclaim) = {
+            let a = self.auction_mut(id);
+            a.share_held = false;
+            a.returning = false;
+            (
+                a.token_id.clone(),
+                a.status == Status::Cancelled && a.bids.is_empty(),
+            )
+        };
+        self.release_token(&token_id, id);
+        emit(event, json!({ "auction_id": U64(id), "owner": owner }));
+        if reclaim {
+            self.auctions.remove(&id);
+        }
     }
 
     /// NEAR kept free for each accepted auction until it finishes.

@@ -172,10 +172,12 @@ impl AuctionContract {
                 let winner: AccountId = winner
                     .parse()
                     .unwrap_or_else(|_| env::panic_str("winner checked above"));
+                let op = self.new_op();
                 let token_id = {
                     let a = self.auction_mut(auction_id);
                     a.status = Status::Delivering;
                     a.delivering_since = U64(env::block_timestamp());
+                    a.delivery_op = op;
                     a.winner = Some(winner.clone());
                     a.price = Some(U128(price));
                     a.token_id.clone()
@@ -199,7 +201,7 @@ impl AuctionContract {
                         Self::ext(env::current_account_id())
                             .with_static_gas(GAS_DELIVERED_CB)
                             .with_unused_gas_weight(0)
-                            .on_delivered(auction_id),
+                            .on_delivered(auction_id, op),
                     );
                 true
             }
@@ -210,9 +212,13 @@ impl AuctionContract {
     /// Failure (winner not an active member any more, dispute freeze, ...):
     /// cancel, refund every deposit and send the share back.
     #[private]
-    pub fn on_delivered(&mut self, auction_id: u64) -> bool {
+    pub fn on_delivered(&mut self, auction_id: u64, op: u64) -> bool {
+        // Only the callback of the delivery attempt that is still current.
         let live = self.auctions.get(&auction_id).is_some_and(|a| {
-            a.status == Status::Delivering && a.winner.is_some() && a.price.is_some()
+            a.status == Status::Delivering
+                && a.delivery_op == op
+                && a.winner.is_some()
+                && a.price.is_some()
         });
         if !live {
             return false;
@@ -283,7 +289,7 @@ impl AuctionContract {
             a.share_held = false;
             a.token_id.clone()
         };
-        self.token_auction.remove(&token_id);
+        self.release_token(&token_id, auction_id);
         self.finish_record(auction_id);
         emit(
             "auction_sold",

@@ -681,7 +681,7 @@ fn a_delivered_share_pays_seller_winner_and_losers() {
         after_end(),
         PromiseResult::Successful(vec![]),
     );
-    assert!(c.on_delivered(0));
+    assert!(c.on_delivered(0, c.auction(0).delivery_op));
     let a = c.auction(0);
     assert_eq!(a.status, Status::Sold);
     assert!(!a.share_held);
@@ -697,7 +697,7 @@ fn a_delivered_share_pays_seller_winner_and_losers() {
 fn a_refused_delivery_cancels_refunds_all_and_returns_the_share() {
     let mut c = delivering();
     ctx_result("auction.root.testnet", after_end(), PromiseResult::Failed);
-    assert!(!c.on_delivered(0));
+    assert!(!c.on_delivered(0, c.auction(0).delivery_op));
     let a = c.auction(0);
     assert_eq!(a.status, Status::Cancelled);
     assert!(a.share_held && a.returning);
@@ -715,7 +715,7 @@ fn on_delivered_outside_delivering_does_nothing() {
         T0,
         PromiseResult::Successful(vec![]),
     );
-    assert!(!c.on_delivered(0));
+    assert!(!c.on_delivered(0, c.auction(0).delivery_op));
     assert_eq!(c.auction(0).status, Status::Open);
     assert_eq!(c.owed_total, 0);
 }
@@ -724,9 +724,9 @@ fn on_delivered_outside_delivering_does_nothing() {
 fn a_failed_share_return_can_be_retried() {
     let mut c = delivering();
     ctx_result("auction.root.testnet", after_end(), PromiseResult::Failed);
-    c.on_delivered(0);
+    c.on_delivered(0, c.auction(0).delivery_op);
     ctx_result("auction.root.testnet", after_end(), PromiseResult::Failed);
-    assert!(!c.on_returned(0));
+    assert!(!c.on_returned(0, c.auction(0).return_op));
     let a = c.auction(0);
     assert!(a.share_held && !a.returning);
     assert_eq!(c.auction_for_token("s1".into()), Some(U64(0)));
@@ -742,7 +742,7 @@ fn a_failed_share_return_can_be_retried() {
         after_end() + 101 * SEC,
         PromiseResult::Successful(vec![]),
     );
-    assert!(c.on_returned(0));
+    assert!(c.on_returned(0, c.auction(0).return_op));
     assert!(!c.auction(0).share_held);
     assert_eq!(c.auction_for_token("s1".into()), None);
 }
@@ -892,7 +892,7 @@ fn sold() -> AuctionContract {
         after_end(),
         PromiseResult::Successful(vec![]),
     );
-    c.on_delivered(0);
+    c.on_delivered(0, c.auction(0).delivery_op);
     c
 }
 
@@ -1187,35 +1187,35 @@ fn reconcile_waits_fifteen_minutes_and_only_for_stuck_states() {
     });
 }
 
-/// The delivery callback was lost and the registry says the share never left.
+fn reconciled_logs_contain(event: &str) -> bool {
+    get_logs().iter().any(|l| l.contains(event))
+}
+
+const HASH_EV: &str = "ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12ab12";
+
+/// A stuck delivery: the winner is bob (price 30), carol lost.
+fn delivery_op(c: &AuctionContract) -> u64 {
+    c.auction(0).delivery_op
+}
+
+fn reconcile_with_owner(c: &mut AuctionContract, owner: &str) -> bool {
+    let op = delivery_op(c);
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + 20 * 60 * SEC,
+        nft_token_owner(owner),
+    );
+    c.on_reconciled(0, 0, op)
+}
+
+/// N-M1: the one case reconcile pays on its own: the winner holds the share
+/// and the delivery attempt's callback never arrived.
 #[test]
-fn a_lost_delivery_callback_is_reconciled_from_the_registry() {
+fn reconcile_pays_the_sale_only_when_the_winner_holds_the_share() {
     fresh(|| {
         let mut c = delivering();
-        ctx_result(
-            "auction.root.testnet",
-            after_end() + 20 * 60 * SEC,
-            nft_token_owner("auction.root.testnet"),
-        );
-        assert!(c.on_reconciled(0, 0));
-        let a = c.auction(0);
-        assert_eq!(a.status, Status::Cancelled);
-        assert!(a.share_held && a.returning, "the share is sent back");
-        assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX);
-        assert_eq!(c.get_owed(acc("carol.testnet")).0, MAX);
-        assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
-        assert_eq!(c.escrow_total, 0);
-        assert_eq!(c.owed_total, 2 * MAX);
-    });
-    // The registry says the winner holds it: the sale is paid.
-    fresh(|| {
-        let mut c = delivering();
-        ctx_result(
-            "auction.root.testnet",
-            after_end() + 20 * 60 * SEC,
-            nft_token_owner("bob.testnet"),
-        );
-        assert!(c.on_reconciled(0, 0));
+        assert!(reconcile_with_owner(&mut c, "bob.testnet"));
+        assert!(reconciled_logs_contain("\"reconciled\""));
         assert_eq!(c.auction(0).status, Status::Sold);
         assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
         assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX - 30_000_000);
@@ -1223,67 +1223,150 @@ fn a_lost_delivery_callback_is_reconciled_from_the_registry() {
         assert_eq!(c.owed_total, 2 * MAX);
         assert_eq!(c.escrow_total, 0);
         assert_eq!(c.auction_for_token("s1".into()), None);
-        // A late on_delivered after this does nothing.
+        // The late callback of the same attempt does nothing.
         ctx_result(
             "auction.root.testnet",
             after_end() + 21 * 60 * SEC,
             PromiseResult::Successful(vec![]),
         );
-        assert!(!c.on_delivered(0));
+        assert!(!c.on_delivered(0, delivery_op(&c)));
         assert_eq!(c.owed_total, 2 * MAX);
     });
-    // The share went on from the winner to someone else: still a paid sale.
-    fresh(|| {
-        let mut c = delivering();
-        ctx_result(
-            "auction.root.testnet",
-            after_end() + 20 * 60 * SEC,
-            nft_token_owner("third.testnet"),
-        );
-        assert!(c.on_reconciled(0, 0));
-        assert_eq!(c.auction(0).status, Status::Sold);
-    });
-    // The share is back with the seller: refund everyone, nothing to return.
-    fresh(|| {
-        let mut c = delivering();
-        ctx_result(
-            "auction.root.testnet",
-            after_end() + 20 * 60 * SEC,
-            nft_token_owner("seller.testnet"),
-        );
-        assert!(c.on_reconciled(0, 0));
-        let a = c.auction(0);
-        assert_eq!(a.status, Status::Cancelled);
-        assert!(!a.share_held && !a.returning);
-        assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
-        assert_eq!(c.owed_total, 2 * MAX);
-        assert_eq!(c.auction_for_token("s1".into()), None);
-    });
+    // Any other holder: nothing is paid, nothing is cancelled.
+    for owner in ["unrelated.testnet", "seller.testnet", "carol.testnet"] {
+        fresh(move || {
+            let mut c = delivering();
+            assert!(!reconcile_with_owner(&mut c, owner));
+            assert!(reconciled_logs_contain("reconcile_pending"));
+            assert_eq!(c.auction(0).status, Status::Delivering, "{owner}");
+            assert_eq!(c.owed_total, 0);
+            assert_eq!(c.escrow_total, 2 * MAX);
+        });
+    }
     // An unreadable registry answer changes nothing.
     fresh(|| {
         let mut c = delivering();
+        let op = delivery_op(&c);
         for bad in [PromiseResult::Failed, ok_bytes("null"), ok_bytes("{}")] {
             ctx_result("auction.root.testnet", after_end() + 20 * 60 * SEC, bad);
-            assert!(!c.on_reconciled(0, 0));
+            assert!(!c.on_reconciled(0, 0, op));
             assert_eq!(c.auction(0).status, Status::Delivering);
             assert_eq!(c.owed_total, 0);
         }
     });
 }
 
-/// The return callback was lost: `returning` would stay true forever.
+/// N-M2 and AR-1 case 3: a delivery that is only late is not cancelled and
+/// refunded by an early reconcile, so the winner cannot end up with both the
+/// share and the deposit.
 #[test]
-fn a_lost_return_callback_is_reconciled() {
-    fn returning() -> AuctionContract {
-        let mut c = delivering();
-        ctx_result("auction.root.testnet", after_end(), PromiseResult::Failed);
-        c.on_delivered(0);
-        let a = c.auction(0);
-        assert!(a.share_held && a.returning);
-        c
-    }
+fn a_delayed_delivery_is_not_cancelled_by_an_early_reconcile() {
+    let mut c = delivering();
+    // 15 minutes on, the registry still shows the share in the auction.
+    assert!(!reconcile_with_owner(&mut c, "auction.root.testnet"));
+    assert!(reconciled_logs_contain("reconcile_pending"));
+    let a = c.auction(0);
+    assert_eq!(a.status, Status::Delivering);
+    assert!(a.share_held && !a.returning);
+    assert_eq!(c.escrow_total, 2 * MAX);
+    assert_eq!(c.owed_total, 0);
+    // The delayed transfer lands: its own callback pays the sale.
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + 3600 * SEC,
+        PromiseResult::Successful(vec![]),
+    );
+    assert!(c.on_delivered(0, delivery_op(&c)));
+    assert_eq!(c.auction(0).status, Status::Sold);
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
+    assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX - 30_000_000);
+}
+
+/// AR-1 case 1: a registrar moves the share to an unrelated account. The
+/// winner never received it, so nothing is sold.
+#[test]
+fn ar1_case1_an_unrelated_holder_does_not_make_a_sale() {
+    let mut c = delivering();
+    assert!(!reconcile_with_owner(&mut c, "unrelated.testnet"));
+    assert_eq!(c.auction(0).status, Status::Delivering);
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
+    // The operator, from the receipt outcome (the transfer failed), cancels.
+    ctx("auction.root.testnet", after_end() + 3600 * SEC, 0);
+    let op = delivery_op(&c);
+    assert!(c
+        .resolve_delivery(U64(0), U64(op), false, HASH_EV.into())
+        .is_some());
+    assert_eq!(c.auction(0).status, Status::Cancelled);
+    assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX);
+    assert_eq!(c.get_owed(acc("carol.testnet")).0, MAX);
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
+}
+
+/// AR-1 case 2: the delivery succeeded, its callback was lost, and the winner
+/// sent the share back to the seller. Reconcile does not refund; the
+/// operator, knowing the transfer succeeded, pays the sale.
+#[test]
+fn ar1_case2_a_share_sent_back_by_the_winner_is_still_a_sale() {
+    let mut c = delivering();
+    assert!(!reconcile_with_owner(&mut c, "seller.testnet"));
+    assert_eq!(c.auction(0).status, Status::Delivering);
+    assert_eq!(c.owed_total, 0);
+    ctx("auction.root.testnet", after_end() + 3600 * SEC, 0);
+    let op = delivery_op(&c);
+    assert!(c
+        .resolve_delivery(U64(0), U64(op), true, HASH_EV.into())
+        .is_none());
+    assert_eq!(c.auction(0).status, Status::Sold);
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
+    assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX - 30_000_000);
+    assert_eq!(c.get_owed(acc("carol.testnet")).0, MAX);
+}
+
+/// A stuck return is never retried or cleared by reconcile, so a second
+/// return cannot start while the first may still execute, and the share
+/// cannot be listed again under it (AR-1 case 4).
+#[test]
+fn ar1_case4_a_pending_return_blocks_retry_and_relisting() {
+    let mut c = returning_stuck();
+    let op = c.auction(0).return_op;
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + 20 * 60 * SEC,
+        nft_token_owner("auction.root.testnet"),
+    );
+    assert!(!c.on_reconciled(0, 1, op));
+    assert!(reconciled_logs_contain("reconcile_pending"));
+    assert!(c.auction(0).returning && c.auction(0).share_held);
+    ctx("anyone.testnet", after_end() + 21 * 60 * SEC, 0);
+    assert!(panics(std::panic::AssertUnwindSafe(|| {
+        c.return_share(U64(0));
+    })));
+    // The index still points at the old auction, so a listing is refused.
+    ctx("reg.root.testnet", after_end() + 22 * 60 * SEC, 0);
+    let msg = json!({"reserve": RESERVE.to_string(), "max_deposit": MAX.to_string(),
+        "ends_at": (after_end() + 7200 * SEC).to_string()})
+    .to_string();
+    assert!(c.nft_on_transfer(
+        acc("seller.testnet"),
+        acc("seller.testnet"),
+        "s1".into(),
+        msg
+    ));
+}
+
+fn returning_stuck() -> AuctionContract {
+    let mut c = delivering();
+    ctx_result("auction.root.testnet", after_end(), PromiseResult::Failed);
+    c.on_delivered(0, c.auction(0).delivery_op);
+    let a = c.auction(0);
+    assert!(a.share_held && a.returning);
+    c
+}
+
+#[test]
+fn reconcile_waits_for_a_stuck_return_too() {
     fresh(|| {
-        let c = returning();
+        let c = returning_stuck();
         let t = c.auction(0).returning_since.0;
         ctx("anyone.testnet", t + RECONCILE_AFTER_NS - 1, 0);
         assert!(panics(std::panic::AssertUnwindSafe(|| {
@@ -1292,45 +1375,200 @@ fn a_lost_return_callback_is_reconciled() {
         ctx("anyone.testnet", t + RECONCILE_AFTER_NS, 0);
         let _ = c.reconcile(U64(0));
     });
-    // Still held by the auction: the flag is cleared, so `return_share` works.
+}
+
+/// The operator calls need the auction account itself, a known operation id
+/// and an evidence hash.
+#[test]
+fn resolve_calls_need_the_auction_key_the_right_op_and_evidence() {
     fresh(|| {
-        let mut c = returning();
-        ctx_result(
-            "auction.root.testnet",
-            after_end() + 20 * 60 * SEC,
-            nft_token_owner("auction.root.testnet"),
-        );
-        assert!(c.on_reconciled(0, 1));
-        let a = c.auction(0);
-        assert!(a.share_held && !a.returning);
-        ctx("anyone.testnet", after_end() + 21 * 60 * SEC, 0);
-        assert!(c.return_share(U64(0)).is_some());
+        let mut c = delivering();
+        let op = delivery_op(&c);
+        for (who, o, h) in [
+            ("anyone.testnet", op, HASH_EV),
+            ("seller.testnet", op, HASH_EV),
+            ("auction.root.testnet", op + 1, HASH_EV),
+            ("auction.root.testnet", op, "xyz"),
+            ("auction.root.testnet", 0, HASH_EV),
+        ] {
+            ctx(who, after_end() + 3600 * SEC, 0);
+            assert!(
+                panics(std::panic::AssertUnwindSafe(|| {
+                    let _ = c.resolve_delivery(U64(0), U64(o), true, h.into());
+                })),
+                "{who} {o} {h}"
+            );
+        }
+        assert_eq!(c.auction(0).status, Status::Delivering);
+        assert_eq!(c.owed_total, 0);
     });
-    // The share is elsewhere (the lost callback had succeeded): marked out.
     fresh(|| {
-        let mut c = returning();
-        ctx_result(
-            "auction.root.testnet",
-            after_end() + 20 * 60 * SEC,
-            nft_token_owner("seller.testnet"),
-        );
-        assert!(c.on_reconciled(0, 1));
+        let mut c = returning_stuck();
+        let op = c.auction(0).return_op;
+        ctx("anyone.testnet", after_end() + 3600 * SEC, 0);
+        assert!(panics(std::panic::AssertUnwindSafe(|| {
+            c.resolve_return(U64(0), U64(op), true, HASH_EV.into());
+        })));
+        ctx("auction.root.testnet", after_end() + 3600 * SEC, 0);
+        // false: the transfer failed, so a retry is allowed.
+        c.resolve_return(U64(0), U64(op), false, HASH_EV.into());
+        assert!(!c.auction(0).returning && c.auction(0).share_held);
+        // The same op again is stale.
+        assert!(panics(std::panic::AssertUnwindSafe(|| {
+            c.resolve_return(U64(0), U64(op), true, HASH_EV.into());
+        })));
+        ctx("anyone.testnet", after_end() + 3601 * SEC, 0);
+        assert!(c.return_share(U64(0)).is_some());
+        assert!(c.auction(0).return_op > op);
+    });
+    fresh(|| {
+        // returned = true: the share is out and held no more.
+        let mut c = returning_stuck();
+        let op = c.auction(0).return_op;
+        ctx("auction.root.testnet", after_end() + 3600 * SEC, 0);
+        c.resolve_return(U64(0), U64(op), true, HASH_EV.into());
         let a = c.auction(0);
         assert!(!a.share_held && !a.returning);
         assert_eq!(c.auction_for_token("s1".into()), None);
-        // Money is untouched by this path.
         assert_eq!(c.owed_total, 2 * MAX);
     });
-    // The wrong stage for the state does nothing.
-    fresh(|| {
-        let mut c = returning();
+}
+
+/// AR-2, first reproduction: two recoveries read the same expired return; the
+/// first clears it, a retry starts a new attempt, the second (stale) one must
+/// not clear the new attempt.
+#[test]
+fn ar2_a_stale_snapshot_cannot_clear_a_newer_return() {
+    let mut c = returning_stuck();
+    let old_op = c.auction(0).return_op;
+    ctx("auction.root.testnet", after_end() + 3600 * SEC, 0);
+    c.resolve_return(U64(0), U64(old_op), false, HASH_EV.into());
+    ctx("anyone.testnet", after_end() + 3601 * SEC, 0);
+    assert!(c.return_share(U64(0)).is_some());
+    let new_op = c.auction(0).return_op;
+    assert!(new_op > old_op && c.auction(0).returning);
+    // Stale callbacks of the old attempt, with every owner: no effect.
+    for owner in ["auction.root.testnet", "seller.testnet"] {
         ctx_result(
             "auction.root.testnet",
-            after_end() + 20 * 60 * SEC,
+            after_end() + 3602 * SEC,
+            nft_token_owner(owner),
+        );
+        assert!(!c.on_reconciled(0, 1, old_op));
+        assert!(c.auction(0).returning && c.auction(0).return_op == new_op);
+    }
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + 3602 * SEC,
+        PromiseResult::Successful(vec![]),
+    );
+    assert!(!c.on_returned(0, old_op));
+    assert!(c.auction(0).returning && c.auction(0).share_held);
+    // The current attempt still works.
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + 3603 * SEC,
+        PromiseResult::Successful(vec![]),
+    );
+    assert!(c.on_returned(0, new_op));
+    assert!(!c.auction(0).share_held);
+}
+
+/// AR-2, second reproduction: the share leaves, the token is listed again as a
+/// new auction, and the delayed callback of the old return must not delete
+/// the new auction's index entry.
+#[test]
+fn ar2_a_delayed_return_callback_keeps_a_newer_auctions_index() {
+    let mut c = delivering();
+    ctx_result("auction.root.testnet", after_end(), PromiseResult::Failed);
+    c.on_delivered(0, c.auction(0).delivery_op);
+    let old_op = c.auction(0).return_op;
+    // The return fails visibly, then the share is found elsewhere.
+    ctx_result("auction.root.testnet", after_end() + SEC, PromiseResult::Failed);
+    assert!(!c.on_returned(0, old_op));
+    ctx("anyone.testnet", after_end() + 2 * SEC, 0);
+    let _ = c.refresh_share(U64(0));
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + 3 * SEC,
+        nft_token_owner("seller.testnet"),
+    );
+    assert!(c.on_share_checked(0, c.auction(0).return_op));
+    assert_eq!(c.auction_for_token("s1".into()), None);
+    // The seller lists the share again: auction 1.
+    ctx("reg.root.testnet", after_end() + 4 * SEC, 0);
+    let msg = json!({"reserve": RESERVE.to_string(), "max_deposit": MAX.to_string(),
+        "ends_at": (after_end() + 7200 * SEC).to_string()})
+    .to_string();
+    assert!(!c.nft_on_transfer(
+        acc("seller.testnet"),
+        acc("seller.testnet"),
+        "s1".into(),
+        msg
+    ));
+    assert_eq!(c.auction_for_token("s1".into()), Some(U64(1)));
+    // The old return finally reports success: nothing changes.
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + 5 * SEC,
+        PromiseResult::Successful(vec![]),
+    );
+    assert!(!c.on_returned(0, old_op));
+    assert_eq!(c.auction_for_token("s1".into()), Some(U64(1)));
+    // And the index guard itself: releasing for the wrong auction does nothing.
+    c.release_token("s1", 0);
+    assert_eq!(c.auction_for_token("s1".into()), Some(U64(1)));
+    c.release_token("s1", 1);
+    assert_eq!(c.auction_for_token("s1".into()), None);
+}
+
+/// N-L1: every path that ends a no bid auction's hold on the share drops the
+/// record, and callbacks that find the record gone just return false.
+#[test]
+fn share_out_paths_reclaim_a_no_bid_record_and_late_callbacks_are_quiet() {
+    fn no_bid_cancelled() -> AuctionContract {
+        let mut c = listed();
+        ctx("seller.testnet", T0 + 20 * SEC, 0);
+        assert!(c.cancel(U64(0)).is_some());
+        c
+    }
+    // resolve_return(true)
+    fresh(|| {
+        let mut c = no_bid_cancelled();
+        let op = c.auction(0).return_op;
+        ctx("auction.root.testnet", T0 + 3600 * SEC, 0);
+        c.resolve_return(U64(0), U64(op), true, HASH_EV.into());
+        assert!(c.get_auction(U64(0)).is_none());
+        assert_eq!(c.open_auctions, 0);
+        ctx_result(
+            "auction.root.testnet",
+            T0 + 3601 * SEC,
+            PromiseResult::Successful(vec![]),
+        );
+        assert!(!c.on_returned(0, op), "late callback, record gone");
+    });
+    // refresh_share: the return failed, the share is found elsewhere.
+    fresh(|| {
+        let mut c = no_bid_cancelled();
+        let op = c.auction(0).return_op;
+        ctx_result("auction.root.testnet", T0 + 30 * SEC, PromiseResult::Failed);
+        assert!(!c.on_returned(0, op));
+        ctx("anyone.testnet", T0 + 31 * SEC, 0);
+        let _ = c.refresh_share(U64(0));
+        ctx_result(
+            "auction.root.testnet",
+            T0 + 32 * SEC,
             nft_token_owner("seller.testnet"),
         );
-        assert!(!c.on_reconciled(0, 0));
-        assert!(c.auction(0).returning);
+        assert!(c.on_share_checked(0, op));
+        assert!(c.get_auction(U64(0)).is_none());
+        ctx_result(
+            "auction.root.testnet",
+            T0 + 33 * SEC,
+            nft_token_owner("seller.testnet"),
+        );
+        assert!(!c.on_share_checked(0, op), "record gone");
+        assert!(!c.on_reconciled(0, 1, op), "record gone");
     });
 }
 
@@ -1487,7 +1725,7 @@ fn a_cancelled_auction_with_no_bids_leaves_no_record() {
         T0 + 21 * SEC,
         PromiseResult::Successful(vec![]),
     );
-    assert!(c.on_returned(0));
+    assert!(c.on_returned(0, c.auction(0).return_op));
     assert!(c.get_auction(U64(0)).is_none());
     assert_eq!(c.auction_for_token("s1".into()), None);
     // Listing the share again works and costs one record only.
@@ -1555,7 +1793,7 @@ fn worst_case(stop: u8) -> u64 {
                 after_end() + 2 * SEC,
                 PromiseResult::Successful(vec![]),
             );
-            assert!(c.on_delivered(0));
+            assert!(c.on_delivered(0, c.auction(0).delivery_op));
             assert_eq!(c.auction(0).status, Status::Sold);
             assert_eq!(c.owed_total, 8 * MAX);
         }
@@ -1627,4 +1865,151 @@ fn a_failed_withdrawal_closes_its_record_and_restores_the_credit() {
     assert!(c.get_pending_withdrawal(U64(0)).is_none());
     assert_eq!(c.get_accounting().pending_total.0, 0);
     assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
+}
+
+/// AR-3: a withdrawal callback whose pending record is gone changes no money,
+/// and the amounts come from the record.
+#[test]
+fn ar3_a_replayed_withdrawal_callback_changes_no_money() {
+    let mut c = sold();
+    ctx("anyone.testnet", after_end() + SEC, 0);
+    c.withdraw(vec![acc("seller.testnet")]);
+    // Resolved by the operator as failed: the credit is back once.
+    ctx("auction.root.testnet", after_end() + 3600 * SEC, 0);
+    c.resolve_withdrawal(U64(0), false, HASH_EV.into());
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
+    let owed = c.owed_total;
+    // Then the real callback finally arrives, failed, with other arguments too.
+    for (acct, amt) in [("seller.testnet", 30_000_000u128), ("carol.testnet", 99)] {
+        ctx_result(
+            "auction.root.testnet",
+            after_end() + 3601 * SEC,
+            PromiseResult::Failed,
+        );
+        assert!(!c.on_withdrawn(0, acc(acct), U128(amt)));
+        assert_eq!(c.owed_total, owed);
+        assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
+        assert_eq!(c.get_owed(acc("carol.testnet")).0, MAX);
+    }
+    assert_eq!(c.get_accounting().pending_total.0, 0);
+}
+
+/// The record, not the callback arguments, decides the amount and account.
+#[test]
+fn on_withdrawn_takes_account_and_amount_from_the_pending_record() {
+    let mut c = sold();
+    ctx("anyone.testnet", after_end() + SEC, 0);
+    c.withdraw(vec![acc("seller.testnet")]);
+    ctx_result("auction.root.testnet", after_end() + 2 * SEC, PromiseResult::Failed);
+    assert!(!c.on_withdrawn(0, acc("carol.testnet"), U128(1)));
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
+    assert_eq!(c.get_owed(acc("carol.testnet")).0, MAX);
+}
+
+#[test]
+fn resolve_withdrawal_needs_the_auction_key_and_closes_the_record() {
+    let mut c = sold();
+    ctx("anyone.testnet", after_end() + SEC, 0);
+    c.withdraw(vec![acc("seller.testnet")]);
+    for who in ["anyone.testnet", "seller.testnet"] {
+        ctx(who, after_end() + 3600 * SEC, 0);
+        assert!(panics(std::panic::AssertUnwindSafe(|| {
+            c.resolve_withdrawal(U64(0), true, HASH_EV.into());
+        })));
+    }
+    ctx("auction.root.testnet", after_end() + 3600 * SEC, 0);
+    assert!(panics(std::panic::AssertUnwindSafe(|| {
+        c.resolve_withdrawal(U64(0), true, "short".into());
+    })));
+    // paid: the record goes, no credit comes back.
+    c.resolve_withdrawal(U64(0), true, HASH_EV.into());
+    assert!(c.get_pending_withdrawal(U64(0)).is_none());
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
+    assert_eq!(c.get_accounting().pending_total.0, 0);
+    assert!(panics(std::panic::AssertUnwindSafe(|| {
+        c.resolve_withdrawal(U64(0), true, HASH_EV.into());
+    })));
+}
+
+/// AR-4: the floor must be free to write pending records; a short account
+/// fails the call before anything is debited.
+#[test]
+fn withdraw_needs_the_free_balance_floor_and_debits_nothing_without_it() {
+    let mut c = sold();
+    let mut b = base("anyone.testnet");
+    b.block_timestamp(after_end() + SEC)
+        .account_balance(NearToken::from_yoctonear(1));
+    testing_env!(b.build());
+    assert!(panics(std::panic::AssertUnwindSafe(|| {
+        c.withdraw(vec![acc("seller.testnet")]);
+    })));
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
+    assert!(c.get_pending_withdrawal(U64(0)).is_none());
+    assert_eq!(c.get_accounting().pending_total.0, 0);
+}
+
+/// AR-5: the view skips holes and says where to continue, with bounded work.
+#[test]
+fn ar5_get_auctions_skips_holes_and_returns_a_cursor() {
+    fresh(|| {
+        // Three no bid auctions are listed and reclaimed, then one stays live.
+        let mut c = with_key();
+        for i in 0..3u64 {
+            ctx("reg.root.testnet", T0 + i * 100 * SEC, 0);
+            assert!(!c.nft_on_transfer(
+                acc("seller.testnet"),
+                acc("seller.testnet"),
+                "s1".into(),
+                list_msg(3600 + i * 100)
+            ));
+            ctx("seller.testnet", T0 + i * 100 * SEC + 10 * SEC, 0);
+            let _ = c.cancel(U64(i));
+            let op = c.auction(i).return_op;
+            ctx_result(
+                "auction.root.testnet",
+                T0 + i * 100 * SEC + 20 * SEC,
+                PromiseResult::Successful(vec![]),
+            );
+            assert!(c.on_returned(i, op));
+            assert!(c.get_auction(U64(i)).is_none());
+        }
+        ctx("reg.root.testnet", T0 + 400 * SEC, 0);
+        assert!(!c.nft_on_transfer(
+            acc("seller.testnet"),
+            acc("seller.testnet"),
+            "s1".into(),
+            list_msg(7200)
+        ));
+        let page = c.get_auctions(None, Some(1));
+        assert_eq!(page.items.len(), 1);
+        assert_eq!(page.items[0].rec.id, 3);
+        assert!(page.next.is_none());
+    });
+    fresh(|| {
+        // A long run of holes: bounded scan, cursor continues, live record found.
+        let mut c = listed();
+        let live = c.auction(0).clone();
+        c.next_id = 1000;
+        c.auctions.remove(&0);
+        let mut rec = live;
+        rec.id = 450;
+        c.auctions.insert(450, rec);
+        let mut from = None;
+        let mut found = Vec::new();
+        let mut calls = 0;
+        loop {
+            let page = c.get_auctions(from, Some(5));
+            calls += 1;
+            found.extend(page.items.iter().map(|a| a.rec.id));
+            match page.next {
+                Some(n) => from = Some(n),
+                None => break,
+            }
+        }
+        assert_eq!(found, vec![450]);
+        assert_eq!(calls, 5, "1000 ids at 200 per call");
+        let first = c.get_auctions(None, Some(5));
+        assert!(first.items.is_empty());
+        assert_eq!(first.next, Some(U64(MAX_SCAN)));
+    });
 }
