@@ -50,7 +50,7 @@ describe('landing page', () => {
     const base = read('src/layouts/Base.astro');
     expect(base).toContain('class="badge ok"');
     expect(base).toContain('NEAR testnet');
-    expect(base).toContain('Live demo. Payments use Mock USDC.');
+    expect(base).toContain('Live demo with Mock USDC for payments.');
     expect(base).not.toMatch(/badge sim/);
     const hero = read('src/pages/index.astro');
     expect(hero).toContain('Open the testnet app');
@@ -67,7 +67,7 @@ describe('landing page', () => {
     expect(read('src/components/landing/Closing.astro')).not.toContain('Open the demo dashboard');
     const app = read('src/layouts/App.astro');
     expect(app).toContain('class="badge ok app-net"');
-    expect(app).toContain('Live demo. Payments use Mock USDC.');
+    expect(app).toContain('Live demo with Mock USDC for payments.');
     expect(app).toContain('Identity checks, payers and payer statements are Simulated. Nothing here is an investment product or legal advice.');
     expect(app).not.toMatch(/app-foot[\s\S]*badge sim/);
     expect(app).toContain('.side-link[aria-current="page"] { background: var(--surface); }');
