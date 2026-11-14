@@ -21,6 +21,16 @@ use std::process::Command;
 const MAX: u128 = 100 * MUSDC;
 const RESERVE: u128 = 10 * MUSDC;
 
+static TMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// A fresh temp file holding `content` (tests run in parallel in one process).
+fn temp_json(content: &str) -> std::path::PathBuf {
+    let n = TMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    let path = std::env::temp_dir().join(format!("auction-test-{}-{n}.json", std::process::id()));
+    std::fs::write(&path, content).unwrap();
+    path
+}
+
 fn helper(args: &[&str]) -> String {
     let root = format!("{}/../..", env!("CARGO_MANIFEST_DIR"));
     let out = Command::new("node")
@@ -100,7 +110,7 @@ async fn setup_auction() -> anyhow::Result<A> {
     // The auction is a plain credentialed member: no registry change.
     e.grant(auction.id()).await?;
     // Publish the TEE key: the answer is the real module's pubkey output.
-    let pubkey = helper(&["pubkey"]);
+    let pubkey = helper(&["pubkey", auction.id().as_str()]);
     check(
         mock.call("set_answer")
             .args_json(json!({ "answer": json!({"v":1,"ok":true,"pubkey":pubkey}).to_string() }))
@@ -117,6 +127,21 @@ async fn setup_auction() -> anyhow::Result<A> {
     );
     let got: Option<String> = auction.view("get_tee_pubkey").await?.json()?;
     assert_eq!(got.as_deref(), Some(pubkey.as_str()));
+    // The request the contract really sent, run through the real module with
+    // the caller the mock saw, gives the same key (so `contract` is in it).
+    let rec: Value = mock.view("last_request").await?.json()?;
+    assert_eq!(rec["caller"], auction.id().as_str());
+    let path = temp_json(rec["input_data"].as_str().unwrap());
+    let out = helper(&[
+        "run",
+        path.to_str().unwrap(),
+        rec["caller"].as_str().unwrap(),
+    ]);
+    let _ = std::fs::remove_file(&path);
+    assert_eq!(
+        serde_json::from_str::<Value>(&out)?["pubkey"],
+        pubkey.as_str()
+    );
     check(
         mock.call("set_answer")
             .args_json(json!({ "answer": null }))
@@ -242,13 +267,17 @@ impl A {
     }
 
     async fn settle(&self, id: u64) -> anyhow::Result<ExecutionFinalResult> {
+        self.settle_gas(id, 300).await
+    }
+
+    async fn settle_gas(&self, id: u64, tgas: u64) -> anyhow::Result<ExecutionFinalResult> {
         Ok(self
             .e
             .outsider
             .call(self.auction.id(), "settle")
             .args_json(json!({ "auction_id": id.to_string() }))
             .deposit(NearToken::from_millinear(20))
-            .gas(Gas::from_tgas(300))
+            .gas(Gas::from_tgas(tgas))
             .transact()
             .await?)
     }
@@ -268,19 +297,30 @@ impl A {
     /// returns null, so the auction reopens), run the real WASI module on the
     /// recorded input, set its output as the answer, settle again.
     async fn settle_with_real_tee(&self, id: u64) -> anyhow::Result<ExecutionFinalResult> {
+        self.settle_with_real_tee_gas(id, 300).await
+    }
+
+    async fn settle_with_real_tee_gas(
+        &self,
+        id: u64,
+        tgas: u64,
+    ) -> anyhow::Result<ExecutionFinalResult> {
         self.set_answer(None).await?;
-        let r = self.settle(id).await?;
+        let r = self.settle_gas(id, tgas).await?;
         assert!(r.is_success());
         assert_eq!(self.auction_view(id).await?["status"], "open");
         let rec: Value = self.mock.view("last_request").await?.json()?;
         let input = rec["input_data"].as_str().unwrap();
-        let path =
-            std::env::temp_dir().join(format!("auction-input-{}-{id}.json", std::process::id()));
-        std::fs::write(&path, input)?;
-        let out = helper(&["run", path.to_str().unwrap()]);
+        let path = temp_json(input);
+        // The caller OutLayer would report is the account that called it.
+        let out = helper(&[
+            "run",
+            path.to_str().unwrap(),
+            rec["caller"].as_str().unwrap(),
+        ]);
         let _ = std::fs::remove_file(&path);
         self.set_answer(Some(out)).await?;
-        self.settle(id).await
+        self.settle_gas(id, tgas).await
     }
 
     async fn withdraw(&self, who: &[&AccountId]) -> anyhow::Result<ExecutionFinalResult> {
@@ -315,6 +355,54 @@ impl A {
         assert_eq!(self.e.balance(self.auction.id()).await?, escrow + owed);
         Ok(())
     }
+}
+
+/// Eight bidders: the two seeded ones plus six new members with mock USDC.
+async fn eight_bidders(a: &A) -> anyhow::Result<Vec<Account>> {
+    let root = a.e.worker.root_account()?;
+    let mut bidders: Vec<Account> = vec![a.e.buyer.clone(), a.e.writer_b.clone()];
+    for i in 0..6 {
+        let acc = root
+            .create_subaccount(&format!("bidder{i}"))
+            .initial_balance(NearToken::from_near(5))
+            .transact()
+            .await?
+            .into_result()?;
+        a.e.grant(acc.id()).await?;
+        a.mint_usdc(acc.id(), 200 * MUSDC).await?;
+        bidders.push(acc);
+    }
+    Ok(bidders)
+}
+
+/// Gas burnt by each receipt that ran on the auction account, with the event
+/// names it logged, so the callbacks can be told apart. Prints a table.
+fn auction_gas(label: &str, auction: &AccountId, r: &ExecutionFinalResult) -> Vec<(String, u64)> {
+    let mut rows = Vec::new();
+    for o in r.outcomes() {
+        if &o.executor_id != auction {
+            continue;
+        }
+        let events: Vec<String> = o
+            .logs
+            .iter()
+            .filter_map(|l| l.split("\"event\":\"").nth(1))
+            .filter_map(|t| t.split('"').next())
+            .map(str::to_string)
+            .collect();
+        rows.push((events.join(","), o.gas_burnt.as_gas()));
+    }
+    for (events, gas) in &rows {
+        println!(
+            "{label}: auction receipt [{events}] burnt {:.2} Tgas",
+            *gas as f64 / 1e12
+        );
+    }
+    println!(
+        "{label}: total burnt by the whole transaction {:.2} Tgas",
+        r.total_gas_burnt.as_gas() as f64 / 1e12
+    );
+    rows
 }
 
 /// Test A1: the auction can hold a share with only the existing registrar
@@ -764,20 +852,7 @@ async fn a11_eight_bids_settle_within_300_tgas() -> anyhow::Result<()> {
     let a = setup_auction().await?;
     let token = a.new_share("USRC12600110").await?;
     check(a.list(&token, 62).await?);
-    // Eight bidders: the two seeded ones plus six new members.
-    let root = a.e.worker.root_account()?;
-    let mut bidders: Vec<Account> = vec![a.e.buyer.clone(), a.e.writer_b.clone()];
-    for i in 0..6 {
-        let acc = root
-            .create_subaccount(&format!("bidder{i}"))
-            .initial_balance(NearToken::from_near(5))
-            .transact()
-            .await?
-            .into_result()?;
-        a.e.grant(acc.id()).await?;
-        a.mint_usdc(acc.id(), 200 * MUSDC).await?;
-        bidders.push(acc);
-    }
+    let bidders = eight_bidders(&a).await?;
     for (i, b) in bidders.iter().enumerate() {
         a.bid(b, 0, (20 + 5 * i as u128) * MUSDC).await?;
     }
@@ -785,10 +860,7 @@ async fn a11_eight_bids_settle_within_300_tgas() -> anyhow::Result<()> {
     a.wait_until_ended(0).await?;
     let r = a.settle_with_real_tee(0).await?;
     let r = ok(r);
-    println!(
-        "settle gas burnt (second run): {} Tgas",
-        r.total_gas_burnt.as_tgas()
-    );
+    auction_gas("a11 second settle", a.auction.id(), &r);
     let v = a.auction_view(0).await?;
     assert_eq!(v["status"], "sold");
     assert_eq!(v["winner"], bidders[7].id().as_str());
@@ -800,5 +872,240 @@ async fn a11_eight_bids_settle_within_300_tgas() -> anyhow::Result<()> {
     check(a.withdraw(&[a.e.writer_a.id()]).await?);
     assert_eq!(a.accounting().await?, (0, 0));
     assert_eq!(a.e.balance(a.auction.id()).await?, 0);
+    a.e.assert_solvent().await
+}
+
+/// Test A12 (M1): eight valid bids, every ciphertext the largest the contract
+/// takes (512 characters), settled with the least gas settle accepts (230
+/// Tgas). The callback that reads the answer, hashes the bids and starts the
+/// delivery has to fit its 120 Tgas with room to spare, and the sale must
+/// finish. Prints the measured gas of each receipt.
+#[tokio::test]
+async fn a12_eight_max_size_ciphertexts_settle() -> anyhow::Result<()> {
+    let a = setup_auction().await?;
+    let token = a.new_share("USRC12600111").await?;
+    check(a.list(&token, 62).await?);
+    let bidders = eight_bidders(&a).await?;
+    for (i, b) in bidders.iter().enumerate() {
+        let ct = helper(&[
+            "seal-max",
+            &a.pubkey,
+            "0",
+            a.auction.id().as_str(),
+            b.id().as_str(),
+            &((20 + 5 * i as u128) * MUSDC).to_string(),
+        ]);
+        assert_eq!(ct.len(), 512);
+        check(a.bid_with(b, 0, MAX, &ct).await?);
+    }
+    let v = a.auction_view(0).await?;
+    assert_eq!(v["bid_count"], 8);
+    for b in v["bids"].as_array().unwrap() {
+        assert_eq!(b["ciphertext"].as_str().unwrap().len(), 512);
+    }
+    a.wait_until_ended(0).await?;
+    // Below the minimum is refused up front.
+    a.set_answer(None).await?;
+    let r = a.settle_gas(0, 229).await?;
+    assert!(r.is_failure(), "229 Tgas is below the minimum");
+    let r = a.settle_with_real_tee_gas(0, 230).await?;
+    let r = ok(r);
+    let rows = auction_gas("a12 second settle at 230 Tgas", a.auction.id(), &r);
+    let v = a.auction_view(0).await?;
+    assert_eq!(v["status"], "sold");
+    assert_eq!(v["winner"], bidders[7].id().as_str());
+    assert_eq!(num(&v["price"]), 50 * MUSDC);
+    // Every receipt on the auction used well under its allowance. The two
+    // callbacks are the ones that logged `winner_chosen` and `auction_sold`.
+    let on_settled = rows.iter().find(|(e, _)| e.contains("winner_chosen"));
+    let on_delivered = rows.iter().find(|(e, _)| e.contains("auction_sold"));
+    let (on_settled, on_delivered) = (on_settled.unwrap().1, on_delivered.unwrap().1);
+    assert!(
+        on_settled < 120_000_000_000_000 - 85_000_000_000_000,
+        "on_settled must leave room for the two promises it creates"
+    );
+    assert!(on_delivered < 60_000_000_000_000);
+    check(
+        a.withdraw(&bidders.iter().map(|b| b.id()).collect::<Vec<_>>()[..])
+            .await?,
+    );
+    check(a.withdraw(&[a.e.writer_a.id()]).await?);
+    assert_eq!(a.accounting().await?, (0, 0));
+    a.e.assert_solvent().await
+}
+
+/// Test A13 (C1): a request to OutLayer from any account other than the
+/// auction contract is refused by the module, so the secret cannot be used as
+/// a decryption oracle. The attacker crafts an input with a victim's real
+/// ciphertext and their own bid at the maximum, calls the (mock) OutLayer
+/// directly, and the module, given the caller OutLayer reports, prints no
+/// winner and no price. The same input from the auction contract is answered.
+/// Simulated: OutLayer is the mock; the module, the ciphertexts and the
+/// contract are real. What OutLayer's keystore does is not tested here.
+#[tokio::test]
+async fn a13_a_direct_request_from_another_caller_is_refused() -> anyhow::Result<()> {
+    let a = setup_auction().await?;
+    let token = a.new_share("USRC12600112").await?;
+    check(a.list(&token, 62).await?);
+    let (victim, other) = (&a.e.buyer, &a.e.writer_b);
+    a.bid(victim, 0, 55 * MUSDC).await?;
+    // The attacker (an outsider, not even a member) seals a bid at the
+    // maximum for their own name. All ciphertexts are public chain data.
+    let attacker = a.e.outsider.id();
+    let atk_ct = a.seal(0, attacker, MAX);
+    let v = a.auction_view(0).await?;
+    let victim_ct = v["bids"][0]["ciphertext"].as_str().unwrap().to_string();
+    let crafted = json!({
+        "mode": "settle", "auction_id": "0", "contract": a.auction.id(),
+        "reserve": RESERVE.to_string(), "max_deposit": MAX.to_string(),
+        "bids": [
+            {"bidder": victim.id(), "ct": victim_ct},
+            {"bidder": attacker, "ct": atk_ct},
+        ],
+    })
+    .to_string();
+    // The attacker calls OutLayer directly, so the mock records them as caller.
+    check(
+        a.e.outsider
+            .call(a.mock.id(), "request_execution")
+            .args_json(json!({
+                "source": {"WasmUrl": {"url": "https://x", "hash": "aa", "build_target": "wasm32-wasip1"}},
+                "resource_limits": {"max_instructions": 1_000_000_000u64, "max_memory_mb": 64, "max_execution_seconds": 30},
+                "input_data": crafted,
+                "secrets_ref": {"profile": "royltee-auction", "account_id": a.e.writer_a.id()},
+                "response_format": "Json",
+            }))
+            .deposit(NearToken::from_millinear(20))
+            .transact()
+            .await?,
+    );
+    let rec: Value = a.mock.view("last_request").await?.json()?;
+    assert_eq!(rec["caller"], attacker.as_str());
+    let run = |caller: &str| {
+        let path = temp_json(&crafted);
+        let out = helper(&["run", path.to_str().unwrap(), caller]);
+        let _ = std::fs::remove_file(&path);
+        serde_json::from_str::<Value>(&out).unwrap()
+    };
+    let refused = run(rec["caller"].as_str().unwrap());
+    assert_eq!(refused["ok"], false);
+    assert!(refused.get("winner").is_none() && refused.get("price").is_none());
+    assert!(!refused.to_string().contains(&(55 * MUSDC).to_string()));
+    // Naming the auction as the caller inside the input does not help: the
+    // module trusts only the environment OutLayer sets.
+    // The auction itself is answered, with the price that would leak.
+    let answered = run(a.auction.id().as_str());
+    assert_eq!(answered["price"], (55 * MUSDC).to_string());
+
+    // Fed to the auction as an answer, a refusal changes nothing.
+    a.bid(other, 0, 40 * MUSDC).await?;
+    a.wait_until_ended(0).await?;
+    a.set_answer(Some(refused.to_string())).await?;
+    check(a.settle(0).await?);
+    let v = a.auction_view(0).await?;
+    assert_eq!(v["status"], "open");
+    assert_eq!(v["failures"], 1);
+    assert_eq!(a.accounting().await?, (2 * MAX, 0));
+    assert_eq!(a.e.owner(&token).await?, a.auction.id().as_str());
+    // And the real run through the contract still settles.
+    check(a.settle_with_real_tee(0).await?);
+    let v = a.auction_view(0).await?;
+    assert_eq!(v["status"], "sold");
+    assert_eq!(num(&v["price"]), 40 * MUSDC);
+    a.e.assert_solvent().await
+}
+
+/// Test A14 (H1): a delivery whose callback cannot commit is recovered with
+/// `reconcile`. The auction is drained of NEAR just before the second settle,
+/// so `on_delivered` cannot write the credits and the auction stays
+/// Delivering with the share already at the winner. After 15 minutes and a
+/// top up, anyone calls `reconcile`, which reads the registry and pays the
+/// sale.
+#[tokio::test]
+async fn a14_delivery_that_cannot_commit_is_reconciled() -> anyhow::Result<()> {
+    let a = setup_auction().await?;
+    let token = a.new_share("USRC12600113").await?;
+    check(a.list(&token, 62).await?);
+    a.bid(&a.e.buyer, 0, 90 * MUSDC).await?;
+    a.bid(&a.e.writer_b, 0, 60 * MUSDC).await?;
+    a.wait_until_ended(0).await?;
+    // First settle records the request; run the real module on it.
+    a.set_answer(None).await?;
+    check(a.settle(0).await?);
+    let rec: Value = a.mock.view("last_request").await?.json()?;
+    let path = temp_json(rec["input_data"].as_str().unwrap());
+    let out = helper(&[
+        "run",
+        path.to_str().unwrap(),
+        rec["caller"].as_str().unwrap(),
+    ]);
+    let _ = std::fs::remove_file(&path);
+    a.set_answer(Some(out)).await?;
+    // Leave the auction account 130 bytes of free storage stake (measured:
+    // `on_settled` needs less, the three credits of `on_delivered` need more,
+    // and 100 and 160 bytes both behave the same way).
+    let info = a.auction.view_account().await?;
+    let locked = info.storage_usage as u128 * 10u128.pow(19);
+    let keep = locked + 130 * 10u128.pow(19);
+    let spare = info.balance.as_yoctonear() - keep;
+    let root = a.e.worker.root_account()?;
+    check(
+        a.auction
+            .as_account()
+            .transfer_near(root.id(), NearToken::from_yoctonear(spare))
+            .await?,
+    );
+    // Settle: the winner is chosen and the registry moves the share, but the
+    // payout callback cannot write its credits and rolls back.
+    let r = a.settle(0).await?;
+    println!("a14 settle logs: {:?}", r.logs());
+    let v = a.auction_view(0).await?;
+    assert_eq!(v["status"], "delivering", "the callback did not commit");
+    assert_eq!(
+        a.e.owner(&token).await?,
+        a.e.buyer.id().as_str(),
+        "share is at the winner"
+    );
+    assert_eq!(a.accounting().await?, (2 * MAX, 0));
+    // Too early.
+    let early =
+        a.e.outsider
+            .call(a.auction.id(), "reconcile")
+            .args_json(json!({ "auction_id": "0" }))
+            .max_gas()
+            .transact()
+            .await?;
+    assert!(early.is_failure(), "reconcile waits 15 minutes");
+    // Wait, top up, reconcile.
+    let since: u64 = v["delivering_since"].as_str().unwrap().parse()?;
+    while a.now().await? < since + 15 * 60 * 1_000_000_000 {
+        a.e.worker.fast_forward(200).await?;
+    }
+    check(
+        root.transfer_near(a.auction.id(), NearToken::from_near(1))
+            .await?,
+    );
+    check(
+        a.e.outsider
+            .call(a.auction.id(), "reconcile")
+            .args_json(json!({ "auction_id": "0" }))
+            .max_gas()
+            .transact()
+            .await?,
+    );
+    let v = a.auction_view(0).await?;
+    assert_eq!(v["status"], "sold");
+    assert_eq!(v["winner"], a.e.buyer.id().as_str());
+    assert_eq!(num(&v["price"]), 60 * MUSDC);
+    assert_eq!(a.owed(a.e.writer_a.id()).await?, 60 * MUSDC);
+    assert_eq!(a.owed(a.e.buyer.id()).await?, MAX - 60 * MUSDC);
+    assert_eq!(a.owed(a.e.writer_b.id()).await?, MAX);
+    assert_eq!(a.accounting().await?, (0, 2 * MAX));
+    a.assert_auction_solvent().await?;
+    check(
+        a.withdraw(&[a.e.writer_a.id(), a.e.buyer.id(), a.e.writer_b.id()])
+            .await?,
+    );
+    assert_eq!(a.accounting().await?, (0, 0));
     a.e.assert_solvent().await
 }
