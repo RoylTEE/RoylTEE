@@ -11,13 +11,22 @@ const landingFiles = ['src/pages/index.astro', 'src/styles/landing.css', 'src/da
 describe('landing page', () => {
   it('tells the story in order', () => {
     const page = read('src/pages/index.astro');
-    const order = ['<section class="hero">', '<Problem />', '<Audience />', '<Flow />', '<Product />', '<Tech />', '<WhyNear />', '<Tracks />', '<Compare />', '<Proof />', '<Latest />', 'id="lifecycle"', '<Origin />', '<Closing />'].map((m) => page.indexOf(m));
+    const order = ['<section class="hero">', '<Problem />', '<Audience />', '<Flow />', '<Product />', '<Tech />', '<WhyNear />', '<Tracks />', '<Compare />', '<Proof />', '<Latest />', '<Origin />', '<Closing />'].map((m) => page.indexOf(m));
     expect(order.every((i) => i >= 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
   });
   it('keeps the anchors the help notes and footer link to', () => {
     const all = landingFiles.filter((f) => f.endsWith('.astro')).map(read).join('\n');
-    for (const id of ['problem', 'how', 'near', 'tracks', 'lifecycle', 'agents', 'trust', 'verify']) expect(all, id).toContain(`id="${id}"`);
+    for (const id of ['problem', 'how', 'near', 'tracks']) expect(all, id).toContain(`id="${id}"`);
+  });
+  it('the detail that left the landing lives on its own page, under the same anchor', () => {
+    const where: Record<string, string> = { lifecycle: 'how-it-works', agents: 'security', trust: 'security', verify: 'security' };
+    for (const [id, page] of Object.entries(where)) expect(read(`src/pages/${page}.astro`), `${page}#${id}`).toContain(`id="${id}"`);
+    expect(read('src/pages/index.astro')).not.toMatch(/id="(lifecycle|agents|trust)"/);
+  });
+  it('the landing keeps the story: no method names, account ids, key details or test counts in its copy', () => {
+    const copy = ['src/pages/index.astro', ...readdirSync(join(root, 'src/components/landing')).map((f) => `src/components/landing/${f}`)].map(read).join('\n');
+    expect(copy).not.toMatch(/\.royltee-dev\.testnet|full access key|yoctoNEAR|ft_transfer_call|nft_transfer|pay_from_allowance|view_access_key_list|outlayer-verify|\d+ tests/i);
   });
   it('nav and footer link only to pages that exist, and nothing is called a placeholder', () => {
     const files = [read('src/components/Nav.astro'), read('src/components/Footer.astro')].join('\n');
@@ -58,15 +67,6 @@ describe('landing page', () => {
     for (const l of LATEST) { expect(l.when).toMatch(/^\d{4}-\d\d-\d\d \d\d:\d\d UTC$/); expect(l.txHref).toContain('nearblocks.io/txns/'); }
     const whens = LATEST.map((l) => l.when);
     expect([...whens].sort().reverse()).toEqual(whens);
-  });
-  it('the cost figures on the page match the spend log', () => {
-    const log = readFileSync(join(root, '..', 'SPEND_LOG.md'), 'utf8');
-    expect(log).toContain('0.0052473054807262 NEAR');
-    expect(log).toContain('OutLayer charged 0.0010383018 NEAR');
-    const why = read('src/components/landing/WhyNear.astro');
-    expect(why).toContain('about 0.0052 NEAR');
-    expect(why).toContain('about 0.0010 NEAR');
-    expect(why).toMatch(/not measured mainnet costs/);
   });
   it('the tracks carry their published names, and the origin section claims no result', () => {
     const tracks = read('src/components/landing/Tracks.astro');

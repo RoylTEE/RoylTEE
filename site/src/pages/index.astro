@@ -2,7 +2,6 @@
 import Base from '../layouts/Base.astro';
 import '../styles/landing.css';
 import { DASHBOARD_URL, PITCH } from '../consts';
-import { REGISTRY, SCENES, txUrl, accountUrl } from '../data/testnet';
 import Problem from '../components/landing/Problem.astro';
 import Tech from '../components/landing/Tech.astro';
 import WhyNear from '../components/landing/WhyNear.astro';
@@ -15,19 +14,6 @@ import Compare from '../components/landing/Compare.astro';
 import Proof from '../components/landing/Proof.astro';
 import Latest from '../components/landing/Latest.astro';
 import Closing from '../components/landing/Closing.astro';
-const sale = SCENES.filter((s) => s.tokens.includes('s2') || (s.step === 'Refusal'));
-const holder = ['Claim the balance of its share account', 'Transfer the share to another verified member', 'Set a short public note on the share (CLI only in this demo)', 'Confirm a co-holder share of the same work (CLI only in this demo)'];
-const agent = ['Pay a work or share from its allowance', 'Report a statement line', 'Stay under a per payment limit, a 24 hour limit and a daily count'];
-const nobody = ['Choose where an agent payment goes', 'Change a split alone (except the registrar resolving a dispute, with a document hash)', 'Add a key to a share account', 'Pay the same statement line twice'];
-const real = [
-  ['Registry, share account and Mock USDC (testnet) contracts', 'Identity checks (KYB) behind a member credential'],
-  ['Share accounts with zero access keys', 'The fiat rail and conversion to USDC'],
-  ['Payments, splits, claims and transfers in Mock USDC', 'Payer statements and statement line ids'],
-  ['Agent limits, one payment per statement line, revocation', 'Provenance evidence (the field is real, the evidence is not checked)'],
-  ['Locks, credentials, disputes and escrow', 'Dispute documents (hashes of dummy documents)'],
-];
-const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \\
-  -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"s2.reg.royltee-dev.testnet"}}'`;
 ---
 <Base current="home" announce>
   <section class="hero">
@@ -42,7 +28,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
           <a class="btn l-btn-amber" href={DASHBOARD_URL}>Open the demo dashboard</a>
           <a class="btn l-btn-ghost" href="/verify">Verify on testnet</a>
         </div>
-        <p class="caption">Live on NEAR testnet. Registry contract <a class="acct-link" href={accountUrl(REGISTRY)} target="_blank" rel="noopener">{REGISTRY}</a>. The registry account itself still holds one full access key on testnet; see Real and Simulated below.</p>
+        <p class="caption">Live on NEAR testnet. Money in the demo is Simulated.</p>
       </div>
     </div>
   </section>
@@ -58,79 +44,6 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
   <Proof />
   <Latest />
 
-  <section class="section details" id="lifecycle">
-    <div class="container">
-      <div class="section-head">
-        <p class="eyebrow">The catalog sale, on testnet</p>
-        <h2>Share s2 was sold. The address stayed. The money followed.</h2>
-        <p class="lead">These are the real transactions, in order. Open any of them on the explorer.</p>
-      </div>
-      <div class="panel">
-        <div class="table-wrap">
-          <table class="ledger rows-sm">
-            <thead><tr><th>Step</th><th>What happened</th><th>Result</th><th>Transaction</th></tr></thead>
-            <tbody>
-              {sale.map((s) => (
-                <tr>
-                  <td class="p nowrap"><strong>{s.step}</strong>{s.simulated && <span class="badge sim">Simulated payer</span>}{s.agent && <span class="badge info">Scripted agent</span>}</td>
-                  <td class="p-wrap">{s.what}<span class="small muted only-wide"><br />{s.shows}</span></td>
-                  <td class="p-end">{s.result === 'refused' ? <span class="badge bad">Refused</span> : <span class="badge ok">Done</span>}</td>
-                  <td class="m">{s.txs.map((h) => <a class="acct-link" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div class="panel-foot">All on 2026-11-13 (UTC). Vault s2.reg.royltee-dev.testnet had 0 access keys before and after the sale. <a class="link" href="/share?id=s2">Check it live on the share page</a>.</div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="agents">
-    <div class="container">
-      <div class="section-head">
-        <p class="eyebrow">Holder powers and agent limits</p>
-        <h2>Short lists, enforced in code</h2>
-        <p class="lead">An agent holds a key that can only call two methods. Anything that moves ownership needs a deposit, and that key type cannot attach one.</p>
-      </div>
-      <div class="powers">
-        <div class="panel"><div class="panel-head"><h3>A share holder can</h3></div><ul class="checks">{holder.map((h) => <li>{h}</li>)}</ul></div>
-        <div class="panel"><div class="panel-head"><h3>A payment agent can</h3></div><ul class="checks">{agent.map((h) => <li>{h}</li>)}</ul><div class="panel-foot"><a class="link" href="/agents">See the live agent role</a></div></div>
-        <div class="panel"><div class="panel-head"><h3>Nobody can</h3></div><ul class="checks no">{nobody.map((h) => <li>{h}</li>)}</ul></div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="trust">
-    <div class="container">
-      <div class="section-head">
-        <p class="eyebrow">Real and Simulated</p>
-        <h2>What runs on chain, and what is a stand in</h2>
-      </div>
-      <div class="panel">
-        <div class="table-wrap">
-          <table class="ledger rows-sm trust">
-            <thead><tr><th>Real, on NEAR testnet</th><th>Simulated</th></tr></thead>
-            <tbody>{real.map(([a, b]) => <tr><td class="p-wrap">{a}</td><td class="m wrap"><span class="only-narrow">Simulated: </span>{b}</td></tr>)}</tbody>
-          </table>
-        </div>
-        <div class="panel-foot">The registrar is a trusted role: every registrar action that moves a share or money carries a document hash and emits an event. The registry and token accounts still hold one full access key each, so the registry itself is not keyless (kept on testnet by decision, so late fixes stay possible). The contracts use no trusted execution environment.</div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section" id="verify">
-    <div class="container verify">
-      <div class="section-head">
-        <p class="eyebrow">Check it yourself</p>
-        <h2>No wallet needed</h2>
-        <p class="lead">Ask a public testnet node for the access keys of the share account that was sold. The answer is an empty list.</p>
-      </div>
-      <pre class="code"><code>{curl}</code></pre>
-      <p class="muted">From a clone of the repository, <code class="mono">npm run verify:testnet</code> checks all 15 share accounts, the code hashes and the balances.</p>
-      <p class="muted">The <a class="link" href="/verify">Verify page</a> lists every claim with its code, its test and its transaction, runs the live checks in your browser, and shows what happens when someone tries to break it. The <a class="link" href="/whitepaper">whitepaper</a> (version 1.0, also as a <a class="link" href="/royltee-whitepaper.pdf" download>PDF</a>) explains the design and what is Simulated or UNVERIFIED. The <a class="link" href="/auction">Auction page</a> walks through the sealed-bid sale of a share that ran in a TEE, step by step, with its attestation proof.</p>
-    </div>
-  </section>
   <Origin />
   <Closing />
 </Base>
@@ -154,15 +67,6 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
     .hero-copy { padding: var(--s2) 0 var(--s7); }
     .hero-copy h1 { font-size: 2.375rem; }
   }
-  .powers { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s5); }
-  .checks { list-style: none; margin: 0; padding: var(--s3) var(--s5) var(--s4); display: grid; }
-  .checks li { padding: .6rem 0 .6rem 1.6rem; border-bottom: 1px solid var(--rule); position: relative; font-size: var(--fs-14); }
-  .checks li:last-child { border-bottom: 0; }
-  .checks li::before { content: ''; position: absolute; left: .1rem; top: .95rem; width: .7rem; height: .4rem; border-left: 2px solid var(--ok); border-bottom: 2px solid var(--ok); transform: rotate(-45deg); }
-  .checks.no li::before { width: .75rem; height: 2px; border: 0; background: var(--bad); transform: none; top: 1.15rem; }
-  .code { margin: 0 0 var(--s4); padding: var(--s4) var(--s5); background: var(--ink); color: #f1eee6; border-radius: var(--r-card); overflow-x: auto; font-family: var(--mono); font-size: var(--fs-14); line-height: 1.6; }
-  .details { border-top: 1px solid var(--rule); }
-  @media (max-width: 991px) { .powers { grid-template-columns: 1fr; } }
 </style>
 <style is:global>
   html body footer.site-foot { margin-top: 0; }

@@ -13,8 +13,7 @@ import { LATEST } from '../../data/landing';
         <li>
           <div class="top"><span class="mono when">{l.when}</span><span class="badge info">{l.step}</span>{l.simulated && <span class="badge sim">Simulated</span>}</div>
           <p class="what">{l.what}</p>
-          <p class="muted shows">{l.shows}</p>
-          <a class="acct-link" href={l.txHref} target="_blank" rel="noopener">{l.tx.slice(0, 8)}</a>
+          <a class="l-textlink" href={l.txHref} target="_blank" rel="noopener">View on the explorer</a>
         </li>
       ))}
     </ul>

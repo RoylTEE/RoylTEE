@@ -2,10 +2,10 @@
 import { PROJECT_NAME } from '../../consts';
 const rows = [
   ['Where the record lives', 'Split sheets, contracts and databases, each kept by a different party', 'One record per share on NEAR, read by every member'],
-  ['When records disagree', 'Money is held or misdirected until someone reconciles them', 'An over-allocation or a repeated work code opens a dispute at once. Only the contested money is held, and the rest is paid as usual'],
+  ['When records disagree', 'Money is held or misdirected until someone reconciles them', 'If claims add up to more than 100 percent, or a song is registered twice, a dispute opens at once. Only the contested money is held, and the rest is paid as usual'],
   ['After a catalog sale', 'Every payer has to be told, and money keeps arriving at the old owner until each one updates', 'The NFT moves and the payout address stays, so payers change nothing. Unclaimed money goes with the share'],
-  ['Checking a claim', 'The payer works from its own copy, which it cannot easily check', 'Anyone can read it from a public testnet node, no account needed'],
-  ['Payment agents', 'An agent has no authoritative source, and anything it reads can be written by an attacker', 'The contract looks up the payees itself. Text in metadata has no effect, and a statement line pays once'],
+  ['Checking a claim', 'The payer works from its own copy, which it cannot easily check', 'Anyone can read it from a public node, no account needed'],
+  ['Payment agents', 'An agent has no authoritative source, and anything it reads can be written by an attacker', 'The contract finds the payees itself. Text in the notes of a song cannot redirect money, and each statement line pays once'],
 ];
 ---
 <section class="night" id="compare">
@@ -23,7 +23,7 @@ const rows = [
         <tbody>{rows.map(([a, b, c]) => <tr><th scope="row">{a}</th><td>{b}</td><td class="us">{c}</td></tr>)}</tbody>
       </table>
     </div>
-    <p class="note">The left column follows the problem section of the whitepaper and describes the industry in general, not any named company. The right column is what the deployed contracts do on testnet. The TEE covers the auction only, not the registry.</p>
+    <p class="note">The left column follows the problem section of the whitepaper and describes the industry in general, not any named company. The right column is what the deployed contracts do on testnet. The secure hardware covers the auction only, not the registry.</p>
   </div>
 </section>
 <style>

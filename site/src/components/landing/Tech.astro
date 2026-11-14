@@ -1,21 +1,19 @@
 ---
-import { REGISTRY, TOKEN, accountUrl } from '../../data/testnet';
-import { AUCTION_FACTS } from '../../data/landing';
 import { AUCTION } from '../../data/auction';
-const chips = ['NEAR testnet', 'NEP-171', 'NEP-177', 'NEP-181', 'NEP-141 mock USDC (Simulated)', 'OutLayer TEE'];
+const chips = ['NEAR testnet', 'Open NFT and token standards', 'Mock USDC (Simulated)', 'OutLayer secure hardware (TEE)'];
 const passed = AUCTION.verify.checks.filter((c) => c.verdict === 'PASS').length;
 const blocks = [
-  { t: 'Zero-key vaults', tag: 'NEP-171, 177, 181', d: 'Each share is an NFT. It owns a payout vault, a NEAR account created with no access keys. Whoever holds the NFT is the only one who can claim its money.' },
-  { t: 'Escrow in mock USDC', tag: 'NEP-141, Simulated', d: 'One payment is split by basis points into the vaults in a single transaction. Money for a share still waiting for approval is held in escrow, not paid. The token is Mock USDC, with no value.' },
-  { t: 'Dispute freeze', tag: 'Registrar resolves', d: 'If a new registration would take a work above 100 percent, or repeats a work code, a dispute opens. Only the contested money is held. The other shares keep being paid.' },
-  { t: 'Sealed-bid auction in a TEE', tag: 'OutLayer, attested', d: `Bids are encrypted to a key only the TEE holds. After the end time, a module in Intel TDX hardware opens them and prints only the winner and the second price. The attestation checks passed ${passed} of ${AUCTION.verify.checks.length}.` },
+  { t: 'Vaults no one holds a key to', tag: 'Keyless', d: 'Each share is an NFT. It owns a payout vault, a NEAR account with no keys. Whoever holds the NFT is the only one who can claim its money.' },
+  { t: 'Escrow in mock dollars', tag: 'Simulated money', d: 'One payment is split between the shares in a single step. Money for a share still waiting for approval is held, not paid. The token is Mock USDC, which has no value.' },
+  { t: 'Disputes that freeze only what is contested', tag: 'Fair disputes', d: 'If a new claim would take a song above 100 percent, or a song is registered twice, a dispute opens. Only the contested money is held. The other shares keep being paid.' },
+  { t: 'Sealed-bid auction in a TEE', tag: 'Sealed bids', d: `Bids are encrypted so that only a secure program can read them. After the end time it opens them and reveals only the winner and the second price. An independent checker confirmed its proof: ${passed} of ${AUCTION.verify.checks.length} checks passed.` },
 ];
 const layers = [
-  { n: 'Web app', t: 'Astro pages on Vercel', d: 'Read NEAR testnet with view calls. Signing goes through a NEAR wallet you connect.' },
-  { n: 'Registry', t: 'Registry contract and vault accounts', d: 'The registry holds the rules. Each share vault is its own account with no keys.', link: [REGISTRY, accountUrl(REGISTRY)] },
-  { n: 'Money', t: 'Mock USDC, NEP-141 (Simulated)', d: 'The payment token. It has no value and stands in for a real stablecoin.', link: [TOKEN, accountUrl(TOKEN)] },
-  { n: 'Auction', t: 'Auction contract and OutLayer TEE module', d: 'Holds a share for sale. The TEE opens sealed bids and attests to what it ran.', link: [AUCTION_FACTS.account, AUCTION_FACTS.accountHref] },
-  { n: 'Proof', t: 'nearblocks explorer', d: 'Anyone can open every account and transaction on this page, no login.' },
+  { n: 'Web app', t: 'The website you are on', d: 'It reads NEAR testnet. Signing goes through a NEAR wallet you connect.' },
+  { n: 'Registry', t: 'The registry and the share vaults', d: 'The registry holds the rules. Each share vault is its own account with no keys.' },
+  { n: 'Money', t: 'Mock USDC (Simulated)', d: 'The payment token. It has no value and stands in for a real stablecoin.' },
+  { n: 'Auction', t: 'The auction and OutLayer secure hardware', d: 'Holds a share for sale. The TEE opens sealed bids and proves what it ran.' },
+  { n: 'Proof', t: 'A public explorer', d: 'Anyone can open every account and transaction behind this page, no login.' },
 ];
 ---
 <section class="l-sec" id="tech">
@@ -40,11 +38,11 @@ const layers = [
       {layers.map((l) => (
         <li>
           <span class="ln mono">{l.n}</span>
-          <div class="lb"><strong>{l.t}</strong><span class="muted">{l.d}</span>{l.link && <a class="acct-link" href={l.link[1]} target="_blank" rel="noopener">{l.link[0]}</a>}</div>
+          <div class="lb"><strong>{l.t}</strong><span class="muted">{l.d}</span></div>
         </li>
       ))}
     </ol>
-    <p class="links"><a class="l-textlink" href="/auction">How the auction ran</a> <a class="l-textlink" href="/whitepaper">Read the whitepaper</a></p>
+    <p class="links"><a class="l-textlink" href="/how-it-works">How it works, in detail</a> <a class="l-textlink" href="/auction">How the auction ran</a> <a class="l-textlink" href="/whitepaper">Read the whitepaper</a></p>
   </div>
 </section>
 <style>

@@ -88,7 +88,7 @@ describe('auction page data', () => {
     const a = AREAS.find((x) => x.key === 'auction')!;
     expect(a.group).toBe('Registry');
     expect(a.href).toBe('/auction');
-    for (const f of ['src/pages/index.astro', 'src/pages/dashboard.astro', 'src/pages/verify.astro']) expect(readFileSync(join(root, f), 'utf8'), f).toContain('href="/auction"');
+    for (const f of ['src/components/landing/Proof.astro', 'src/pages/dashboard.astro', 'src/pages/verify.astro']) expect(readFileSync(join(root, f), 'utf8'), f).toContain('href="/auction"');
   });
   it('page and data pass the wording check', () => {
     for (const f of ['src/pages/auction.astro', 'src/data/auction.ts', 'src/data/auction.json']) expect(forbidden(readFileSync(join(root, f), 'utf8')), f).toEqual([]);

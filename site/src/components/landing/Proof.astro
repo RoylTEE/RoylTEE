@@ -6,7 +6,7 @@ import { PROOF, AUCTION_FACTS } from '../../data/landing';
     <div class="l-head">
       <p class="l-eyebrow">Proof, not promises</p>
       <h2 class="l-h2">Numbers you can recount yourself</h2>
-      <p class="lead">These figures are counted from the recorded evidence files in the repository when the site is built. Each one links to the page that shows the detail.</p>
+      <p class="lead">These figures are counted from the recorded evidence in the repository when the site is built. Each one links to the page that shows the detail.</p>
     </div>
     <ul class="stats">
       {PROOF.map((p) => (
@@ -18,7 +18,7 @@ import { PROOF, AUCTION_FACTS } from '../../data/landing';
         </li>
       ))}
     </ul>
-    <p class="caption foot">The sealed-bid auction ran on contract <a class="acct-link" href={AUCTION_FACTS.accountHref} target="_blank" rel="noopener">{AUCTION_FACTS.account}</a>: {AUCTION_FACTS.bids} bids, settled {AUCTION_FACTS.settledAt} at {AUCTION_FACTS.price} mUSDC (Simulated money).</p>
+    <p class="caption foot">A sealed-bid auction settled on testnet on {AUCTION_FACTS.settledAt}: {AUCTION_FACTS.bids} bids, a winning price of {AUCTION_FACTS.price} mUSDC (Simulated money). <a class="link" href="/auction">See the run</a>.</p>
   </div>
 </section>
 <style>
