@@ -48,11 +48,13 @@ fn new_contract() -> AuctionContract {
     AuctionContract::new(
         acc("reg.root.testnet"),
         acc("usdc.root.testnet"),
-        acc("outlayer.testnet"),
-        "https://test.fastfs.io/auction.root.testnet/outlayer.testnet/aa.wasm".into(),
-        "a".repeat(64),
-        acc("owner.testnet"),
-        "royltee-auction".into(),
+        OutlayerSetup {
+            outlayer: acc("outlayer.testnet"),
+            wasm_url: "https://test.fastfs.io/auction.root.testnet/outlayer.testnet/aa.wasm".into(),
+            wasm_hash: "a".repeat(64),
+            secrets_account: acc("owner.testnet"),
+            secrets_profile: "royltee-auction".into(),
+        },
     )
 }
 
@@ -320,7 +322,7 @@ fn only_mock_usdc_can_deposit() {
     let mut c = listed();
     ctx("evil-token.testnet", T0 + SEC, 0);
     assert!(panics(std::panic::AssertUnwindSafe(|| {
-        c.ft_on_transfer(acc("bob.testnet"), U128(MAX), "{}".into());
+        let _ = c.ft_on_transfer(acc("bob.testnet"), U128(MAX), "{}".into());
     })));
 }
 
@@ -964,11 +966,13 @@ fn init_checks_its_arguments() {
             AuctionContract::new(
                 acc("reg.root.testnet"),
                 acc("usdc.root.testnet"),
-                acc("outlayer.testnet"),
-                u,
-                h,
-                acc("owner.testnet"),
-                p,
+                OutlayerSetup {
+                    outlayer: acc("outlayer.testnet"),
+                    wasm_url: u,
+                    wasm_hash: h,
+                    secrets_account: acc("owner.testnet"),
+                    secrets_profile: p,
+                },
             );
         }))
     };

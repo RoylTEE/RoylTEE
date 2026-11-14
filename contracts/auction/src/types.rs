@@ -106,3 +106,18 @@ pub struct Accounting {
     pub escrow_total: U128,
     pub owed_total: U128,
 }
+
+/// Where OutLayer runs and what it runs. Passed once to `new`.
+#[near(serializers = [json])]
+pub struct OutlayerSetup {
+    /// The OutLayer contract (`outlayer.testnet`).
+    pub outlayer: AccountId,
+    /// https URL of the published WASI module.
+    pub wasm_url: String,
+    /// sha256 of that module, 64 lowercase hex.
+    pub wasm_hash: String,
+    /// Account that owns the OutLayer secret row.
+    pub secrets_account: AccountId,
+    /// Profile name of that secret row.
+    pub secrets_profile: String,
+}

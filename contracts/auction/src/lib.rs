@@ -110,39 +110,32 @@ pub struct AuctionContract {
 
 #[near]
 impl AuctionContract {
-    /// `wasm_url` and `wasm_hash` pin the WASI module OutLayer runs (hash is
-    /// 64 lowercase hex). `secrets_account` and `secrets_profile` name the
-    /// OutLayer secret row that holds the TEE master secret.
+    /// `setup.wasm_url` and `setup.wasm_hash` pin the WASI module OutLayer
+    /// runs (hash is 64 lowercase hex). `setup.secrets_account` and
+    /// `setup.secrets_profile` name the OutLayer secret row that holds the
+    /// TEE master secret.
     #[init]
-    pub fn new(
-        registry: AccountId,
-        usdc: AccountId,
-        outlayer: AccountId,
-        wasm_url: String,
-        wasm_hash: String,
-        secrets_account: AccountId,
-        secrets_profile: String,
-    ) -> Self {
+    pub fn new(registry: AccountId, usdc: AccountId, setup: OutlayerSetup) -> Self {
         require!(
-            wasm_url.starts_with("https://") && wasm_url.len() <= 300,
+            setup.wasm_url.starts_with("https://") && setup.wasm_url.len() <= 300,
             "wasm_url must be an https URL"
         );
         require!(
-            logic::is_hash64(&wasm_hash),
+            logic::is_hash64(&setup.wasm_hash),
             "wasm_hash must be 64 lowercase hex characters"
         );
         require!(
-            !secrets_profile.is_empty() && secrets_profile.len() <= 64,
+            !setup.secrets_profile.is_empty() && setup.secrets_profile.len() <= 64,
             "secrets_profile must be 1 to 64 bytes"
         );
         Self {
             registry,
             usdc,
-            outlayer,
-            wasm_url,
-            wasm_hash,
-            secrets_account,
-            secrets_profile,
+            outlayer: setup.outlayer,
+            wasm_url: setup.wasm_url,
+            wasm_hash: setup.wasm_hash,
+            secrets_account: setup.secrets_account,
+            secrets_profile: setup.secrets_profile,
             limits: Limits::default(),
             tee_pubkey: None,
             key_requested_at: 0,
