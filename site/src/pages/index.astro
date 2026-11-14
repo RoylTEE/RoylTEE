@@ -43,6 +43,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
         <p class="lead">The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it. The registry account itself still holds one full access key on testnet; see Real and Simulated below.</p>
         <div class="actions">
           <a class="btn primary" href={DASHBOARD_URL}>Open the registry</a>
+          <a class="btn" href="/verify">Verify every claim</a>
           <a class="btn" href="#verify">Check it yourself</a>
         </div>
         <p class="caption">Registry contract <a class="acct-link" href={accountUrl(REGISTRY)} target="_blank" rel="noopener">{REGISTRY}</a></p>
@@ -187,6 +188,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
       </div>
       <pre class="code"><code>{curl}</code></pre>
       <p class="muted">From a clone of the repository, <code class="mono">npm run verify:testnet</code> checks all 13 share accounts, the code hashes and the balances.</p>
+      <p class="muted">The <a class="link" href="/verify">Verify page</a> lists every claim with its code, its test and its transaction, runs the live checks in your browser, and shows what happens when someone tries to break it.</p>
     </div>
   </section>
 </Base>

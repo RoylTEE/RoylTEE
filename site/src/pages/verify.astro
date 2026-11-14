@@ -1,10 +1,57 @@
 ---
 import App from '../layouts/App.astro';
+import { CLAIMS, ATTACKS, txOutcome } from '../data/claims';
+import { txUrl, accountUrl } from '../data/testnet';
+const REPO = 'https://github.com/RoylTEE/RoylTEE/blob/main/';
+const statusText = { live: 'Reading', test: 'Test only', pending: 'Pending deploy' } as const;
+const attackText = { refused: 'Refused on chain', contained: 'Contained on chain', test: 'Test only', pending: 'Pending deploy' } as const;
 const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \\
   -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"s2.reg.royltee-dev.testnet"}}'`;
 ---
-<App area="verify" title="Verify" intro="Check the deployment yourself: the code running on each contract, the share accounts with no keys, and the keys still left on the contract accounts. Everything here is read live.">
+<App area="verify" title="Verify" intro="Check the deployment yourself: every claim with its code, its test and its transaction, the code running on each contract, the share accounts with no keys, and the keys still left on the contract accounts. Everything marked live is read from testnet now, with view calls only.">
   <section class="figures kpi" data-vfig><p class="loading figure">Reading testnet</p></section>
+  <section class="figures kpi" data-claims-sum><p class="loading figure">Reading claims</p></section>
+  <section class="panel" aria-labelledby="cl-h" id="claims">
+    <div class="panel-head"><h2 id="cl-h">Every claim, checked</h2><span class="caption">Claim, code, test, evidence</span></div>
+    <ul class="proofs">
+      {CLAIMS.map((c) => (
+        <li class="proof" data-claim={c.id} data-check={c.check ?? ''} data-status={c.status}>
+          <div class="proof-top">
+            <p class="proof-claim">{c.claim}</p>
+            <div class="proof-result" data-result><span class={`badge ${c.status === 'pending' ? 'warn' : c.status === 'test' ? 'plain' : 'info'}`}>{statusText[c.status]}</span><div class="caption" data-detail></div></div>
+          </div>
+          {c.note && <p class="caption">{c.note}</p>}
+          <dl class="proof-grid">
+            <div><dt>Code</dt><dd>{c.code.map((r) => <div><a class="link mono hash" href={`${REPO}${r.file}`} target="_blank" rel="noopener">{r.file.split('/').pop()}</a> <span class="mono hash">{r.fn}</span></div>)}</dd></div>
+            <div><dt>Tests</dt><dd>{c.tests.length ? c.tests.map((t) => <div class="mono hash">{t}</div>) : <span class="caption">none until deployed</span>}</dd></div>
+            <div><dt>On-chain evidence</dt><dd>{c.evidence.length ? c.evidence.map((e) => (
+              'tx' in e
+                ? <div><a class="acct-link" href={txUrl(e.tx)} target="_blank" rel="noopener" title={txOutcome(e.tx)}>{e.tx.slice(0, 8)}</a> <span class="caption">{e.what} ({txOutcome(e.tx)})</span></div>
+                : <div><a class="acct-link" href={accountUrl(e.account)} target="_blank" rel="noopener">{e.account}</a> <span class="caption">{e.what}</span></div>
+            )) : <span class="caption">Pending deploy</span>}</dd></div>
+          </dl>
+        </li>
+      ))}
+    </ul>
+    <p class="panel-foot">Live checks use read-only view calls to a public testnet node. A pass means the chain matches the claim now. The test names are in contracts/ and site/tests; the repository test <span class="mono">tests/claims.test.ts</span> fails if a name here does not exist. Rows marked Pending deploy have nothing on chain yet and are not counted as passing.</p>
+  </section>
+  <section class="panel" aria-labelledby="br-h" id="break">
+    <div class="panel-head"><h2 id="br-h">Try to break it</h2><span class="caption">Attack, what the contract does, proof</span></div>
+    <ul class="proofs">
+      {ATTACKS.map((a) => (
+        <li class="proof" data-attack={a.id}>
+          <div class="proof-top">
+            <p class="proof-claim">{a.attack}</p>
+            <div class="proof-result">{a.tx && <a class="acct-link" href={txUrl(a.tx)} target="_blank" rel="noopener">{a.tx.slice(0, 8)}</a>} <span class={`badge ${a.status === 'refused' ? 'ok' : a.status === 'pending' ? 'warn' : a.status === 'contained' ? 'info' : 'plain'}`}>{attackText[a.status]}</span></div>
+          </div>
+          <p class="proof-does">{a.result}</p>
+          {a.note && <p class="caption">{a.note}</p>}
+          <p class="caption">Test: {a.tests.length ? a.tests.map((t, i) => <><span class="mono hash">{t}</span>{i < a.tests.length - 1 ? ', ' : ''}</>) : 'none until deployed'}</p>
+        </li>
+      ))}
+    </ul>
+    <p class="panel-foot">Where a row says Test only, no transaction exists: the refusal was proven in the sandbox, not on testnet. Open the linked transactions to read the contract's own error text.</p>
+  </section>
   <section class="panel" aria-labelledby="ch-h">
     <div class="panel-head"><h2 id="ch-h">Contract code</h2><span class="caption">Code hash on chain now against the deploy record</span></div>
     <div class="table-wrap" data-code><p class="loading panel-body">Reading code hashes</p></div>
@@ -32,5 +79,16 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
 <script>import '../scripts/verify.ts';</script>
 <style is:global>
   .code { margin: 0; padding: var(--s4); background: var(--ink); color: #f3f1ea; border-radius: var(--r-ctl); overflow-x: auto; font-family: var(--mono); font-size: var(--fs-12); line-height: 1.6; }
-  .hash { font-family: var(--mono); font-size: var(--fs-12); }
+  .hash { font-family: var(--mono); font-size: var(--fs-12); overflow-wrap: anywhere; }
+  .proofs { list-style: none; margin: 0; padding: 0; }
+  .proof { padding: var(--s4) var(--s5); border-top: 1px solid var(--rule); display: grid; gap: var(--s2); }
+  .proof:first-child { border-top: 0; }
+  .proof-top { display: flex; justify-content: space-between; gap: var(--s4); align-items: flex-start; }
+  .proof-claim { margin: 0; font-weight: 500; }
+  .proof-result { flex: 0 0 15rem; text-align: right; }
+  .proof-does { margin: 0; }
+  .proof-grid { margin: 0; display: grid; grid-template-columns: 1fr 1.2fr 1.6fr; gap: var(--s4); }
+  .proof-grid dt { font-size: var(--fs-12); color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: var(--s1); }
+  .proof-grid dd { margin: 0; display: grid; gap: var(--s1); }
+  @media (max-width: 900px) { .proof-grid { grid-template-columns: 1fr; } .proof-top { flex-direction: column; } .proof-result { flex: none; text-align: left; } }
 </style>
