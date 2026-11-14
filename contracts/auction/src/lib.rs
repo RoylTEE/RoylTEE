@@ -71,6 +71,9 @@ pub const GAS_KEY_CB: Gas = Gas::from_tgas(15);
 pub const GAS_NFT_TRANSFER: Gas = Gas::from_tgas(25);
 pub const GAS_DELIVERED_CB: Gas = Gas::from_tgas(60);
 pub const GAS_RETURNED_CB: Gas = Gas::from_tgas(10);
+pub const GAS_NFT_TOKEN: Gas = Gas::from_tgas(10);
+/// Longest `nft_token` answer read when checking who holds a share.
+pub const MAX_TOKEN_RETURN: usize = 16 * 1024;
 pub const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 pub const GAS_WITHDRAW_CB: Gas = Gas::from_tgas(8);
 /// Gas a `settle` call must carry: the OutLayer call plus the callback chain.

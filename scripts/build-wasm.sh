@@ -25,8 +25,8 @@ mkdir -p contracts/res
 cargo build -p vault --target "$TARGET" --release --target-dir target/wasm
 cp "$OUT/vault.wasm" contracts/res/vault.wasm
 
-cargo build -p mock_usdc -p registry -p test_receiver -p auction --target "$TARGET" --release --target-dir target/wasm
-for c in mock_usdc registry test_receiver auction; do
+cargo build -p mock_usdc -p registry -p test_receiver -p auction -p mock_outlayer --target "$TARGET" --release --target-dir target/wasm
+for c in mock_usdc registry test_receiver auction mock_outlayer; do
   cp "$OUT/$c.wasm" "contracts/res/$c.wasm"
 done
 

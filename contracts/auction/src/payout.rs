@@ -77,6 +77,54 @@ impl AuctionContract {
         self.start_return(auction_id.0)
     }
 
+    /// For a cancelled auction whose share left some other way (for example
+    /// the registrar moved it with `registrar_transfer` after this contract's
+    /// credential was suspended): reads the owner from the registry and, if
+    /// it is no longer this contract, marks the share as out. Anyone can call.
+    pub fn refresh_share(&self, auction_id: U64) -> Promise {
+        let a = self.auction(auction_id.0);
+        require!(a.status == Status::Cancelled, "auction is not cancelled");
+        require!(a.share_held, "the share is already out");
+        require!(!a.returning, "a return is in flight");
+        Promise::new(self.registry.clone())
+            .function_call(
+                "nft_token".to_string(),
+                json_bytes(json!({ "token_id": a.token_id })),
+                NearToken::from_yoctonear(0),
+                GAS_NFT_TOKEN,
+            )
+            .then(
+                Self::ext(env::current_account_id())
+                    .with_static_gas(GAS_RETURNED_CB)
+                    .on_share_checked(auction_id.0),
+            )
+    }
+
+    #[private]
+    pub fn on_share_checked(&mut self, auction_id: u64) -> bool {
+        let owner = callback_result(MAX_TOKEN_RETURN)
+            .and_then(|b| serde_json::from_slice::<Value>(&b).ok())
+            .and_then(|v| v.get("owner_id").and_then(Value::as_str).map(str::to_owned));
+        let Some(owner) = owner else { return false };
+        if owner == env::current_account_id().as_str() {
+            return false;
+        }
+        let token_id = {
+            let a = self.auction_mut(auction_id);
+            if a.status != Status::Cancelled || !a.share_held || a.returning {
+                return false;
+            }
+            a.share_held = false;
+            a.token_id.clone()
+        };
+        self.token_auction.remove(&token_id);
+        emit(
+            "share_out",
+            json!({ "auction_id": U64(auction_id), "owner": owner }),
+        );
+        true
+    }
+
     #[private]
     pub fn on_returned(&mut self, auction_id: u64) -> bool {
         let ok = callback_result(64).is_some();

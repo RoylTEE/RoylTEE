@@ -1751,6 +1751,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mock_outlayer"
+version = "0.1.0"
+dependencies = [
+ "near-sdk",
+]
+
+[[package]]
 name = "mock_usdc"
 version = "0.1.0"
 dependencies = [

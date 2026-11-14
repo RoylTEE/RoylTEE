@@ -10,7 +10,7 @@
     "test:sandbox": "npm run build:wasm && cargo test -p sandbox_tests -- --nocapture",
     "verify:testnet": "node scripts/verify-testnet.mjs",
     "test:verify": "node --test scripts/verify-testnet.test.mjs",
-    "lint": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && RUSTFLAGS='--cfg near' cargo clippy -p vault -p registry -p mock_usdc -p test_receiver -p auction --target wasm32-unknown-unknown --target-dir target/wasm -- -D warnings && cargo fmt --manifest-path tee/auction-wasi/Cargo.toml --check && cargo clippy --manifest-path tee/auction-wasi/Cargo.toml --all-targets --locked -- -D warnings && cargo clippy --manifest-path tee/auction-wasi/Cargo.toml --target wasm32-unknown-unknown --target-dir tee/auction-wasi/target --locked -- -D warnings",
+    "lint": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && RUSTFLAGS='--cfg near' cargo clippy -p vault -p registry -p mock_usdc -p test_receiver -p auction -p mock_outlayer --target wasm32-unknown-unknown --target-dir target/wasm -- -D warnings && cargo fmt --manifest-path tee/auction-wasi/Cargo.toml --check && cargo clippy --manifest-path tee/auction-wasi/Cargo.toml --all-targets --locked -- -D warnings && cargo clippy --manifest-path tee/auction-wasi/Cargo.toml --target wasm32-unknown-unknown --target-dir tee/auction-wasi/target --locked -- -D warnings",
     "test:wasi": "cargo test --manifest-path tee/auction-wasi/Cargo.toml --locked",
     "test:auction": "node --test scripts/auction/auction.test.mjs"
   }
