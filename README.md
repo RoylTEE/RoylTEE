@@ -8,12 +8,12 @@ The payout address never changes, only who controls it. An agent can pay it, but
 
 Track: NFTs That Do Something (`nfts`). Testnet only, no real money. No wallet and no keys are needed for anything below.
 
-1. **Open the check page:** https://royltee.vercel.app/verify. It reads NEAR testnet live in your browser (view calls only) and lists every claim with its code, its test and its transaction.
+1. **Open the check page:** https://royltee.app/verify (UNVERIFIED: the custom domain has not been checked serving yet, see the note below). It reads NEAR testnet live in your browser (view calls only) and lists every claim with its code, its test and its transaction.
 2. **Or run one command** (Node 18 or newer, no install, read only): `git clone https://github.com/RoylTEE/RoylTEE.git && cd RoylTEE && npm run verify:testnet`
-3. **What you should see.** The command prints one `PASS` line per check and ends with `ALL CHECKS PASSED`: 15 share vaults with `0 access keys`, every code hash equal to `deployments/testnet.json`, the recorded owner of every share, and the solvency line. The page shows `3/3` code hashes matching, `15/15` vaults keyless and `8/8` claims passing a live check. Three rows say Recorded on chain (the registry redeploy, the split sheet and the auction); they show transactions but are not counted in the live total.
+3. **What you should see.** The command prints one `PASS` line per check and ends with `ALL CHECKS PASSED`: 15 share vaults with `0 access keys`, every code hash equal to `deployments/testnet.json`, the recorded owner of every share, and the solvency line. The page shows `3/3` code hashes matching, `15/15` share accounts running the vault code, `15/15` share accounts keyless, `2` full access keys on contract accounts (the registry and Mock USDC, labeled Kept on testnet) and `8/8` claims passing a live check. Three rows say Recorded on chain (the registry redeploy, the split sheet and the auction); they show transactions but are not counted in the live total. These figures were read from the rendered `/verify` page of the local dev server on 2026-11-14 at 12:29 UTC (headless Chrome, live testnet reads).
 4. **Then read:** [Every claim, checked](#every-claim-checked), [Try to break it](#try-to-break-it), [The track brief, item by item](#the-track-brief-item-by-item) and the [design whitepaper](docs/WHITEPAPER.md) (version 1.0, 14 November 2026; PDF in [site/public/royltee-whitepaper.pdf](site/public/royltee-whitepaper.pdf)).
 
-UNVERIFIED (pre-submission item): on 2026-11-14 08:07 UTC the hosted site answered with a redirect to a Vercel login page. Open the project to the public, check the `/verify` link in a private window, then delete this note.
+UNVERIFIED (pre-submission item): the custom domain `https://royltee.app` was bought and added to the Vercel project by the owner, and nobody has checked yet that it serves the site. A request from the build machine at about 12:28 UTC on 2026-11-14 got no response (curl status 000; the name resolved to a private address there, so this says nothing about the public internet). On 2026-11-14 at 08:07 UTC and again at about 12:28 UTC the default address `https://royltee.vercel.app/verify` answered with a redirect to a Vercel login page (status 302), so deployment protection was on. Open the project to the public, check `https://royltee.app/verify` in a private window, then delete this note.
 
 RoylTEE is a permissioned, business to business registry of music rights shares on NEAR testnet. Each rights share is an NEP-171 NFT. Each share NFT controls its own NEAR sub-account (a "vault") that receives that share's royalty money. The vault has zero access keys. Only the registry contract can move money out of it, and only to whoever holds the NFT at that moment, with one registrar exception for rejected shares (see [Who can hold a token](#who-can-hold-a-token)). On testnet today the registry account itself still holds one full access key (kept on testnet by decision so late fixes stay possible; on mainnet it would be deleted after the final deploy, or upgrades handed to a multisig or DAO, and proven by the same zero-keys check the share vaults pass), so whoever holds that key could replace the registry code and with it these rules; the guarantee is only as strong as that key. The mock USDC account keeps its key for the same reason, and so does the auction account.
 
@@ -67,12 +67,12 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 | 4 | `npm test` | Builds all contracts to wasm, prints the size and sha256 of each file in `contracts/res/`, then runs every unit test and the near-workspaces sandbox tests: `9 passed` (agents), `15 passed` (auction), `4 passed` (disputes), `4 passed` (final), `4 passed` (limits), `4 passed` (review), `11 passed` (sandbox), `3 passed` (upgrade), then the 14 WASI host tests and the 18 Node tests. 54 sandbox tests, 318 in total. Takes a few minutes. |
 | 5 | Optional: `npm run lint` | `cargo fmt --check`, then `cargo clippy -D warnings` for the host and wasm targets; ends with `Finished` and exit code 0. |
 | 6 | Open the explorer links under [Live testnet deployment](#live-testnet-deployment) | The same accounts, the catalog sale transfer of `s2`, the refused outsider claim, the agent payment and the dispute, on NEAR testnet. |
-| 7 | Site (in `site/`): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest: `Test Files  23 passed (23)` and `Tests  243 passed (243)`; `astro check`: `0 errors`; a build in `site/.vercel/output`. |
-| 8 | Site, local: `npm run dev` (at the repo root or in `site/`, after the `npm ci` of step 7), then open http://127.0.0.1:4321 | The pages listed under [Website and help chat](#website-and-help-chat). `/admin` answers 401 when not signed in. Without server secrets the help chat and support API answer 503 ("not configured yet"). `site/README.md` explains how to run the API locally with in-memory storage. |
+| 7 | Site (in `site/`): `cd site && npm ci && npm test && npm run typecheck && npm run build` | Vitest: `Test Files  27 passed (27)` and `Tests  272 passed (272)`; `astro check`: `0 errors`; a build in `site/.vercel/output`. |
+| 8 | Site, local: `npm run dev` (at the repo root or in `site/`, after the `npm ci` of step 7), then open http://127.0.0.1:4321 | The pages listed under [Website and help chat](#website-and-help-chat), each answering 200 (checked 2026-11-14 UTC). `/admin` answers 401 when not signed in. Without server secrets the help chat and support API answer 503 ("not configured yet"). `site/README.md` explains how to run the API locally with in-memory storage. |
 
-Hosted site: https://royltee.vercel.app (UNVERIFIED: which commit it runs, its live security headers, whether chat and support are configured, and whether a wallet sign-in works there have not been checked yet. **Pre-submission item:** check it in a private window and record the result here.)
+Hosted site: https://royltee.app (custom domain; UNVERIFIED that it serves the site, see the note above; the default address https://royltee.vercel.app answered with a Vercel login redirect on 2026-11-14. Also UNVERIFIED: which commit it runs, its live security headers, whether chat and support are configured, and whether a wallet sign-in works there have not been checked yet. **Pre-submission item:** check it in a private window and record the result here.)
 
-The numbers above (steps 2 to 5 and 7) come from running these commands on 2026-11-14 (UTC) on the merged release tree: the registry code deployed on testnet since the final redeploy plus the sealed-bid auction (the local registry build equals the on chain sha256, see [Live testnet deployment](#live-testnet-deployment)). Step 8 (every page answered 200 on the local dev server, `/admin` answered 401, chat and ticket API 503 without server secrets) was last run on 2026-11-13 (UTC) and was not re-run for this tree (UNVERIFIED since).
+The numbers above (steps 2 to 5 and 7) come from running these commands on 2026-11-14 (UTC) on the merged release tree: the registry code deployed on testnet since the final redeploy plus the sealed-bid auction (the local registry build equals the on chain sha256, see [Live testnet deployment](#live-testnet-deployment)). Step 8 was re-run on this tree on 2026-11-14 at about 12:30 UTC (`npm run dev` in `site/`, `curl` on each URL): `/`, `/dashboard/`, `/activity`, `/auction`, `/catalog/`, `/catalog/lookup`, `/catalog/splits`, `/shares/`, `/shares/accounts`, `/shares/claims`, `/share?id=s1`, `/disputes`, `/registrar`, `/agents`, `/member`, `/verify`, `/docs`, `/help`, `/whitepaper` and `/royltee-whitepaper.pdf` all answered 200 (20 URLs), `/admin` answered 401 and an unknown path answered 404. `POST /api/chat` and `POST /api/support/tickets` without server secrets answered 503 ("Support storage is not configured yet.").
 
 Demo scripts: there are no separate `seed-demo`, `simulated-payer` or `scripted-agent` scripts. The on-chain demo (seed accounts and works, the Simulated payer's payments, the scripted agent's calls) was run as the `near` CLI commands written out step by step in [DEPLOY_PLAN.md](DEPLOY_PLAN.md), steps 1 to 13 (the split sheet scene is step 16 and the auction demo is step 17; the auction bids were sealed with `scripts/auction/encrypt-bid.mjs`), and every resulting transaction id is in `deployments/testnet.json` (the auction's own record is `deployments/auction-testnet.json`). The key check (zero keys on every vault, the registry and mock USDC keys equal to the record, the agent's single scoped function call key) is `npm run verify:testnet` (`scripts/verify-testnet.mjs`), not a separate `verify-keys` script.
 
@@ -155,6 +155,35 @@ Ownership data for a song lives in split sheets, PDFs, contracts and payer datab
 RoylTEE gives every share one stable payout address. A payer pays the share's vault (or pays the work once and the registry splits it). Who controls that vault is decided by the registry at the moment of a claim, so a sale changes the controller without changing the address any payer uses.
 
 ## How it works
+
+The flow from a registered share to a payout, and the sealed-bid sale of a share. Boxes marked Simulated use Mock USDC, which has no value. Only the settle step of the auction runs in a TEE.
+
+```mermaid
+flowchart TD
+    M["Member registers a work and a share"] --> R["Registry mints the share NFT and creates its vault<br/>(a NEAR account with 0 access keys)"]
+    R --> A{"Registered by the<br/>work registrant?"}
+    A -->|yes| ACT["Share is active"]
+    A -->|no| PEND["Share is pending"]
+    PAY["Payer pays the work once<br/>(Mock USDC, Simulated)"] --> SPLIT["Registry splits by basis points<br/>exact to the last unit"]
+    SPLIT --> V["Vault of each active share"]
+    SPLIT --> ESC["Escrow: part for a pending share,<br/>a contested share, or no share"]
+    PEND -. "approve_share signed by the registrant" .-> REL["Held money released to the vault"]
+    ESC --> REL
+    REL --> V
+    ACT --> V
+    V --> CL["claim() pays the current NFT holder only"]
+    CL --> H["Holder receives the money"]
+    V -. "share sold: only the NFT moves,<br/>the vault address stays" .-> NEW["New holder claims"]
+    ACT -. "nft_transfer_call" .-> LIST["Auction contract holds the share<br/>(reserve, max deposit, end time)"]
+    LIST --> BID["Bidders send sealed bids<br/>(ciphertext on chain, equal deposits)"]
+    BID --> SET["settle() asks OutLayer to run the audited module"]
+    SET --> TEE["Inside the TEE: open the bids,<br/>print winner and second price"]
+    TEE --> MOVE["Contract moves the share to the winner<br/>and credits seller, winner change, losers"]
+    MOVE --> W["withdraw() pays out"]
+    TEE -. "outlayer-verify: 5 of 5 checks" .-> PROOF["Attestation proof (off chain check)"]
+```
+
+Plain drawing of the money path:
 
 ```
 payer --ft_transfer_call (work, period, statement hash)--> registry (reg.royltee-dev.testnet)
@@ -262,7 +291,7 @@ Test suites (counts from `npm test` and the site's `npm test` on the merged rele
 | Auction WASI module host tests | `tee/auction-wasi/src/lib.rs` | 14 |
 | Auction Node tests (real module under WASI) | `scripts/auction/auction.test.mjs` | 18 |
 | Sandbox: auction (mock OutLayer, real module answers) | `contracts/tests/tests/auction.rs` | 15 |
-| Site (help chat, tickets, limits, dashboard) | `site/tests/` | 243 (23 files) |
+| Site (help chat, tickets, limits, dashboard) | `site/tests/` | 272 (27 files) |
 
 Brief test list to sandbox tests (every sandbox test ends with a solvency check; tests that touch a vault also check it has zero keys):
 
@@ -386,7 +415,7 @@ On mainnet both full-access keys would be deleted after the final deploy (or upg
 
 ## Website and help chat
 
-The site is an Astro app in `site/`, hosted at https://royltee.vercel.app (hosted state UNVERIFIED, see the note under Steps). This section describes the site on the merged tree (contract, server and UI branches).
+The site is an Astro app in `site/`, hosted at https://royltee.app (UNVERIFIED, see the note under Steps; the default address is https://royltee.vercel.app). This section describes the site on the merged tree (contract, server and UI branches).
 
 - Live reads: most pages read NEAR testnet from your browser with read-only RPC view calls (`call_function`, `view_account` and `view_access_key_list` in `site/src/scripts/chain.ts`, sent to `test.rpc.fastnear.com` with `rpc.testnet.near.org` as the fallback). A view call cannot change anything on chain.
 - Recorded demo: the demo steps, mints, transfers and registrar events (transaction ids and times) are copied into `site/src/data/testnet.ts` from `deployments/testnet.json` and this README. Pages that show them link each row to its transaction on the explorer.
@@ -586,7 +615,7 @@ site/src/pages           the pages listed under Website and help chat, plus the 
 site/src/scripts         browser code: read-only testnet view calls (chain.ts), wallet sign in and transactions (wallet.ts)
 site/src/server          server side: help chat, tickets, sign in, admin checks, rate limits, security headers
 site/src/data/testnet.ts accounts and the recorded demo, copied from deployments/testnet.json
-site/tests               Vitest tests for the site (243 in 23 files)
+site/tests               Vitest tests for the site (272 in 27 files)
 .github/workflows/ci.yml CI: wasm build, fmt, clippy, Rust tests, site typecheck, tests and build, gitleaks
 spike/outlayer/          throwaway OutLayer call-path spike (its own Cargo workspace, not a root workspace member): echo module, probe contract, evidence bundle
 docs/WHITEPAPER.md       design whitepaper, version 1.0 (14 November 2026); site/public/royltee-whitepaper.pdf is made from the same text

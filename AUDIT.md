@@ -182,3 +182,40 @@ Branch `fix/final-contract`, made while the registry key still existed, because 
 | L1, L2, L3, L8 | documented in T19 and T19b | none | n/a |
 
 What the evidence does not show: the paths depend on a callback that never commits, which a sandbox node does not produce. The sandbox tests write the state such a callback would leave with `patch_state` and then run the real recovery calls against a real vault and token. The recovery is quarantine plus a registrar decision backed by the public receipt outcome (a stated registrar trust, T12), so its correctness after key deletion depends on the registrar acting. No code decides a stale payout lock any more because a balance cannot tell a failed withdraw from a paid one plus a deposit of the same size, so without a registrar that share stays frozen (T19). The `near contract deploy ... with-init-call` command line was not sent to a network; the sandbox test sends the same two actions in one batch.
+
+## Dependency audits and accepted risks (2026-11-14)
+
+Run on 2026-11-14 at about 12:30 UTC on the merged release tree, with the RustSec advisory database loaded at that time (1509 advisories) and the npm registry advisories. These are tool results and not a review. Nothing was upgraded in this pass: a dependency change would change the wasm that is deployed on testnet, and the code hashes in `deployments/` must keep matching the local build.
+
+### Rust: `cargo audit` (root workspace)
+
+Result: `error: 1 vulnerability found!` and `warning: 3 allowed warnings found`.
+
+| ID | Crate | Kind | Where it comes from | Decision |
+|---|---|---|---|---|
+| RUSTSEC-2026-0387 | `crypto-bigint` 0.5.5 | Vulnerability: timing variability in operations meant to be constant time. Fix: `>=0.7.6` | Dev and test only (see the evidence below) | Accepted, test only |
+| RUSTSEC-2022-0054 | `wee_alloc` 0.4.5 | Unmaintained | Allocator pulled in by `near-sdk` 5.30.1, in the wasm contracts that use `near-sdk` (registry, Mock USDC, auction) | Accepted: no vulnerability is reported, only that it is unmaintained. The vault does not use it (raw host functions, no allocator) |
+| RUSTSEC-2024-0449 | `unsafe-libyaml` 0.2.11 | Unmaintained | `serde_yaml` of `near-parameters` 0.38.1, reached through `near-sdk` and `near-workspaces` | Accepted: test tooling only, not in the wasm build |
+| RUSTSEC-2025-0026 | `registry` 0.1.0 | Unmaintained | Matched by name. Our contract crate is a local path crate called `registry`, and the advisory is about a different crate on crates.io with the same name | Accepted: a name collision, not our dependency. Not renamed, because the package name is part of the build record |
+
+Evidence for RUSTSEC-2026-0387 (`cargo tree -i crypto-bigint`, same day):
+
+- `cargo tree -i crypto-bigint -e normal` prints `nothing to print` for the host and for `--target wasm32-unknown-unknown`: the crate is in no normal dependency path.
+- `cargo tree -p registry -e normal --target wasm32-unknown-unknown` has no line for `crypto-bigint`, `p256` or `near-vm-runner`: the registry wasm that is deployed does not contain it.
+- `cargo tree -i crypto-bigint -e normal,dev` shows the one path: `crypto-bigint` 0.5.5, `elliptic-curve` 0.13.8, `ecdsa` 0.16.9, `p256` 0.13.2, `near-vm-runner` 0.38.1, `near-sdk` 5.30.1, reached only with the `near-sdk` `unit-testing` feature that the contracts turn on as a dev dependency, and by `near-workspaces` in the sandbox test crate.
+
+So the vulnerable code runs only in unit and sandbox tests, which handle no secret. The fix needs a newer `near-sdk` that moves off `crypto-bigint` 0.5; that is a dependency change that would alter the deployed wasm, so it is left for the audit phase of the roadmap.
+
+### Rust: the other lock files
+
+- `tee/auction-wasi` (the WASI module that runs in the TEE, 42 crates): `cargo audit` exit code 0, no vulnerability and no warning.
+- `spike/outlayer` (throwaway spike, 281 crates, not deployed): the same three advisories as above (`crypto-bigint`, `unsafe-libyaml`, `wee_alloc`). Not shipped.
+
+### npm: `npm audit` in `site/`
+
+Result: `6 vulnerabilities (3 moderate, 3 high)`. All six reach the project only through `@astrojs/vercel` 11.0.21 (`npm ls`):
+
+- High (3 entries): `path-to-regexp` 6.1.0 (GHSA-9wv6-86v2-598j, backtracking regular expressions), reached through `@vercel/routing-utils` 6.6.1, and `@astrojs/vercel` itself, which depends on it.
+- Moderate (3 entries): `glob` 13.0.7 (GHSA-3g3m-2fjr-6pw4), `minimatch` 10.2.6 (GHSA-g3hv-75wg-m249) and `@vercel/nft` 1.11.1, which depends on them.
+
+Decision: accepted as build-time findings. `npm audit fix` would change the lock file, and `npm audit fix --force` would install `@astrojs/vercel` 8.0.4, an older major version and a breaking change, so neither was run. These packages are the adapter's build helpers (route rules and file tracing). Our own code does not import any of them (a search of `site/src` and the Astro config finds no use). Whether the adapter's deployed function bundle includes any of them is UNVERIFIED. The repository root has no npm dependencies and no lock file, so `npm audit` does not apply there.
