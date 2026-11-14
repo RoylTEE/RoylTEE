@@ -8,6 +8,8 @@ const stage = (k: string) => STAGES.find((s) => s.key === k)!;
 const short = (h: string) => `${h.slice(0, 8)}...`;
 ---
 <App area="auction" title="Sealed-bid auction" intro="One real sale of a share NFT on NEAR testnet: sealed bids, a second price opened inside a TEE, and every step with its transaction. Read only: this page does not list, bid or settle." period={false}>
+  <figure class="aban"><img src="/art/hdr-auction.webp" width="1584" height="672" alt="Flat retro illustration: a record turntable with a sealed box on it and envelopes floating above in a beam of light." decoding="async" /></figure>
+
   <section class="panel" aria-labelledby="what-h">
     <div class="panel-head"><h2 id="what-h">How the auction works</h2><span class="badge sim">Simulated money</span></div>
     <div class="panel-body">
@@ -98,4 +100,8 @@ const short = (h: string) => `${h.slice(0, 8)}...`;
   .hash { font-family: var(--mono); font-size: var(--fs-12); overflow-wrap: anywhere; }
   .sub { font-size: var(--fs-14); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 var(--s2); }
   @media (max-width: 767px) { .panel-body.two { grid-template-columns: 1fr; } }
+</style>
+<style>
+  .aban { margin: 0 0 var(--s5); border-radius: var(--r-card); overflow: hidden; border: 1px solid var(--edge); background: var(--night); }
+  .aban img { width: 100%; height: clamp(8rem, 16vw, 13rem); object-fit: cover; object-position: 62% 50%; }
 </style>

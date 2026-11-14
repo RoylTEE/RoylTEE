@@ -1,0 +1,28 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import '../styles/landing.css';
+import { DASHBOARD_URL } from '../consts';
+---
+<Base current="audience" title="Catalog buyers . RoylTEE" description="How a catalog buyer can check shares, payout accounts and unclaimed money on NEAR testnet without a wallet.">
+  <PageHero variant="card" art="card-buyers" w={1200} h={896} alt="Flat retro illustration: two vintage microphones on either side of a chasm, with envelopes passing toward a domed vault in the middle." eyebrow="For catalog buyers" title="Check the catalog before you pay for it" intro="Who holds each share, where its money goes and what is waiting there, all on a public chain.">
+    <div class="p-cta" style="margin-top:0"><a class="btn primary" href={DASHBOARD_URL}>Open the demo dashboard</a><a class="btn" href="/how-it-works">How it works</a></div>
+  </PageHero>
+  <section class="p-sec" id="buyers">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">For catalog buyers</p><h2>Check what you are buying, without asking the seller</h2></div>
+      <div class="p-prose"><h3>The problem</h3><p>Before a catalog sale you need to know who holds each share, where its money goes and what is unclaimed. Those records belong to other parties, and a seller can quietly keep the means to redirect payments.</p></div>
+      <div class="p-head" style="margin-top:var(--s7)"><h3>What RoylTEE does about it</h3></div>
+      <div class="p-cols two"><div class="p-card"><h3>A public record of who holds what</h3><p>Each share NFT has a recorded owner on a public chain. The share page checks every recorded transfer against the owner on chain now.</p></div><div class="p-card"><h3>A payout account you can inspect</h3><p>Its live key list is public. An empty list means nobody, including the registry, can sign for it.</p></div><div class="p-card"><h3>Unclaimed money comes along</h3><p>What the vault holds goes to the new holder with the share. On testnet the buyer of s2 claimed the 0.5 paid before the sale.</p></div><div class="p-card"><h3>Checks without a wallet</h3><p>Anyone can run the public checks against a node or with one command, with no login.</p></div></div>
+      <div class="p-head" style="margin-top:var(--s7)"><h3>Try it in the demo dashboard</h3><p class="muted">Every step uses testnet data. Money is Simulated.</p></div>
+      <ol class="p-walk"><li><span class="k">1. Look the share up</span><span><a class="l-textlink" href="/catalog/lookup/">Catalog, Lookup</a>, then <a class="l-textlink" href="/share?id=s2">share s2</a>.</span></li><li><span class="k">2. Read the holders</span><span>On the share page, the Holders tab lists the recorded mint and transfer events and says whether they match the owner on chain now.</span></li><li><span class="k">3. Check the keys</span><span><a class="l-textlink" href="/shares/accounts/">Share accounts</a> lists all 15 vaults with their live key lists.</span></li><li><span class="k">4. Run the checks yourself</span><span><a class="l-textlink" href="/verify">Verify</a> shows what each claim rests on, and <a class="l-textlink" href="/security#verify">Security, check it yourself</a> has the node call and the one command.</span></li><li><span class="k">5. See a sale end to end</span><span><a class="l-textlink" href="/how-it-works#lifecycle">How it works, the catalog sale</a>.</span></li></ol>
+      <p class="p-note">RoylTEE records what permissioned members register. It does not find ownership by itself, and a wrong registration stays wrong until a dispute corrects it. The registry does not check that a signed legal assignment exists, so the legal agreement still sits next to the record.</p>
+    </div>
+  </section>
+  <section class="p-sec alt">
+    <div class="container">
+      <div class="p-head"><h2>See the proof behind it</h2></div>
+      <div class="p-cta" style="margin-top:0"><a class="btn primary" href="/how-it-works">How it works, step by step</a><a class="btn" href="/verify">Verify on testnet</a><a class="btn" href="/security">Security</a><a class="btn" href="/faq">FAQ and glossary</a></div>
+    </div>
+  </section>
+</Base>

@@ -1,0 +1,27 @@
+---
+import { txUrl, type Scene } from '../data/testnet';
+interface Props { scenes: Scene[]; caption?: string }
+const { scenes, caption } = Astro.props;
+---
+<div class="panel">
+  <div class="table-wrap">
+    <table class="ledger rows-sm">
+      {caption && <caption class="sr">{caption}</caption>}
+      <thead><tr><th>Step</th><th>What happened</th><th>Result</th><th>Transaction</th></tr></thead>
+      <tbody>
+        {scenes.map((s) => (
+          <tr>
+            <td class="p nowrap"><strong>{s.step}</strong>{s.simulated && <span class="badge sim">Simulated payer</span>}{s.agent && <span class="badge info">Scripted agent</span>}</td>
+            <td class="p-wrap">{s.what}<span class="small muted only-wide"><br />{s.shows}</span></td>
+            <td class="p-end">{s.result === 'refused' ? <span class="badge bad">Refused</span> : <span class="badge ok">Done</span>}</td>
+            <td class="m">{s.txs.map((h) => <a class="acct-link" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
+<style>
+  td :global(.badge) { margin-left: .4rem; }
+  td.m :global(a) { display: inline-block; margin-right: .5rem; white-space: nowrap; }
+</style>

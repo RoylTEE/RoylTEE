@@ -22,7 +22,7 @@ Sources: the repository README, DESIGN.md, THREAT_MODEL.md, DEPLOY_PLAN.md, DECI
 - Later on 2026-11-13 (UTC), on the updated registry: a second Simulated payer payment on work 0 (line-sale-2) paid s1 and s2 0.5 mUSDC each; writer-b, who sold s2, was refused when trying to claim it; buyer-pub claimed it. Works 3 (provenance ai_assisted), 4 (fully_ai, shares on a contract basis) and 5 were registered with shares s8 to s13. The scripted agent paid work 1 with its function call key, was refused when one payment went over its per transaction limit, and paid work 5 correctly even though the work's metadata link and the call itself named outsider as the payee: the contract ignored both and paid s12 and s13 only.
 - The deployed registry has the contract review fixes and the audit fix for the payment forward gas (redeployed 2026-11-14 02:43 UTC) and the final contract fixes (redeployed 2026-11-14 09:09 UTC). The split sheet (approve or reject a share) is on the deployed build; all 15 shares are approved. Vaults s1 to s7 keep the vault code they were created with, which cannot receive a token transfer call; s8 to s13 run the newer vault code.
 - Split sheet scene on chain (2026-11-14 UTC, work 6): writer-a registered the work and its own 50 percent share s14, which is approved at once. writer-b registered the other 50 percent as s15, which is pending because writer-b did not register the work. A Simulated payer payment of 1.0 mUSDC on work 6 paid 0.5 to s14 and held the 0.5 for s15 in escrow. Then writer-a signed approve_share on s15 (event share_approved) and the held 0.5 mUSDC was released to the s15 vault.
-- Share s10 (work 4) was sold in a sealed-bid auction on a separate auction contract on 2026-11-14 (UTC): writer-a listed it, two sealed bids came in, and the settle ran through the OutLayer TEE. buyer-pub won at the second price, 70 mUSDC (Simulated money), so s10 is now owned by buyer-pub. This app has no auction screen.
+- Share s10 (work 4) was sold in a sealed-bid auction on a separate auction contract on 2026-11-14 (UTC): writer-a listed it, two sealed bids came in, and the settle ran through the OutLayer TEE. buyer-pub won at the second price, 70 mUSDC (Simulated money), so s10 is now owned by buyer-pub. The app has a read only Auction page (/auction) for that sale.
 - The registry and token accounts still hold one full access key each, so the code can still be fixed in place. On testnet the owner decided to keep them so late fixes stay possible. On mainnet both keys would be deleted after the final deploy (or upgrades handed to a multisig or DAO) and proven with the same zero keys check the vaults pass. Do not claim the registry is keyless.
 - Vault accounts are created by the registry with no keys at all, ever.
 
@@ -33,7 +33,7 @@ Sources: the repository README, DESIGN.md, THREAT_MODEL.md, DEPLOY_PLAN.md, DECI
 - Mint is two phase: the share stays pending until its vault account exists and is registered with the token. If either step fails, no NFT is minted and the unused deposit is refunded.
 - Each share NFT owns a vault account s<N>.reg.royltee-dev.testnet. The vault has no keys. Its only method is withdraw, and only the registry can call it.
 - Payments: a payer pays a work once with ft_transfer_call to the registry, naming the work group and a statement. The registry splits the amount by basis points and forwards each part to the share vaults in the same receipt chain. Splits use integer math; the remainder goes to the share with the largest basis points, ties to the lowest token number, so the parts add up to the payment exactly.
-- A plain transfer straight into a vault also works and is picked up by sync, which anyone can call. A plain transfer to the registry itself is not attributed and stays stuck by design; there is no sweep.
+- A plain transfer straight into a vault also works and is picked up by sync, which only the holder or the registrar can call. A plain transfer to the registry itself is not attributed and stays stuck by design; there is no sweep.
 - Claims: only the current holder can claim, and the money goes to that holder. A claim locks the share until it settles, so the share cannot be sold mid payout.
 - Catalog sale: the holder transfers the NFT to another verified member. Unclaimed money in the vault moves with the token, and the seller cannot claim after the sale. The sale price itself is settled off chain in this demo.
 - Transfers only go to accounts with an active credential. Marketplace approvals are disabled.
@@ -87,15 +87,18 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 - Is this real money? No. Testnet only, Mock USDC (testnet).
 - Can I buy a share? No. It is a permissioned registry among verified members, not a public sale.
 - Do I need a wallet to read the site? No. A wallet is needed to open support tickets, and to claim or sign split sheets on the Your shares page.
-- Where is the code? The source link on the site is a placeholder until the repository is public.
+- Where is the code? On GitHub at github.com/RoylTEE/RoylTEE, under the MIT license.
 
 ## In app links
 
 - [Home](/)
 - [How it works](/#how)
-- [Holder powers and agent limits](/#agents)
-- [Lifecycle and catalog sale](/#lifecycle)
-- [Trust and privacy](/#trust)
+- [How it works in detail](/how-it-works)
+- [Holder powers and agent limits](/security#agents)
+- [Lifecycle and catalog sale](/how-it-works#lifecycle)
+- [Trust and privacy](/security#trust)
+- [Security](/security)
+- [FAQ and glossary](/faq)
 - [Testnet notice](/#notice)
 - [Registry overview](/dashboard/)
 - [Works and rights](/catalog/)

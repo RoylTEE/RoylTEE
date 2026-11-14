@@ -18,7 +18,7 @@ export function setup(overrides: Record<string, string> = {}) {
     return new Response(JSON.stringify(keys.get(p.account_id)?.has(p.public_key) ? { result: { nonce: 1, permission: 'FullAccess' } } : { result: { nonce: 1, permission: { FunctionCall: { receiver_id: 'x', method_names: [] } } } }));
   }) as typeof fetch;
   const modelCalls: Turn[][] = [];
-  const reply = { text: 'Unclaimed money stays in the share vault, so it moves with the share. See [Lifecycle and catalog sale](/#lifecycle).' };
+  const reply = { text: 'Unclaimed money stays in the share vault, so it moves with the share. See [Lifecycle and catalog sale](/how-it-works#lifecycle).' };
   const deps: Deps = { config, store, now: () => clock.now, fetcher, model: async turns => { modelCalls.push(turns); return reply.text; }, address: '203.0.113.7' };
   let jar = '';
   async function call(route: string, body?: unknown, opts: { method?: string; origin?: string | null; type?: string; cookie?: string; address?: string; auth?: string } = {}) {

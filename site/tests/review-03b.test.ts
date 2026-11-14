@@ -46,14 +46,14 @@ describe('review 03c L3: the agent payment is not labelled Simulated payer', () 
 describe('review 03c M2: power claims match the deployed build', () => {
   const read = (p: string) => readFileSync(new URL(`../src/${p}`, import.meta.url), 'utf8');
   it('does not say every registrar action has a document hash', () => {
-    for (const f of ['pages/registrar.astro', 'pages/index.astro', 'content/help-notes.md']) {
+    for (const f of ['pages/registrar.astro', 'pages/index.astro', 'pages/security.astro', 'content/help-notes.md']) {
       expect(read(f)).not.toMatch(/[Ee]very registrar action (is an event with|carries) a document hash/);
     }
   });
   it('states split sheet approval and the registrar credential refusal as deployed', () => {
     expect(read('pages/registrar.astro')).toMatch(/Hold a credential \(refused by the deployed build/);
     expect(read('pages/member.astro')).not.toMatch(/Not on the deployed build yet/);
-    expect(read('pages/index.astro')).toMatch(/Change a split alone \(except the registrar/);
+    expect(read('pages/security.astro')).toMatch(/Change a split alone \(except the registrar/);
   });
 });
 

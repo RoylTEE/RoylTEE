@@ -5,12 +5,12 @@ interface Props { current?: string }
 const { current = '' } = Astro.props;
 /* Project site navigation. The registry app has its own menu (src/layouts/App.astro). */
 const links = [
-  { key: 'how', t: 'How it works', href: '/#how' },
+  { key: 'how', t: 'How it works', href: '/how-it-works' },
   { key: 'near', t: 'Why NEAR', href: '/#near' },
   { key: 'auction', t: 'Auction', href: '/auction' },
+  { key: 'security', t: 'Security', href: '/security' },
   { key: 'verify', t: 'Verify', href: '/verify' },
   { key: 'whitepaper', t: 'Whitepaper', href: '/whitepaper' },
-  { key: 'docs', t: 'Docs', href: '/docs' },
 ];
 ---
 <header class="site-head">

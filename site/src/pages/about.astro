@@ -1,0 +1,54 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import '../styles/landing.css';
+import { PROJECT_NAME, SOURCE_URL, PITCH } from '../consts';
+---
+<Base current="learn" title="About . RoylTEE" description="What RoylTEE is, why it exists, where it was built, and its license.">
+  <PageHero art="hdr-about" alt="Flat retro illustration: a small domed building and a house lit from within, on a mesa under a dusk sky." eyebrow="About" title="What RoylTEE is, and why" intro={PITCH} />
+
+  <section class="p-sec" id="what">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">What it is</p><h2>A shared record for who is owed what</h2></div>
+      <div class="p-prose">
+        <p>{PROJECT_NAME} is a permissioned, business to business registry of music rights shares on NEAR testnet. Each share is an NFT, and each NFT controls its own payout account, a vault with no access key. Money paid for a work is split by the registry and lands in the vaults. Whoever holds the share claims it.</p>
+        <p>It is a record among verified industry members. It is not sold to the public, it is not an investment product, and nothing on this site is legal advice. The token is evidence and a payout address, not legal title.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="why">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Why it exists</p><h2>The same split is kept in too many places</h2></div>
+      <div class="p-prose">
+        <p>Today, a song's split lives in contracts, emails and spreadsheets held by different parties. When a split changes, every copy has to change, and money can be held, misdirected or sent to the wrong owner. When a catalog is sold, payers have to be told. Software agents that pay royalties can be misled by text they read.</p>
+        <p>{PROJECT_NAME} puts one record in the middle, with a payout address that never changes and rules the contract enforces. It is a demonstration on testnet, with Mock USDC and Simulated identity checks. It is not a live service.</p>
+        <p><a class="l-textlink" href="/how-it-works">How it works</a> &nbsp; <a class="l-textlink" href="/whitepaper">Read the whitepaper</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="p-sec" id="origin">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Where this started</p><h2>Built at NEAR HACKATHON</h2></div>
+      <div class="p-prose">
+        <p>{PROJECT_NAME} was built at <a class="link" href="https://nearhackathon.com" rel="noopener">NEAR HACKATHON</a>, whose development phase ran from 2026-11-01 00:00 UTC to 2026-11-14 23:59 UTC. It is entered in three tracks: <span class="l-tag">nfts</span> <span class="l-tag">privacy</span> <span class="l-tag">security</span>.</p>
+        <p>It is an independent project that runs on NEAR testnet only. No endorsement by NEAR or the event organizers is implied.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="open">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Open source</p><h2>MIT license, published by RoylTEE Labs</h2></div>
+      <div class="p-prose">
+        <p>The code, the contracts, the tests and the documents are open under the MIT license. The commits are published under the name RoylTEE Labs. The dated build record is on the <a class="link" href="/updates">updates page</a>.</p>
+      </div>
+      <div class="p-cta">
+        <a class="btn primary" href={SOURCE_URL} target="_blank" rel="noopener">Source code on GitHub</a>
+        <a class="btn" href="/updates">Updates</a>
+        <a class="btn" href="/help#support">Contact support</a>
+      </div>
+    </div>
+  </section>
+</Base>

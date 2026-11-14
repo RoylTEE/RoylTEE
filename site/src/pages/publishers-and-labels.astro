@@ -1,0 +1,39 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import '../styles/landing.css';
+import { DASHBOARD_URL } from '../consts';
+---
+<Base current="audience" title="Publishers and labels . RoylTEE" description="How RoylTEE helps publishers and labels with split sheets, payouts, agents and catalog sales, with a walkthrough in the demo dashboard.">
+  <PageHero variant="card" art="card-publishers" w={1200} h={896} alt="Flat retro illustration: a filing cabinet with glowing drawers open on a cliff, a gem hovering above it in a beam of light." eyebrow="For publishers and labels" title="Splits and sales that stay in sync" intro="One signed split sheet, exact payouts, and a catalog sale that moves the payout with the share.">
+    <div class="p-cta" style="margin-top:0"><a class="btn primary" href={DASHBOARD_URL}>Open the demo dashboard</a><a class="btn" href="/how-it-works">How it works</a></div>
+  </PageHero>
+  <section class="p-sec" id="publishers">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">For publishers</p><h2>Fewer copies of the split, one record everyone reads</h2></div>
+      <div class="p-prose"><h3>The problem</h3><p>A publisher keeps its own copy of every split and payers keep theirs. When a split changes, every copy has to change, and a disagreement means money held or sent to the wrong place.</p></div>
+      <div class="p-head" style="margin-top:var(--s7)"><h3>What RoylTEE does about it</h3></div>
+      <div class="p-cols two"><div class="p-card"><h3>One split sheet, signed</h3><p>A work's registrant signs each share before money flows to it. Until then the money waits in escrow, held by the registry.</p></div><div class="p-card"><h3>Exact splits</h3><p>A payment is split by basis points, rounded down per share, with the remainder going to the largest share, so the parts add up to the payment exactly.</p></div><div class="p-card"><h3>Agents with limits</h3><p>A payer can give a software agent a capped allowance. It names a work, never a payee, and can pay each statement line once. The organisation can stop it at its next call.</p></div><div class="p-card"><h3>A dispute path</h3><p>A claim over 100 percent opens a dispute. Only the contested share freezes, and the registrar resolves it with a document hash.</p></div></div>
+      <div class="p-head" style="margin-top:var(--s7)"><h3>Try it in the demo dashboard</h3><p class="muted">Every step uses testnet data. Money is Simulated.</p></div>
+      <ol class="p-walk"><li><span class="k">1. Review split sheets</span><span><a class="l-textlink" href="/catalog/splits/">Catalog, Split sheets</a>: every registered share and its status.</span></li><li><span class="k">2. Follow the escrow</span><span><a class="l-textlink" href="/share?id=s15">Share s15</a>: its 0.5 mUSDC was held until approval, then released.</span></li><li><span class="k">3. Sign or draft</span><span><a class="l-textlink" href="/member#approvals">Your shares, Split sheets to approve</a> and <a class="l-textlink" href="/member#draft">Draft a split sheet</a>. Both send transactions, so they are marked UNVERIFIED from the site.</span></li><li><span class="k">4. Look at the agent</span><span><a class="l-textlink" href="/agents">Agents</a>: the scripted agent's limits, its payments and the refusals.</span></li><li><span class="k">5. Watch a dispute</span><span><a class="l-textlink" href="/disputes">Disputes</a>: the work 2 dispute and the resolution by the registrar.</span></li></ol>
+      <p class="p-note">The agent in the demo is a script. Payer statements are Simulated, and the payer is a demo account that stands in for a real statement.</p>
+    </div>
+  </section>
+  <section class="p-sec alt" id="labels">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">For labels</p><h2>A catalog sale that does not break the payouts</h2></div>
+      <div class="p-prose"><h3>The problem</h3><p>When a label sells a catalog, every payer has to be told the new payee and unclaimed money has to be sorted out afterwards. The old owner can still collect for a while, and each side has to trust the other.</p></div>
+      <div class="p-head" style="margin-top:var(--s7)"><h3>What RoylTEE does about it</h3></div>
+      <div class="p-cols two"><div class="p-card"><h3>The address stays</h3><p>A sold share keeps the same payout vault. Payers change nothing. Control passes with the NFT.</p></div><div class="p-card"><h3>Money moves with it</h3><p>What was unclaimed in the vault belongs to the new holder. The seller can no longer claim, and a claim attempt by the seller was refused on testnet.</p></div><div class="p-card"><h3>Nobody keeps a key</h3><p>Each vault was created with no access key and never gets one, so there is nothing for a seller to keep or hand over.</p></div><div class="p-card"><h3>Sealed-bid sales</h3><p>A share can also be sold in a sealed-bid auction. A TEE opens the bids, and its proof can be checked on the chain.</p></div></div>
+      <div class="p-head" style="margin-top:var(--s7)"><h3>Try it in the demo dashboard</h3><p class="muted">Every step uses testnet data. Money is Simulated.</p></div>
+      <ol class="p-walk"><li><span class="k">1. See the sale</span><span><a class="l-textlink" href="/how-it-works#lifecycle">How it works, the catalog sale</a>: share s2 sold, with each transaction linked.</span></li><li><span class="k">2. See the vault</span><span><a class="l-textlink" href="/share?id=s2">Share s2</a>: the Holders tab shows the transfer, and the Account tab shows 0 keys before and after.</span></li><li><span class="k">3. Check every vault</span><span><a class="l-textlink" href="/shares/accounts/">Share accounts</a>: all 15 vaults and their live key lists.</span></li><li><span class="k">4. Watch an auction</span><span><a class="l-textlink" href="/auction">The auction</a>: a real sealed-bid sale on testnet, with its attestation checks.</span></li></ol>
+      <p class="p-note">In this demo the price of a direct sale is settled off chain. In the auction the price is paid in Mock USDC, which is Simulated money. The registry does not check that a signed legal assignment exists.</p>
+    </div>
+  </section>
+  <section class="p-sec alt">
+    <div class="container">
+      <div class="p-head"><h2>See the proof behind it</h2></div>
+      <div class="p-cta" style="margin-top:0"><a class="btn primary" href="/how-it-works">How it works, step by step</a><a class="btn" href="/verify">Verify on testnet</a><a class="btn" href="/security">Security</a><a class="btn" href="/faq">FAQ and glossary</a></div>
+    </div>
+  </section>
+</Base>

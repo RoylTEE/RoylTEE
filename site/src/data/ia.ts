@@ -54,7 +54,7 @@ export const AREAS: Area[] = [
     { key: 'docs', label: 'Docs', href: '/docs' },
     { key: 'whitepaper', label: 'Whitepaper', href: '/whitepaper' },
   ] },
-  { key: 'how', label: 'How it works', group: 'Support', purpose: 'The project site', href: '/#how', tabs: [] },
+  { key: 'how', label: 'How it works', group: 'Support', purpose: 'The lifecycle step by step', href: '/how-it-works', tabs: [] },
 ];
 
 export const area = (key: string) => AREAS.find((a) => a.key === key)!;

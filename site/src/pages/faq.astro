@@ -1,0 +1,88 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import '../styles/landing.css';
+import { SOURCE_URL } from '../consts';
+
+const faq: { q: string; a: string; href?: string; cta?: string }[] = [
+  { q: 'What is RoylTEE?', a: 'A permissioned registry of music rights shares on NEAR testnet. Each share is an NFT that controls its own payout vault. The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.', href: '/how-it-works', cta: 'How it works' },
+  { q: 'Is this real money?', a: 'No. It runs on testnet only, and payments use Mock USDC (testnet), a mock token with no value. Everything that depends on money or identity outside the chain is Simulated.', href: '/security#trust', cta: 'Real and Simulated' },
+  { q: 'Can I buy a share?', a: 'No. It is a permissioned record among verified industry members, not a public sale and not an investment product. Nothing on this site is legal advice.' },
+  { q: 'Is a share a legal title?', a: 'No. The token is a record of an assignment as declared by members, plus a payment instruction. It is evidence and a payout address. A participation agreement that would give the record legal effect is roadmap, and the registry does not check that a signed legal assignment exists.' },
+  { q: 'Do I need a wallet?', a: 'Not to read the site or to run the checks. A NEAR testnet wallet is needed to open support tickets and to claim or sign split sheets on the Your shares page. Sending those from the site has not been run on testnet yet, so it is UNVERIFIED.', href: '/member', cta: 'Your shares' },
+  { q: 'Who can hold a share?', a: 'Only verified members, meaning accounts with an active credential granted by the registrar. In this demo the identity checks behind a credential are Simulated.' },
+  { q: 'What happens to unclaimed money when a share is sold?', a: 'It moves with the share. The vault keeps its address, the new holder can claim what was waiting, and the seller can no longer claim. On testnet the buyer of s2 claimed the 0.5 mUSDC paid before the sale.', href: '/how-it-works#lifecycle', cta: 'The catalog sale' },
+  { q: 'Who controls a vault?', a: 'Nobody holds a key to it. A vault is created with no access key and gets none afterwards. Only the registry can move money out of it, and only when the current holder claims. You can check the empty key list yourself.', href: '/security#verify', cta: 'Check it yourself' },
+  { q: 'Is the registry itself keyless?', a: 'No, not yet. The registry and the Mock USDC token accounts each still hold one full access key, and the auction account keeps one for its recovery calls. They were kept on testnet by decision so late fixes stay possible. On mainnet the plan is to delete them after the final deploy, or hand upgrades to a multisig or a DAO with a delay. That is not built.', href: '/security#plan', cta: 'Plan, not done' },
+  { q: 'Can a payment agent be tricked into paying the wrong account?', a: 'It names a work, never a payee, so the contract finds the vaults itself. On testnet, a work whose metadata told agents to pay an outsider got that account 0. An agent also has a per payment limit, a rolling 24 hour limit and a daily count, and each statement line pays once. The agent in the demo is a script, not an AI model.', href: '/security#agents', cta: 'Agent limits' },
+  { q: 'What if two parties claim the same song?', a: 'If a new share would push a work above 100 percent, a dispute opens at once. Only the contested shares are frozen, and the rest keep being paid. A duplicate song code opens a duplicate dispute. The registrar resolves it with a document hash.', href: '/how-it-works#disputes', cta: 'Disputes' },
+  { q: 'How is a payment split?', a: 'By basis points, where 1 basis point is 0.01 percent. Each share gets its fraction rounded down, and the remainder goes to the largest share, ties to the lowest token number, so the parts add up to the payment exactly.' },
+  { q: 'What does the TEE do?', a: 'Only the sealed-bid auction uses one. It opens the bids and reveals only the winner and the second price. A checker confirmed the settle ran in genuine Intel TDX hardware with the approved code, which does not prove the auction rules were followed. The registry does not use a TEE.', href: '/auction', cta: 'The auction' },
+  { q: 'Is the data private?', a: 'Partly. Song titles are stored as hashes and personal data stays off chain. Shares, owners, payments and the sale price are public on chain. The sealed bid amounts are not shown after settle, though with two bidders the second price is the loser\'s exact bid, so losing bids are not always unpublished.' },
+  { q: 'Has it been audited?', a: 'There is a manual audit pass by the builder. It is not an independent review. The threat model was written before the code.', href: '/security#threats', cta: 'Threat model' },
+  { q: 'Where is the code?', a: 'On GitHub at ' + SOURCE_URL.replace('https://', '') + ', under the MIT license.', href: SOURCE_URL, cta: 'Source code' },
+  { q: 'What is not built?', a: 'Mainnet, real money and a public sale. Sync licenses, the amend_split method, an event indexer for statement periods, TEE attestation of statements, and a legal participation agreement are not built either.' },
+];
+
+const gloss: [string, string][] = [
+  ['attestation', 'A signed statement from hardware that a specific program ran on specific input and produced a specific output. Here, an Intel TDX quote that a checker verified.'],
+  ['escrow', 'Money the registry holds instead of paying out, for a share that is pending approval, contested or unassigned. It is released when the share is approved or the dispute is resolved.'],
+  ['mUSDC', 'Mock USDC (testnet), symbol mUSDC, six decimals. A mock token with no value that stands in for a real stablecoin. All money in the demo is Simulated.'],
+  ['NEP-141', 'The NEAR standard for fungible tokens. Mock USDC follows it.'],
+  ['NEP-171', 'The NEAR standard for non-fungible tokens. The registry implements it, with NEP-177 (metadata) and NEP-181 (enumeration). Marketplace approvals (NEP-178) are disabled on purpose, so a listing cannot move a share.'],
+  ['NEP-177', 'The NEAR extension of NEP-171 that gives each token metadata, such as a name and a reference.'],
+  ['NEP-181', 'The NEAR extension of NEP-171 that lets anyone list tokens and the tokens of one account.'],
+  ['NFT share', 'One right of one work (for example master, territory worldwide, 50 percent) recorded as an NFT. Whoever holds it controls its vault and can claim its money.'],
+  ['Simulated', 'A label for anything that stands in for the real world: identity checks, the fiat rail, payer statements, provenance evidence, dispute documents and the money itself.'],
+  ['split sheet', 'The list of shares that makes up a work, with each rightholder\'s size. A share registered by someone other than the work\'s registrant stays pending until the registrant signs it.'],
+  ['TEE', 'Trusted execution environment: a protected area of a processor whose contents the host cannot read. The auction opens its sealed bids in one, run by OutLayer.'],
+  ['testnet', 'NEAR\'s practice network. It works like the real one but its tokens are free and have no value.'],
+  ['vault', 'The NEAR account that receives one share\'s money. It is created with no access key. Only the registry can move money out of it.'],
+  ['basis point', 'One hundredth of one percent. A split is written in basis points, from 1 to 10000.'],
+  ['registrar', 'The trusted role that grants and suspends member credentials and resolves disputes with a document hash.'],
+  ['credential', 'The record that an account is a verified member. Only accounts with an active credential can register works, hold shares or receive them.'],
+];
+---
+<Base current="learn" title="FAQ and glossary . RoylTEE" description="Answers about RoylTEE, from the project's own documents, and a glossary of the terms used on this site.">
+  <PageHero art="hdr-faq" alt="Flat retro illustration: a satellite dish on a cliff at dusk sending a beam of glowing points into the sky." eyebrow="FAQ and glossary" title="Questions, answered from the documents" intro="Short answers, each taken from the project's own docs, and the terms used on this site explained." />
+
+  <section class="p-sec" id="faq">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">FAQ</p><h2>Common questions</h2></div>
+      <div class="faq">
+        {faq.map((f) => (
+          <details>
+            <summary>{f.q}</summary>
+            <div class="ans"><p>{f.a}</p>{f.href && <p><a class="l-textlink" href={f.href}>{f.cta}</a></p>}</div>
+          </details>
+        ))}
+      </div>
+      <p class="p-note" style="margin-top:var(--s5)">Something not covered? Ask the <a class="link" href="/help">help chat</a>, which answers from the same notes, or open a support ticket there.</p>
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="glossary">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Glossary</p><h2>The terms, in plain words</h2></div>
+      <dl class="gloss">
+        {gloss.map(([t, d]) => (<div id={`g-${t.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}><dt>{t}</dt><dd>{d}</dd></div>))}
+      </dl>
+    </div>
+  </section>
+</Base>
+<style>
+  .faq { display: grid; border: 1px solid var(--edge); border-radius: var(--r-card); background: var(--surface); overflow: hidden; max-width: 52rem; }
+  .faq details { border-bottom: 1px solid var(--rule); }
+  .faq details:last-child { border-bottom: 0; }
+  .faq summary { cursor: pointer; padding: var(--s4) var(--s5); font-weight: 600; font-size: var(--fs-16); list-style: none; display: flex; justify-content: space-between; gap: var(--s4); align-items: center; min-height: 3rem; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: '+'; font-family: var(--mono); color: var(--amber-ink); font-size: var(--fs-18); flex: none; }
+  .faq details[open] summary::after { content: '-'; }
+  .faq summary:focus-visible { outline: 2px solid var(--focus, var(--amber)); outline-offset: -2px; }
+  .ans { padding: 0 var(--s5) var(--s5); display: grid; gap: var(--s3); font-size: var(--fs-14); line-height: 1.65; color: var(--ink-2); max-width: 46rem; }
+  .gloss { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s4) var(--s6); margin: 0; }
+  .gloss > div { padding: var(--s4) var(--s5); background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-card); scroll-margin-top: 6rem; }
+  .gloss dt { font-weight: 700; font-family: var(--mono); font-size: var(--fs-14); margin-bottom: var(--s2); }
+  .gloss dd { margin: 0; font-size: var(--fs-14); line-height: 1.6; color: var(--ink-2); }
+  @media (max-width: 899px) { .gloss { grid-template-columns: 1fr; } }
+</style>

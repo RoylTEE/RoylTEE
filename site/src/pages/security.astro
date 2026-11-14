@@ -1,0 +1,137 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import '../styles/landing.css';
+import { ATTACKS } from '../data/claims';
+import { AUCTION } from '../data/auction';
+import { REPO_FILE_BASE } from '../data/auction';
+import { REGISTRY, TOKEN, txUrl } from '../data/testnet';
+import { SOURCE_URL } from '../consts';
+
+const holder = ['Claim the balance of its share account', 'Transfer the share to another verified member', 'Set a short public note on the share (CLI only in this demo)', 'Confirm a co-holder share of the same work (CLI only in this demo)'];
+const agent = ['Pay a work or share from its allowance', 'Report a statement line', 'Stay under a per payment limit, a 24 hour limit and a daily count'];
+const nobody = ['Choose where an agent payment goes', 'Change a split alone (except the registrar resolving a dispute, with a document hash)', 'Add a key to a share account', 'Pay the same statement line twice'];
+const real = [
+  ['Registry, share account and Mock USDC (testnet) contracts', 'Identity checks (KYB) behind a member credential'],
+  ['Share accounts with zero access keys', 'The fiat rail and conversion to USDC'],
+  ['Payments, splits, claims and transfers in Mock USDC', 'Payer statements and statement line ids'],
+  ['Agent limits, one payment per statement line, revocation', 'Provenance evidence (the field is real, the evidence is not checked)'],
+  ['Locks, credentials, disputes and escrow', 'Dispute documents (hashes of dummy documents)'],
+];
+const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"s2.reg.royltee-dev.testnet"}}'`;
+const checks = AUCTION.verify.checks;
+const threat = REPO_FILE_BASE + 'THREAT_MODEL.md';
+const audit = REPO_FILE_BASE + 'AUDIT.md';
+---
+<Base current="security" title="Security . RoylTEE" description="What RoylTEE protects and how: zero-key vaults, agent limits, dispute freeze, the TEE auction proof, the threat model, and what is still open.">
+  <PageHero art="hdr-security" alt="Flat retro illustration: a large domed vault inside a glass cylinder on a cliff, a beam of light falling on it from above." eyebrow="Security" title="What is locked, and what is still open" intro="Where the system holds, how you can check it yourself, and the places we still trust someone, said plainly." />
+
+  <section class="p-sec" id="vaults">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Zero-key vaults</p><h2>The payout account has no key, so nobody can sign for it</h2></div>
+      <div class="p-prose">
+        <p>Each share has its own NEAR account, a vault, that receives its royalty money. It is created with no access key in the same batch that mints the share, and none is added afterwards. Only the registry contract can move money out of it, and only when the current holder claims. Selling the share moves control of the money by moving the NFT, so there is no key to hand over or to keep.</p>
+        <p>The registry has no call that deletes, redeploys or adds a key to a vault. You can check that on chain, with one node call or one command: see the steps below.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="agents">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Holder powers and agent limits</p><h2>Short lists, enforced in code</h2><p class="muted">An agent holds a key that can only call two methods. Anything that moves ownership needs a deposit, and that key type cannot attach one.</p></div>
+      <div class="p-cols">
+        <div class="panel"><div class="panel-head"><h3>A share holder can</h3></div><ul class="checks">{holder.map((h) => <li>{h}</li>)}</ul></div>
+        <div class="panel"><div class="panel-head"><h3>A payment agent can</h3></div><ul class="checks">{agent.map((h) => <li>{h}</li>)}</ul><div class="panel-foot"><a class="link" href="/agents">See the live agent role</a></div></div>
+        <div class="panel"><div class="panel-head"><h3>Nobody can</h3></div><ul class="checks no">{nobody.map((h) => <li>{h}</li>)}</ul></div>
+      </div>
+      <p class="p-note" style="margin-top:var(--s4)">The agent in the demo is a script. Its payments and refusals are recorded on <a class="link" href="/activity">Activity</a>. Revoking an agent has no transaction on testnet, so a sandbox test is its only proof.</p>
+    </div>
+  </section>
+
+  <section class="p-sec" id="disputes">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Dispute freeze</p><h2>A conflict freezes the contested share and nothing else</h2></div>
+      <div class="p-prose">
+        <p>A claim that would push a right over 100 percent opens a dispute. Only the contested share is frozen, its new money waits in escrow, and the others keep being paid. The registrar resolves it by naming an outcome with a document hash, and every such action emits an event. The registrar is a trusted role, and the dispute documents in the demo are hashes of dummy documents.</p>
+        <p><a class="l-textlink" href="/how-it-works#disputes">The dispute on testnet, step by step</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="tee">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">TEE auction attestation</p><h2>The auction answer came from the approved code in genuine hardware</h2><p class="muted">The sealed-bid auction opens its bids inside a trusted execution environment run by OutLayer. A checker then tested the settle transaction. It passed {checks.filter((c) => c.verdict === 'PASS').length} of {checks.length} checks.</p></div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="ledger rows-sm">
+            <thead><tr><th>Check</th><th>Question</th><th>Result</th></tr></thead>
+            <tbody>{checks.map((c) => <tr><td class="p"><strong>{c.name}</strong></td><td class="p-wrap">{c.question.charAt(0).toUpperCase() + c.question.slice(1)}</td><td class="p-end"><span class={c.verdict === 'PASS' ? 'badge ok' : 'badge bad'}>{c.verdict}</span></td></tr>)}</tbody>
+          </table>
+        </div>
+        <div class="panel-foot">This proves the input produced the output inside genuine Intel TDX hardware running the approved build. It does not prove the auction rules were followed, and the fairness of the answer is not proven. Only the auction uses a TEE: the registry, the vaults and Mock USDC are ordinary contracts. <a class="link" href="/auction">See the whole run</a>.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="p-sec" id="threats">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Threat model</p><h2>We wrote the attacks down before the code</h2><p class="muted">The threat model lists 39 rows for the registry and its vaults and 27 for the auction. It was written on 2026-11-12 (UTC), before any contract code. The audit is a manual pass by the builder. It is not an independent review.</p></div>
+      <div class="p-cta" style="margin:0 0 var(--s5)">
+        <a class="btn" href={threat} target="_blank" rel="noopener">Threat model on GitHub</a>
+        <a class="btn" href={audit} target="_blank" rel="noopener">Audit notes on GitHub</a>
+      </div>
+      <p class="p-note" style="margin-bottom:var(--s5)">These links open the repository at <span class="mono">{SOURCE_URL.replace('https://', '')}</span>, on its main branch.</p>
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="ledger rows-sm">
+            <thead><tr><th>Attack tried</th><th>What happened</th><th>Record</th></tr></thead>
+            <tbody>{ATTACKS.map((a) => <tr><td class="p-wrap">{a.attack}</td><td class="p-wrap">{a.result}</td><td class="m">{a.tx ? <a class="acct-link" href={txUrl(a.tx)} target="_blank" rel="noopener">{a.tx.slice(0, 8)}</a> : <span class="muted">Test only</span>}</td></tr>)}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="trust">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Real and Simulated</p><h2>What runs on chain, and what is a stand in</h2></div>
+      <div class="panel">
+        <div class="table-wrap">
+          <table class="ledger rows-sm trust">
+            <thead><tr><th>Real, on NEAR testnet</th><th>Simulated</th></tr></thead>
+            <tbody>{real.map(([a, b]) => <tr><td class="p-wrap">{a}</td><td class="m wrap"><span class="only-narrow">Simulated: </span>{b}</td></tr>)}</tbody>
+          </table>
+        </div>
+        <div class="panel-foot">The registrar is a trusted role: every registrar action that moves a share or money carries a document hash and emits an event. The contracts use no trusted execution environment.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="p-sec" id="plan">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Plan, not done</p><h2>The registry is not keyless yet</h2></div>
+      <div class="p-callout"><span class="badge warn">Not done</span><div>
+        <p>The registry and the Mock USDC token accounts each still hold one full access key, and the auction account keeps its own full access key for its recovery calls. They were kept on testnet by decision, so late fixes stay possible. Only the share vaults are keyless.</p>
+        <p style="margin-top:var(--s3)">On mainnet the plan is to delete those keys after the final deploy, or to hand upgrades to a multisig or a DAO with a delay, and to prove it with the same zero-keys check. None of that is built or scheduled. The accounts are <a class="acct-link" href={`https://testnet.nearblocks.io/address/${REGISTRY}`} target="_blank" rel="noopener">{REGISTRY}</a> and <a class="acct-link" href={`https://testnet.nearblocks.io/address/${TOKEN}`} target="_blank" rel="noopener">{TOKEN}</a>.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="verify">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Check it yourself</p><h2>No wallet needed</h2><p class="muted">Ask a public testnet node for the access keys of the share account that was sold. The answer is an empty list.</p></div>
+      <pre class="code"><code>{curl}</code></pre>
+      <p class="muted" style="margin-bottom:var(--s3)">From a clone of the repository, <code class="mono">npm run verify:testnet</code> checks all 15 share accounts, the code hashes and the balances.</p>
+      <p class="muted">The <a class="link" href="/verify">Verify page</a> lists every claim with its code, its test and its transaction, runs the live checks in your browser, and shows what happens when someone tries to break it. The <a class="link" href="/whitepaper">whitepaper</a> (version 1.0, also as a <a class="link" href="/royltee-whitepaper.pdf">PDF</a>) explains the design and its limits, and <a class="link" href="/auction">the auction page</a> shows the sealed-bid run.</p>
+    </div>
+  </section>
+</Base>
+<style>
+  .checks { list-style: none; margin: 0; padding: var(--s3) var(--s5) var(--s4); display: grid; }
+  .checks li { padding: .6rem 0 .6rem 1.6rem; border-bottom: 1px solid var(--rule); position: relative; font-size: var(--fs-14); }
+  .checks li:last-child { border-bottom: 0; }
+  .checks li::before { content: ''; position: absolute; left: .1rem; top: .95rem; width: .7rem; height: .4rem; border-left: 2px solid var(--ok); border-bottom: 2px solid var(--ok); transform: rotate(-45deg); }
+  .checks.no li::before { width: .75rem; height: 2px; border: 0; background: var(--bad); transform: none; top: 1.15rem; }
+  .code { margin: 0 0 var(--s4); padding: var(--s4) var(--s5); background: var(--ink); color: #f1eee6; border-radius: var(--r-card); overflow-x: auto; font-family: var(--mono); font-size: var(--fs-14); line-height: 1.6; }
+</style>

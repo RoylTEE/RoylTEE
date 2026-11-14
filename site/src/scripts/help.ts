@@ -1,6 +1,6 @@
 import { api, el, signIn, signOut } from './wallet';
 type Turn = { role: 'user' | 'assistant'; text: string; index?: number; signature?: string; tee?: boolean };
-const allowed = new Set(['/', '/#how', '/#agents', '/#lifecycle', '/#trust', '/#notice', '/#problem', '/dashboard/', '/catalog/', '/catalog/splits/', '/catalog/lookup/', '/shares/', '/shares/accounts/', '/shares/claims/', '/activity', '/agents', '/disputes', '/registrar', '/verify', '/auction', '/member', '/docs', '/whitepaper', '/help', '/help#chat', '/help#support']);
+const allowed = new Set(['/', '/#how', '/how-it-works', '/how-it-works#lifecycle', '/security', '/security#agents', '/security#trust', '/faq', '/#notice', '/#problem', '/dashboard/', '/catalog/', '/catalog/splits/', '/catalog/lookup/', '/shares/', '/shares/accounts/', '/shares/claims/', '/activity', '/agents', '/disputes', '/registrar', '/verify', '/auction', '/member', '/docs', '/whitepaper', '/help', '/help#chat', '/help#support']);
 function render(text: string) {
   const p = el('p'); let last = 0;
   for (const m of text.matchAll(/\[([^\]]+)\]\(([^)]+)\)/g)) {

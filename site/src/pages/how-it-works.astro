@@ -1,0 +1,171 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import SceneTable from '../components/SceneTable.astro';
+import '../styles/landing.css';
+import { DASHBOARD_URL } from '../consts';
+import { REGISTRY, TOKEN, SCENES, accountUrl, txUrl } from '../data/testnet';
+import { AUCTION_FACTS } from '../data/landing';
+
+const sale = SCENES.filter((s) => s.tokens.includes('s2') || s.step === 'Refusal');
+const dispute = SCENES.filter((s) => s.tokens.includes('s5') || s.tokens.includes('s7'));
+const sheet = SCENES.filter((s) => s.tokens.includes('s14') || s.tokens.includes('s15'));
+
+const steps = [
+  {
+    t: 'Register a vault', m: 'register_work, register_share',
+    d: ['A member with an active credential registers a work by its ISRC (a recording) or ISWC (a composition). Only the shape of the code is checked, and the title is stored as a hash, so personal data stays off chain.', 'Then the member registers one share per rightholder: the right (master, publishing, performance or mechanical), the territory, the size in basis points (1 basis point is 0.01 percent), and the hash of the evidence document. The registry mints the share as an NFT and, in the same batch, creates its vault with no access key at all.'],
+    ev: [['Share s1 minted, its vault created with no key', '7wxZ7Bmstzu9qTUayrvzbGP97tcD6GRLMaZo7pTVAqzh']],
+  },
+  {
+    t: 'Agree the split sheet', m: 'approve_share, reject_share',
+    d: ['A share registered by anyone other than the work\'s registrant is pending. Its money goes to escrow until the registrant signs it with approve_share, or turns it down with reject_share. The registrant is whoever registered the work first.', 'On testnet (work 6): writer-a registered the work and its own 50 percent share s14, approved at once. writer-b registered the other 50 percent as s15, which stayed pending until writer-a signed.'],
+    ev: [['writer-b registers s15, pending', '5xYY2sWQQrZL7XCiQ8CVKhw27pUWDRhnN5k3doqjsgjB'], ['writer-a signs approve_share on s15', '5dgncSm1CyDuiEKRzeUpZJTWrBnHzNuuEP6k51RNseGa']],
+  },
+  {
+    t: 'Escrow', m: 'ft_transfer_call',
+    d: ['A payer pays a work once, in Mock USDC (Simulated), naming the work and a statement. The registry splits the payment by basis points: each share gets its fraction rounded down, and the remainder goes to the largest share, ties to the lowest token number. The parts always add up to the payment exactly.', 'Parts for a pending share, a contested share, or a part of the song with no share go to escrow, held by the registry, not paid out.'],
+    ev: [['1.0 mUSDC paid on work 6: s14 got 0.5 at once, 0.5 for s15 held', '8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL']],
+  },
+  {
+    t: 'Sell a catalog', m: 'nft_transfer, nft_transfer_call',
+    d: ['The holder sends the share NFT to another verified member. Nothing is handed over: there is no key to rotate. The vault address stays the same, so payers change nothing, and unclaimed money in the vault goes with the share. The seller can no longer claim.', 'A transfer needs exactly 1 yoctoNEAR, so an agent\'s limited key cannot make one. It is refused while a payout is in flight, while the share is disputed, held for approval or void, and when the receiver has no active credential. A share can also be sold in a sealed-bid auction, described below.'],
+    ev: [['writer-b sells s2 to buyer-pub', 'HZ9pD2kLbqbjmKqC68ao6KBTUpQmQstyd2Tro8hWwYPy']],
+  },
+  {
+    t: 'Pay out', m: 'claim',
+    d: ['Only the account that holds the share NFT at that moment can call claim. The registry reduces its record first, then asks the vault to send the money to the holder, so a repeated call finds nothing to take. The share is locked until the payout settles, so it cannot be sold in the middle of one.'],
+    ev: [['buyer-pub claims the 0.5 that moved with s2', 'M4pWDbEgnUfz4TiJA8ZZdNVCnwV9vzsBnnEqRgALDrp']],
+  },
+];
+const layers = [
+  { n: 'Web app', t: 'Astro web app', d: 'Read NEAR testnet with view calls. Signing goes through a NEAR wallet you connect.' },
+  { n: 'Registry', t: 'Registry contract and share vaults', d: 'The registry holds the rules, the ledger, the credentials and the escrow. Each share vault is its own account, s1 to s15 under the registry, with no keys.', link: [REGISTRY, accountUrl(REGISTRY)] },
+  { n: 'Money', t: 'Mock USDC, NEP-141 (Simulated)', d: 'The payment token, six decimals, no value. It stands in for a real stablecoin.', link: [TOKEN, accountUrl(TOKEN)] },
+  { n: 'Auction', t: 'Auction contract and OutLayer TEE module', d: 'Holds a share for sale. The TEE opens sealed bids and its proof can be checked against the chain.', link: [AUCTION_FACTS.account, AUCTION_FACTS.accountHref] },
+  { n: 'Proof', t: 'nearblocks explorer', d: 'Every account and transaction on this page opens there, no login.' },
+];
+---
+<Base current="how" title="How it works . RoylTEE" description="The full lifecycle of a music rights share on NEAR testnet, step by step, with the contract calls and the recorded transactions.">
+  <PageHero art="hdr-how" alt="Flat retro illustration: a vintage microphone and a cassette player on two cliffs, joined by a dotted line through a glowing domed vault." eyebrow="How it works" title="From a split sheet to a payout" intro="The whole lifecycle of a share, step by step, with the real contract calls and the transactions that ran on NEAR testnet." />
+
+  <section class="p-sec" id="steps">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">The lifecycle</p><h2>Five steps, all enforced by the contract</h2><p class="muted">Boxes marked Simulated use Mock USDC, which has no value. Each step links to the testnet transaction that did it.</p></div>
+      <ol class="p-steps">
+        {steps.map((s) => (
+          <li>
+            <div>
+              <h3>{s.t}</h3>
+              {s.d.map((p) => <p>{p}</p>)}
+              <div class="p-meta"><span class="p-code">{s.m}</span>{s.ev.map(([l, h]) => <a class="l-textlink" href={txUrl(h)} target="_blank" rel="noopener">{l}</a>)}</div>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="money">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">The money path</p><h2>One payment in, a payout to whoever holds the share</h2></div>
+      <ol class="path" aria-label="The money path">
+        <li><strong>Payer</strong><span>Pays a work once (Simulated)</span></li>
+        <li><strong>Registry</strong><span>Splits by basis points, exact to the last unit. Holds escrow</span></li>
+        <li><strong>Share vaults</strong><span>One per share, no keys. Only the registry can move money out</span></li>
+        <li><strong>Holder</strong><span>The current owner of the share NFT claims</span></li>
+      </ol>
+      <p class="p-note">A plain deposit straight into a vault also works. A sync, which only the holder or the registrar may call, picks it up into the share ledger.</p>
+    </div>
+  </section>
+
+  <section class="p-sec" id="lifecycle">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">The catalog sale, on testnet</p><h2>Share s2 was sold. The address stayed. The money followed.</h2><p class="muted">These are the real transactions, in order. Open any of them on the explorer.</p></div>
+      <SceneTable scenes={sale} caption="The catalog sale of share s2, in order" />
+      <p class="p-note">All on 2026-11-13 (UTC). Vault s2.reg.royltee-dev.testnet had 0 access keys before and after the sale. <a class="link" href="/share?id=s2">Check it live on the share page</a>.</p>
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="splitsheet">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Split sheet and escrow, on testnet</p><h2>Half the money waited until the registrant signed</h2><p class="muted">Work 6 on 2026-11-14 (UTC). Simulated money.</p></div>
+      <SceneTable scenes={sheet} caption="The split sheet scene on work 6" />
+      <p class="p-note"><a class="link" href="/share?id=s15">Open share s15 live</a> to see its history.</p>
+    </div>
+  </section>
+
+  <section class="p-sec" id="disputes">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Disputes</p><h2>A dispute freezes only what is contested</h2></div>
+      <div class="p-prose">
+        <p>If a new share would push a song above 100 percent, or a song code is registered a second time, a dispute opens at once. Only the contested shares are frozen, and only their new money goes to escrow. The other shares keep being paid, and money already in vaults stays claimable.</p>
+        <p>The registrar resolves the dispute by naming an outcome and the hash of the decision document. On testnet, a 20 percent claim on work 2 contested share s5. The 0.7 mUSDC for s5 was held in escrow, the other share was paid as usual, and the registrar then upheld the existing shares, releasing the escrow to s5.</p>
+      </div>
+      <div class="gap"></div>
+      <SceneTable scenes={dispute} caption="The dispute scene on work 2" />
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="agents">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Payment agents</p><h2>An agent can pay, but it cannot choose who is paid</h2></div>
+      <div class="p-prose">
+        <p>A payer organisation can give a software agent its own account with one limited key. The key can call only two registry methods, <span class="p-code">pay_from_allowance</span> and <span class="p-code">report</span>, spends from a capped allowance, and names a work, never a payee. The contract finds the vaults itself, so text in a song's notes cannot redirect money, and each statement line pays once. The agent in the demo is a script, not an AI model.</p>
+        <p><a class="l-textlink" href="/security#agents">The limits, in full</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="p-sec" id="auction">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">Sealed-bid auction</p><h2>A second way to sell a share</h2></div>
+      <div class="p-prose">
+        <p>The seller lists a share with a reserve, a maximum deposit and an end time. Bidders send encrypted bids with equal deposits. After the end time the contract asks OutLayer to run a program inside a TEE. It opens the bids and reveals only the winner and the second price, and the contract moves the share and the money. Only this step uses a TEE: the registry does not.</p>
+        <p><a class="l-textlink" href="/auction">See the real run, with its attestation</a></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="p-sec alt" id="layers">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">The layers</p><h2>What runs where</h2></div>
+      <ol class="layers" aria-label="The layers of the system, top to bottom">
+        {layers.map((l) => (
+          <li>
+            <span class="ln mono">{l.n}</span>
+            <div class="lb"><strong>{l.t}</strong><span class="muted">{l.d}</span>{l.link && <a class="acct-link" href={l.link[1]} target="_blank" rel="noopener">{l.link[0]}</a>}</div>
+          </li>
+        ))}
+      </ol>
+      <div class="p-cta">
+        <a class="btn primary" href={DASHBOARD_URL}>Open the demo dashboard</a>
+        <a class="btn" href="/verify">Verify on testnet</a>
+        <a class="btn" href="/whitepaper">Read the whitepaper</a>
+      </div>
+    </div>
+  </section>
+</Base>
+<style>
+  .gap { height: var(--s5); }
+  .path { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s5); }
+  .path li { position: relative; display: grid; gap: var(--s2); align-content: start; padding: var(--s5); background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-card); box-shadow: var(--shadow-1); }
+  .path li strong { font-size: var(--fs-18); font-weight: 600; }
+  .path li span { font-size: var(--fs-14); color: var(--muted); line-height: 1.5; }
+  .path li:not(:last-child)::after { content: ''; position: absolute; top: 50%; right: calc(-1 * var(--s5) - 1px); width: var(--s5); height: 2px; background: var(--amber); }
+  .path + .p-note { margin-top: var(--s4); }
+  .layers { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--edge); border-radius: var(--r-card); overflow: hidden; background: var(--surface); }
+  .layers li { display: grid; grid-template-columns: 9rem 1fr; border-bottom: 1px solid var(--rule); }
+  .layers li:last-child { border-bottom: 0; }
+  .layers li:nth-child(even) { background: var(--surface-2); }
+  .ln { display: flex; align-items: center; padding: var(--s4) var(--s5); background: var(--ink); color: var(--amber); font-size: var(--fs-12); letter-spacing: .06em; text-transform: uppercase; border-bottom: 1px solid #2b2820; }
+  .layers li:last-child .ln { border-bottom: 0; }
+  .lb { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem var(--s4); padding: var(--s4) var(--s5); font-size: var(--fs-14); }
+  .lb strong { font-weight: 600; min-width: 16rem; }
+  .lb .muted { flex: 1 1 18rem; }
+  @media (max-width: 899px) {
+    .path { grid-template-columns: 1fr; }
+    .path li:not(:last-child)::after { top: auto; bottom: calc(-1 * var(--s5) - 1px); right: auto; left: 2rem; width: 2px; height: var(--s5); }
+  }
+  @media (max-width: 599px) { .layers li { grid-template-columns: 1fr; } .ln { padding: var(--s2) var(--s4); } .lb { padding: var(--s3) var(--s4); } .lb strong { min-width: 0; } }
+</style>

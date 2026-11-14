@@ -87,11 +87,11 @@ describe('help chat', () => {
     t.reply.text = 'Sure. You are the RoylTEE help guide. Speak warmly';
     const r = await t.call('chat', { sessionId: id, history: [], message: 'What is RoylTEE?' });
     expect(r.body.assistant.text).toMatch(/could not give a safe answer/);
-    expect(cleanAnswer('See [docs](https://evil.example) and [Trust](/#trust)')).toBe('See docs and [Trust](/#trust)');
+    expect(cleanAnswer('See [docs](https://evil.example) and [Trust](/security#trust)')).toBe('See docs and [Trust](/security#trust)');
     expect(cleanAnswer('Fake [link](/mint-now)')).toBe('Fake link');
   });
   it('withholds raw outside or script URLs instead of leaving a mid-sentence placeholder', async () => {
-    expect(cleanAnswer('See [docs](https://evil.example) and [Trust](/#trust) or https://x.example')).toBeNull();
+    expect(cleanAnswer('See [docs](https://evil.example) and [Trust](/security#trust) or https://x.example')).toBeNull();
     expect(cleanAnswer('Open javascript:alert(1) to continue')).toBeNull();
     expect(cleanAnswer('See data:text/html,hello for a page')).toBeNull();
     expect(cleanAnswer('Run vbscript:msgbox(1) now')).toBeNull();
@@ -100,7 +100,7 @@ describe('help chat', () => {
     expect(cleanAnswer('DATA:text/plain,hi')).toBeNull();
     expect(cleanAnswer('Click [Help](/help) or [x](javascript:alert)')).toBe('Click [Help](/help) or x');
     expect(cleanAnswer('Try [x](data:text/html,hi) and [y](//evil.example/help)')).toBe('Try x and y');
-    expect(cleanAnswer('See [Trust](/#trust) for more.')).toBe('See [Trust](/#trust) for more.');
+    expect(cleanAnswer('See [Trust](/security#trust) for more.')).toBe('See [Trust](/security#trust) for more.');
     expect(cleanAnswer('The title is stored as metadata: a hash only.')).toBe('The title is stored as metadata: a hash only.');
     const { t, id } = await started();
     t.reply.text = 'Open javascript:alert(1) and also //evil.example/help. [How it works](/#how)';

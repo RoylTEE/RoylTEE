@@ -1,11 +1,11 @@
 ---
 import Logo from './Logo.astro';
 import { DASHBOARD_URL, WHITEPAPER_URL, SOURCE_URL, PROJECT_NAME } from '../consts';
-import { REGISTRY, accountUrl } from '../data/testnet';
 const cols = [
-  { h: 'Product', l: [['How it works', '/#how'], ['Why NEAR', '/#near'], ['Three tracks', '/#tracks'], ['Catalog sale on testnet', '/#lifecycle'], ['Agent allowances', '/#agents'], ['Trust and privacy', '/#trust']] },
-  { h: 'Registry', l: [['Overview', DASHBOARD_URL], ['Catalog', '/catalog/'], ['Shares', '/shares/'], ['Activity', '/activity'], ['Governance', '/agents'], ['Your shares', '/member']] },
-  { h: 'Learn', l: [['Auction', '/auction'], ['Verify', '/verify'], ['Whitepaper', WHITEPAPER_URL], ['Docs', '/docs'], ['Help chat', '/help#chat'], ['Contact support', '/help#support'], ['Source code', SOURCE_URL]] },
+  { h: 'Product', l: [['How it works', '/how-it-works'], ['Why NEAR', '/#near'], ['Security', '/security'], ['Auction', '/auction'], ['Verify', '/verify'], ['Demo dashboard', DASHBOARD_URL]] },
+  { h: 'For you', l: [['Artists', '/artists'], ['Publishers and labels', '/publishers-and-labels'], ['Catalog buyers', '/catalog-buyers']] },
+  { h: 'Learn', l: [['Whitepaper', WHITEPAPER_URL], ['Docs', '/docs'], ['FAQ and glossary', '/faq'], ['Updates', '/updates']] },
+  { h: 'Company', l: [['About', '/about'], ['Help chat', '/help#chat'], ['Contact support', '/help#support'], ['Source code', SOURCE_URL]] },
 ];
 ---
 <footer class="site-foot" id="notice">
@@ -14,7 +14,6 @@ const cols = [
       <div class="foot-brand">
         <Logo />
         <p>A registry of music rights shares. Each share is an NFT that controls its own payout account.</p>
-        <a class="acct-link" href={accountUrl(REGISTRY)} rel="noopener" target="_blank">{REGISTRY}</a>
       </div>
       {cols.map((c) => (
         <div class="foot-col">
@@ -32,7 +31,7 @@ const cols = [
 </footer>
 <style>
   .site-foot { margin-top: var(--s9); border-top: 1px solid var(--edge); background: var(--surface); padding: var(--s8) 0 var(--s5); }
-  .foot-top { display: grid; grid-template-columns: 1.5fr repeat(3, 1fr); gap: var(--s6); }
+  .foot-top { display: grid; grid-template-columns: 1.4fr repeat(4, 1fr); gap: var(--s6); }
   .foot-brand { display: grid; gap: var(--s3); align-content: start; }
   .foot-brand p { font-size: var(--fs-14); color: var(--muted); max-width: 20rem; }
   .foot-col ul { list-style: none; margin: var(--s3) 0 0; padding: 0; display: grid; }

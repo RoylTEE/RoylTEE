@@ -1,0 +1,28 @@
+---
+import Base from '../layouts/Base.astro';
+import PageHero from '../components/PageHero.astro';
+import '../styles/landing.css';
+import { DASHBOARD_URL } from '../consts';
+---
+<Base current="audience" title="Artists . RoylTEE" description="How RoylTEE gives an artist or writer a share they can see, claim and prove, with a walkthrough in the demo dashboard.">
+  <PageHero variant="card" art="card-artists" w={1200} h={896} alt="Flat retro illustration: a guitar amplifier on a cliff at dusk, with a glowing music note gem floating above it in a beam of light." eyebrow="For artists and writers" title="A share you can see, claim and prove" intro="Your split, as a record only the holder can claim from, with nothing hidden behind a login.">
+    <div class="p-cta" style="margin-top:0"><a class="btn primary" href={DASHBOARD_URL}>Open the demo dashboard</a><a class="btn" href="/how-it-works">How it works</a></div>
+  </PageHero>
+  <section class="p-sec" id="artists">
+    <div class="container">
+      <div class="p-head"><p class="l-eyebrow">For artists and writers</p><h2>Your share, in your own hands</h2></div>
+      <div class="p-prose"><h3>The problem</h3><p>Your split lives in a contract, an email or a spreadsheet that other people keep. Each of them holds a copy, and the copies can disagree. Money can reach the wrong place, wait for a match that never comes, or move when a catalog is sold, and you find out late, if at all.</p></div>
+      <div class="p-head" style="margin-top:var(--s7)"><h3>What RoylTEE does about it</h3></div>
+      <div class="p-cols two"><div class="p-card"><h3>Your share is its own record</h3><p>Each share is an NFT with its own payout vault. You can see what it earned, what was paid out and what you can claim, on a public page, with no login.</p></div><div class="p-card"><h3>Only the holder can claim</h3><p>Money in your vault moves only to the account that holds the share. A seller who moves on, an agent or the registry operator cannot take it.</p></div><div class="p-card"><h3>You sign the split sheet</h3><p>If someone else registers a share on your work, its money waits in escrow until you sign. On testnet, half of a payment stayed held until the work's registrant approved.</p></div><div class="p-card"><h3>Disputes freeze, they do not steal</h3><p>If a claim pushes a work above 100 percent, only the contested share is frozen. The rest keeps being paid.</p></div></div>
+      <div class="p-head" style="margin-top:var(--s7)"><h3>Try it in the demo dashboard</h3><p class="muted">Every step uses testnet data. Money is Simulated.</p></div>
+      <ol class="p-walk"><li><span class="k">1. Find a share</span><span><a class="l-textlink" href="/catalog/lookup/">Catalog, Lookup</a>: search a work by its code or a share by its account.</span></li><li><span class="k">2. Open its page</span><span><a class="l-textlink" href="/share?id=s1">Share s1</a>: summary, statement since mint, the vault's live key list (0 keys), holders and history.</span></li><li><span class="k">3. See your holdings</span><span><a class="l-textlink" href="/member">Your shares</a>: type an account such as writer-a.royltee-dev.testnet to see its shares and claimable money. Claiming needs a NEAR testnet wallet you connect, and the buttons that send transactions are marked UNVERIFIED because they have not been run from the site on testnet.</span></li><li><span class="k">4. See a claim that happened</span><span><a class="l-textlink" href="/activity">Activity</a>: the recorded scripted run, including writer-a claiming s1, with the transaction on the explorer.</span></li><li><span class="k">5. Check a split sheet</span><span><a class="l-textlink" href="/share?id=s15">Share s15</a>: registered pending, then approved by the work's registrant.</span></li></ol>
+      <p class="p-note">Membership in the demo is granted by the registrar, and the identity check behind it is Simulated. A share records an assignment as declared by members. It is not a copyright transfer and does not replace a signed agreement.</p>
+    </div>
+  </section>
+  <section class="p-sec alt">
+    <div class="container">
+      <div class="p-head"><h2>See the proof behind it</h2></div>
+      <div class="p-cta" style="margin-top:0"><a class="btn primary" href="/how-it-works">How it works, step by step</a><a class="btn" href="/verify">Verify on testnet</a><a class="btn" href="/security">Security</a><a class="btn" href="/faq">FAQ and glossary</a></div>
+    </div>
+  </section>
+</Base>

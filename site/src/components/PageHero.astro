@@ -1,0 +1,31 @@
+---
+/* Header band for inner pages: art with the title on its empty left side (or a framed card on the right). */
+interface Props { art: string; alt: string; eyebrow: string; title: string; intro?: string; variant?: 'band' | 'card'; w?: number; h?: number }
+const { art, alt, eyebrow, title, intro, variant = 'band', w = 1584, h = 672 } = Astro.props;
+---
+{variant === 'band' ? (
+  <header class="ph">
+    <img class="ph-art" src={`/art/${art}.webp`} width={w} height={h} alt={alt} fetchpriority="high" decoding="async" />
+    <div class="ph-scrim" aria-hidden="true"></div>
+    <div class="container">
+      <div class="ph-copy">
+        <p class="l-eyebrow">{eyebrow}</p>
+        <h1>{title}</h1>
+        {intro && <p class="lead">{intro}</p>}
+        <slot />
+      </div>
+    </div>
+  </header>
+) : (
+  <header class="phc">
+    <div class="container phc-in">
+      <div class="phc-copy">
+        <p class="l-eyebrow">{eyebrow}</p>
+        <h1>{title}</h1>
+        {intro && <p class="lead">{intro}</p>}
+        <slot />
+      </div>
+      <figure class="phc-art"><img src={`/art/${art}.webp`} width={w} height={h} alt={alt} fetchpriority="high" decoding="async" /></figure>
+    </div>
+  </header>
+)}
