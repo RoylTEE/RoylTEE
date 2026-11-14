@@ -1,6 +1,7 @@
 ---
 /* Recorded on-chain activity, newest first. A ledger table on wide screens, stacked rows on narrow ones. */
 import { SCENES, txUrl, categoriesOf } from '../data/testnet';
+import { nearDoes } from '../data/scene-labels';
 interface Props { id: string; limit?: number; collapsible?: boolean; only?: string }
 const { id, limit, collapsible = false, only } = Astro.props;
 const numbered = SCENES.map((s, i) => ({ ...s, n: i + 1, cats: categoriesOf(s) })).reverse();
@@ -14,7 +15,7 @@ const rows = (only ? numbered.filter((s) => s.cats.includes(only)) : numbered).s
         <tr data-cat={collapsible ? s.cats.join(' ') : undefined}>
           <td class="num x">{s.n}</td>
           <td class="p nowrap"><strong>{s.step}</strong>{s.simulated && <span class="badge sim step-sim">Simulated payer</span>}{s.agent && <span class="badge info step-sim">Scripted agent</span>}</td>
-          <td class="p-wrap">{s.what}<span class="small muted shows only-wide"><br />{s.shows}</span></td>
+          <td class="p-wrap">{s.what}<span class="small muted shows only-wide"><br />{s.shows}</span><span class="near-does"><strong>NEAR does:</strong> {nearDoes(s)}</span></td>
           <td class="m mono">{s.tokens.length ? s.tokens.map((t, i) => <>{i ? ', ' : ''}<a class="link" href={`/share?id=${t}`}>{t}</a></>) : <span class="dim">No share</span>}</td>
           <td class="p-end">{s.result === 'refused' ? <span class="badge bad">Refused</span> : s.result === 'info' ? <span class="badge info">Recorded</span> : <span class="badge ok">Done</span>}</td>
           <td class="m">{s.txs.map((h) => <a class="acct-link tx" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</td>
@@ -25,6 +26,8 @@ const rows = (only ? numbered.filter((s) => s.cats.includes(only)) : numbered).s
 </div>
 {collapsible && rows.length > 5 && <div class="expand-row"><button class="btn sm" type="button" data-expand aria-controls={id} aria-expanded="false" hidden>Show all {rows.length}</button></div>}
 <style is:global>
+  .activity .near-does { display: block; margin-top: .2rem; font-size: var(--fs-12); color: var(--muted); }
+  .activity .near-does strong { color: var(--text, inherit); font-weight: 600; }
   .activity .step-sim { margin-left: var(--s2); }
   .activity .acct-link.tx + .acct-link.tx { margin-left: .5rem; }
   @media (max-width: 767px) { .activity td.p-end { order: 0; } }

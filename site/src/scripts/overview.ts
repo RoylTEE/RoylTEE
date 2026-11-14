@@ -1,6 +1,7 @@
 /** Overview: the registry statement since mint, totals, and what needs attention. View calls only. */
-import { allTokens, allDisputes, view, accessKeys, tokenBalance, pool, approvalOf, musdc, type Token, type Ledger, type Accounting, type Dispute, type Role } from './chain';
+import { allTokens, allDisputes, oneToken, short, pct, view, accessKeys, tokenBalance, pool, approvalOf, musdc, type Token, type Ledger, type Accounting, type Dispute, type Role } from './chain';
 import { AGENTS } from '../data/testnet';
+import { SPLIT_SCENE } from '../data/scene-labels';
 import { h, badge, fig, fail, stamp, type Tone } from './ui';
 
 const $ = <T extends Element>(s: string) => document.querySelector<T>(s)!;
@@ -51,4 +52,20 @@ async function load() {
     stamp(document.querySelector('[data-stamp]'));
   } catch (err) { fail($('[data-statement]'), err, () => void load()); }
 }
+/** The split sheet scene on work 6, read live: both shares, their approval, vault balance and held escrow. */
+async function loadSplit() {
+  const body = document.querySelector('[data-split-rows]');
+  if (!body) return;
+  try {
+    const rows = await Promise.all(SPLIT_SCENE.shares.map(async (id) => {
+      const t = await oneToken(id);
+      if (!t) return h('tr', {}, h('td', { class: 'm', text: id }), h('td', { colspan: 5, text: 'Not found on the registry' }));
+      const approval = await approvalOf(t);
+      const tone: Tone = approval === 'approved' ? 'ok' : approval === 'pending' ? 'warn' : 'plain';
+      return h('tr', {}, h('td', { class: 'm' }, h('a', { class: 'link', href: `/share?id=${id}`, text: id })), h('td', { class: 'm', text: short(t.owner_id) }), h('td', { text: pct(t.extra.percent_bps) }), h('td', {}, badge(approval === 'not deployed' ? 'Not on this build' : approval, tone)), h('td', { class: 'num', text: t.extra.vault_balance ? musdc(t.extra.vault_balance) : 'Unreadable' }), h('td', { class: 'num', text: musdc(t.extra.escrowed || '0') }));
+    }));
+    body.replaceChildren(...rows);
+  } catch (err) { fail(body, err, () => void loadSplit()); }
+}
 void load();
+void loadSplit();

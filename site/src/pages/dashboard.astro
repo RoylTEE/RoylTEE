@@ -1,8 +1,18 @@
 ---
 import App from '../layouts/App.astro';
 import ActivityTable from '../components/ActivityTable.astro';
+import { SPLIT_SCENE } from '../data/scene-labels';
+import { txUrl } from '../data/testnet';
 ---
 <App area="overview" title="Overview" intro="The registry statement since mint and what needs attention, read live from NEAR testnet with view calls.">
+  <section class="panel start" aria-labelledby="start-h">
+    <div class="panel-head"><h2 id="start-h">Start here</h2><span class="badge sim">Simulated money</span></div>
+    <ol class="panel-body start-list">
+      <li><strong>What this is.</strong> A registry of music rights shares on NEAR testnet. Each share is an NFT that owns a money account with no keys, and one payment is split between the shares by the registry code.</li>
+      <li><strong>The one click to try.</strong> <a class="link" href="/share?id=s15">Open share s15</a> to see a split sheet go from pending to approved, with the money that was held and then released.</li>
+      <li><strong>What is Simulated.</strong> The money is Mock USDC with no value, the payer is a test account and the payment agent is scripted. The shares, the accounts without keys and the transactions are real testnet records.</li>
+    </ol>
+  </section>
   <section aria-labelledby="stmt-h" class="stack">
     <div class="row-head"><h2 id="stmt-h">Statement, since mint</h2><span class="caption">All share accounts together, in Mock USDC (testnet)</span></div>
     <div class="figures kpi" data-statement><p class="loading figure">Reading testnet</p></div>
@@ -10,6 +20,16 @@ import ActivityTable from '../components/ActivityTable.astro';
   <section aria-labelledby="tot-h" class="stack">
     <h2 id="tot-h" class="sr">Totals</h2>
     <div class="figures kpi minor" data-counts></div>
+  </section>
+  <section class="panel" aria-labelledby="split-h" data-split-scene>
+    <div class="panel-head"><h2 id="split-h">Split sheet scene, work {SPLIT_SCENE.workId}</h2><span class="caption">{SPLIT_SCENE.workCode}. NEAR does: holds the pending half in escrow, then releases it when the registrant signs.</span></div>
+    <div class="table-wrap"><table class="ledger rows-sm">
+      <thead><tr><th>Share</th><th>Holder</th><th>Share of work</th><th>Approval</th><th class="num">In vault, mUSDC</th><th class="num">Held in escrow, mUSDC</th></tr></thead>
+      <tbody data-split-rows><tr><td colspan="6" class="loading">Reading testnet</td></tr></tbody>
+    </table></div>
+    <ol class="panel-body split-steps">
+      {SPLIT_SCENE.steps.map((st) => <li>{st.label}. {st.txs.map((h) => <a class="acct-link tx" href={txUrl(h)} target="_blank" rel="noopener">{h.slice(0, 8)}</a>)}</li>)}
+    </ol>
   </section>
   <div class="ov-grid">
     <section class="panel" aria-labelledby="att-h">
@@ -24,9 +44,12 @@ import ActivityTable from '../components/ActivityTable.astro';
 </App>
 <script>import '../scripts/overview.ts';</script>
 <style is:global>
+  .start-list { margin: 0; padding-left: var(--s7, 2rem); display: grid; gap: var(--s2); }
+  .split-steps { margin: 0; padding-left: var(--s7, 2rem); display: grid; gap: var(--s2); }
+  .split-steps .acct-link.tx { margin-left: .5rem; }
   .row-head { display: flex; align-items: baseline; gap: var(--s4); flex-wrap: wrap; }
   .figures.minor .figure .value { font-size: var(--fs-22); }
-  .ov-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr); gap: var(--s5); align-items: start; }
+  .ov-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s5); align-items: start; }
   .todo { list-style: none; margin: 0; padding: 0; }
   .todo li { border-bottom: 1px solid var(--rule); }
   .todo li:last-child { border-bottom: 0; }
