@@ -351,6 +351,130 @@ near tokens $TOKEN.$REG view-ft-balance $USDC $NET now                          
 
 Proves: T39 live. A share registered by someone other than the work registrant is held until the registrant signs; the signature is an on-chain event. The reject path (`reject_share`, held money to the group's unallocated escrow) is shown by unit and sandbox tests only.
 
+### Step 17. Sealed-bid share auction (DRAFT, not run, needs the owner's yes; about 14 transactions)
+
+Zero registry change: the auction is a normal credentialed member at a sibling account (`auction.royltee-dev.testnet`, never under `reg`, because `is_system_account` blocks those names). Nothing here touches `reg` or `usdc` code or keys. Design, costs and the owner dashboard steps are in the README section "Sealed-bid share auction". Every command below was checked for syntax with `--help` on near-cli-rs 0.31.1 (the parser accepted each one); none was sent.
+
+```bash
+AUCTION=auction.$ROOT; OL=outlayer.testnet; OL_OWNER=royltee-admin.testnet
+BIDDER1=$WB; BIDDER2=$BUYER
+WASI=contracts/res/auction_wasi.wasm
+WASI_HASH=$(sha256sum $WASI | cut -d' ' -f1)
+WASI_URL=https://test.fastfs.io/$AUCTION/$OL/$WASI_HASH.wasm
+MAX=100000000; RESERVE=20000000        # 100 and 20 mock USDC (6 decimals)
+```
+
+17a. Create the account (1 tx, 6 NEAR stays in it: code about 3 NEAR locked, rest is the free balance the contract checks before it accepts a listing or a bid):
+
+```bash
+near account create-account fund-myself $AUCTION '6 NEAR' \
+  autogenerate-new-keypair save-to-legacy-keychain sign-as $ROOT $NET $SIGN
+```
+
+17b. Publish the WASI module with FastFS (1 tx, fails out of gas by design, same as the spike). Build the payload with `spike/outlayer/scripts/fastfs_payload.py`, then check the URL serves the same hash:
+
+```bash
+python3 spike/outlayer/scripts/fastfs_payload.py $WASI /tmp/auction_fastfs.bin
+near contract call-function as-transaction $OL __fastdata_fastfs file-args /tmp/auction_fastfs.bin \
+  prepaid-gas '1 Tgas' attached-deposit '0 NEAR' sign-as $AUCTION $NET $SIGN   # expected to fail out of gas
+curl -s $WASI_URL | sha256sum                                                  # must print $WASI_HASH
+```
+
+17c. Deploy and initialise in one transaction (no one can initialise in between):
+
+```bash
+near contract deploy $AUCTION use-file contracts/res/auction.wasm \
+  with-init-call new json-args "{\"registry\":\"$REG\",\"usdc\":\"$USDC\",\"setup\":{\"outlayer\":\"$OL\",\"wasm_url\":\"$WASI_URL\",\"wasm_hash\":\"$WASI_HASH\",\"secrets_account\":\"$OL_OWNER\",\"secrets_profile\":\"royltee-auction\"}}" \
+  prepaid-gas '100 Tgas' attached-deposit '0 NEAR' $NET $SIGN
+near contract call-function as-read-only $AUCTION get_config json-args '{}' $NET now
+```
+
+17d. Credential for the auction (1 tx, registrar; this also registers it with mock USDC so it can receive bids):
+
+```bash
+near contract call-function as-transaction $REG grant_credential \
+  json-args "{\"account\":\"$AUCTION\",\"org_name_hash\":\"$H_A\",\"kyb_ref_hash\":\"$H_B\",\"doc_hash\":\"$H_C\"}" \
+  prepaid-gas '300 Tgas' attached-deposit '0.02 NEAR' sign-as $REGISTRAR $NET $SIGN
+near contract call-function as-read-only $REG is_active_member json-args "{\"account\":\"$AUCTION\"}" $NET now   # true
+```
+
+17e. OWNER, in the OutLayer dashboard (a wallet signs; no key is typed anywhere): create the secret profile `royltee-auction` for `$OL_OWNER`, bound to the WASM hash `$WASI_HASH`, with one auto-generated TEE secret `PROTECTED_AUCTION_MASTER` (hex32), access condition as tight as the form allows (target: `And[WasmHash($WASI_HASH), Predecessor{Whitelist[$AUCTION]}]`, form support UNVERIFIED). Then check it exists (read only):
+
+```bash
+near contract call-function as-read-only $OL secrets_exist json-args "{\"accessor\":{\"WasmHash\":{\"hash\":\"$WASI_HASH\"}},\"profile\":\"royltee-auction\",\"owner\":\"$OL_OWNER\"}" $NET now   # false until the owner has stored the secret, then true
+```
+
+17f. Publish the TEE public key (1 tx, anyone; OutLayer refunds what it does not use):
+
+```bash
+near contract call-function as-transaction $AUCTION publish_key json-args '{}' \
+  prepaid-gas '300 Tgas' attached-deposit '0.02 NEAR' sign-as $ROOT $NET $SIGN
+near contract call-function as-read-only $AUCTION get_tee_pubkey json-args '{}' $NET now   # 64 hex
+```
+
+17g. Mint demo mock USDC to the two bidders (2 tx, `PAYER` is the minter; Simulated money):
+
+```bash
+for b in $BIDDER1 $BIDDER2; do
+  near contract call-function as-transaction $USDC mint \
+    json-args "{\"account_id\":\"$b\",\"amount\":\"200000000\"}" \
+    prepaid-gas '30 Tgas' attached-deposit '0 NEAR' sign-as $PAYER $NET $SIGN
+done
+```
+
+17h. Seller side (2 to 3 tx). If the vault holds money, `sync` and `claim` first (unclaimed money travels with the share; T-A8). Then list: registry `nft_transfer_call` to the auction. `TOKEN` is a share id held by `WA` from step 9; `ENDS_AT` is nanoseconds, 10 minutes from now for the demo:
+
+```bash
+TOKEN=<share token id held by $WA>
+ENDS_AT=$(( ($(date +%s) + 600) * 1000000000 ))
+near contract call-function as-transaction $REG nft_transfer_call \
+  json-args "{\"receiver_id\":\"$AUCTION\",\"token_id\":\"$TOKEN\",\"msg\":\"{\\\"reserve\\\":\\\"$RESERVE\\\",\\\"max_deposit\\\":\\\"$MAX\\\",\\\"ends_at\\\":\\\"$ENDS_AT\\\"}\"}" \
+  prepaid-gas '100 Tgas' attached-deposit '1 yoctoNEAR' sign-as $WA $NET $SIGN
+near contract call-function as-read-only $AUCTION get_auction json-args '{"auction_id":"0"}' $NET now
+near contract call-function as-read-only $REG nft_token json-args "{\"token_id\":\"$TOKEN\"}" $NET now   # owner is the auction
+```
+
+17i. Sealed bids (2 tx). Each bidder encrypts on their own machine, the amount never leaves it; only the ciphertext goes on chain, with the fixed deposit `$MAX`:
+
+```bash
+PUB=<the 64 hex characters printed by get_tee_pubkey in 17f>
+MSG1=$(node scripts/auction/encrypt-bid.mjs --pubkey $PUB --auction 0 --contract $AUCTION --bidder $BIDDER1 --amount 70000000 | jq -r .msg)
+near contract call-function as-transaction $USDC ft_transfer_call \
+  json-args "$(jq -nc --arg r $AUCTION --arg a $MAX --arg m "$MSG1" '{receiver_id:$r,amount:$a,msg:$m}')" \
+  prepaid-gas '100 Tgas' attached-deposit '1 yoctoNEAR' sign-as $BIDDER1 $NET $SIGN
+# repeat for $BIDDER2 with --amount 90000000
+```
+
+17j. Settle (1 tx, anyone, after `ENDS_AT`; 300 Tgas and 0.02 NEAR for OutLayer, the rest is refunded). Expected result: winner `$BIDDER2`, price 70 mock USDC (second price), share moves to the winner:
+
+```bash
+near contract call-function as-transaction $AUCTION settle json-args '{"auction_id":"0"}' \
+  prepaid-gas '300 Tgas' attached-deposit '0.02 NEAR' sign-as $ROOT $NET $SIGN
+near contract call-function as-read-only $AUCTION get_auction json-args '{"auction_id":"0"}' $NET now
+```
+
+If OutLayer returns nothing or a bad answer, the auction returns to open and `settle` can be called again; after 6 hours past `ENDS_AT` anyone can call `cancel`, which refunds every bid and returns the share.
+
+17k. Pay out (1 tx, anyone; seller price, winner change, loser refunds sit in the ledger until pulled):
+
+```bash
+near contract call-function as-transaction $AUCTION withdraw \
+  json-args "{\"accounts\":[\"$WA\",\"$BIDDER1\",\"$BIDDER2\"]}" \
+  prepaid-gas '300 Tgas' attached-deposit '0 NEAR' sign-as $ROOT $NET $SIGN
+near contract call-function as-read-only $AUCTION get_accounting json-args '{}' $NET now
+```
+
+17l. Off chain proof: verify the settle transaction with `outlayer-verify tx <hash> --network testnet --api https://testnet-api.outlayer.ai` (see `spike/outlayer/README.md`). UNVERIFIED for this module until run.
+
+17m. Optional: delete the auction's full-access key after the demo, then prove zero keys. Only do this when no further fix is wanted: the contract has no owner or admin method, so a bug can only be fixed while the key exists.
+
+```bash
+near account delete-keys $AUCTION public-keys <the one key printed in 17a> network-config testnet sign-with-legacy-keychain send
+near contract call-function as-read-only $AUCTION get_config json-args '{}' $NET now
+```
+
+Total real spend estimate: under 0.2 NEAR in fees and OutLayer charges (the spike paid 0.0010626 NEAR for one run; the `estimate_execution_cost` view on `outlayer.testnet` returned 0.0040001 NEAR for our default limits of 1 billion instructions, 64 MB and 30 s, read 2026-11-14 UTC; the real charge is at most that), plus 6 NEAR moved into the auction account.
+
 ## Transaction count
 
 The planned count for steps 1 to 13 was 51 transactions, including the two key deletions in step 6. Step 6 was not run (keys on the registry and mock USDC are still present). The run of steps 1 to 13 recorded in `deployments/testnet.json` has 50 on-chain transactions, plus one agent claim that the protocol refused before a transaction was sent. The record also holds step 15, demo writes W1 to W15 and step 15b: 67 on-chain transactions in all. Step 5 (registry deploy and init) is on chain. Step 6 stays reversible until the owner says go.

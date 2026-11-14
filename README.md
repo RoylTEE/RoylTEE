@@ -26,11 +26,12 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 11. [Simulated vs real](#simulated-vs-real)
 12. [What the token legally is](#what-the-token-legally-is)
 13. [TEE roadmap: verified call path on testnet](#tee-roadmap-verified-call-path-on-testnet)
-14. [Roadmap](#roadmap)
-15. [Known limits](#known-limits)
-16. [Libraries, templates and AI-written code](#libraries-templates-and-ai-written-code)
-17. [Repository layout](#repository-layout)
-18. [Built at NEAR HACKATHON](#built-at-near-hackathon)
+14. [Sealed-bid share auction](#sealed-bid-share-auction)
+15. [Roadmap](#roadmap)
+16. [Known limits](#known-limits)
+17. [Libraries, templates and AI-written code](#libraries-templates-and-ai-written-code)
+18. [Repository layout](#repository-layout)
+19. [Built at NEAR HACKATHON](#built-at-near-hackathon)
 
 ## Try it: do X, see Y
 
@@ -169,6 +170,10 @@ Test suites (counts from `npm test` and the site's `npm test` on the merged tree
 | Sandbox: limits and gas | `contracts/tests/tests/limits.rs` | 3 |
 | Sandbox: review fixes | `contracts/tests/tests/review.rs` | 4 |
 | Sandbox: in-place upgrade from the testnet wasm | `contracts/tests/tests/upgrade.rs` | 1 |
+| Auction contract unit tests | `contracts/auction/src/tests.rs` | 38 |
+| Auction WASI module host tests | `tee/auction-wasi/src/lib.rs` | 10 |
+| Auction Node tests (real module under WASI) | `scripts/auction/auction.test.mjs` | 12 |
+| Sandbox: auction (mock OutLayer, real module answers) | `contracts/tests/tests/auction.rs` | 11 |
 | Site (help chat, tickets, limits, dashboard) | `site/tests/` | 219 (18 files) |
 
 Brief test list to sandbox tests (every sandbox test ends with a solvency check; tests that touch a vault also check it has zero keys):
@@ -323,6 +328,7 @@ Screenshots: none yet. **Pre-submission item:** add the landing page, the help c
 | Locks (`payout_in_flight`, `transfer_pending`), credentials, disputes and escrow | Provenance evidence (the field is real, the evidence is not checked) |
 | Events and per-token history | Arbitration and dispute documents (hashes of dummy documents) |
 | | TEE attestation of payer statements (not built; roadmap) |
+| | OutLayer in the auction tests (`contracts/mock-outlayer`); auction money is mock USDC |
 | Site pages' live values (read-only view calls to NEAR testnet) | Payer steps in the site's recorded demo (badge "Simulated payer") |
 | | Document hashes in the site's registrar events (placeholder test values) |
 
@@ -338,11 +344,35 @@ The registry contracts do not use a TEE. The help chat TEE label is unchanged: t
 
 A throwaway testnet probe, not part of the registry, was used to check one OutLayer call path. The contract at `probe.royltee-dev.testnet` called `request_execution` on `outlayer.testnet` with a small WASI echo module. The callback stored the echo of `{"hello":"tee"}`. `outlayer-verify` (git `90c27d9`) then returned PROVEN on all five checks for transaction [`7LFZ3MoTENEP8cJfGYAcrgPhJ81es2CZkYDWjpfXzfQ1`](https://testnet.nearblocks.io/txns/7LFZ3MoTENEP8cJfGYAcrgPhJ81es2CZkYDWjpfXzfQ1): Authenticity (genuine Intel TDX, TCB UpToDate), Identity (the worker build is approved on `worker.outlayer.testnet`), Binding, Input (the request bytes `{"hello":"tee"}` hash to `409dcbcaf2467885300523cda3cfba1fc4f5a02c11dac1e930aad5202aeb40de`), and Output (hash `69249e97227b6c576a795b2cf000fcba3e804258c1b9386fba0e4f89fdf344c1`).
 
-This is a call-path proof only. The sealed-bid auction is not built.
+This was a call-path proof only. The sealed-bid auction below is built and tested locally; it is not deployed.
 
 OutLayer's own docs say it runs on single operator keys today (UNVERIFIED beyond those docs). A NEAR contract cannot check the quote itself.
 
 How to rebuild, re-test and re-verify the probe and the echo module, including the online command (which needs `--api https://testnet-api.outlayer.ai` because the tool's default API address is retired) and `outlayer-verify bundle verify-bundle.json --offline`, is in [spike/outlayer/README.md](spike/outlayer/README.md).
+
+## Sealed-bid share auction
+
+Status: built and tested locally (unit, sandbox and Node tests), NOT deployed. The deploy commands are a draft in [DEPLOY_PLAN.md](DEPLOY_PLAN.md) step 17 and need the owner's yes.
+
+What it does: a holder lists one share for a private auction. Bidders send an encrypted bid. After the end time, a WASI module running in OutLayer's TEE opens the bids and prints only the winner and the price. The contract then moves the share and the money. Losing bids are never published.
+
+How a sale runs:
+
+1. **List.** The seller calls the registry's `nft_transfer_call` to the auction with `{"reserve","max_deposit","ends_at"}`. The auction keeps the share (it returns `false` from `nft_on_transfer`). It needs no registry change: it is a normal credentialed member at `auction.royltee-dev.testnet`, a sibling of the registry account because the registry blocks system names under `reg`.
+2. **Bid.** A bidder runs `node scripts/auction/encrypt-bid.mjs`, which seals the amount to the TEE public key (X25519, HKDF-SHA256, ChaCha20-Poly1305, bound to the auction id, the contract and the bidder). They send exactly `max_deposit` mock USDC with `ft_transfer_call` and the ciphertext as the message. Every deposit is the same size, so the deposit leaks nothing about the bid. Only active members can bid; at most 8 bids per auction.
+3. **Settle.** After `ends_at`, anyone calls `settle`. The contract calls `request_execution` on `outlayer.testnet` with the module (pinned by sha256). The module prints `{winner, price, bids_hash}`. The price is the second highest valid bid, or the reserve. The contract accepts the answer only if the winner is a bidder, the price is between the reserve and `max_deposit`, and `bids_hash` matches the bid list it sent.
+4. **Pay.** The share goes to the winner first (the registry re-checks membership). Only then the contract credits the seller the price, the winner the change, and each loser the full deposit. Money leaves with `withdraw`, which debits before it sends and restores the credit if the send fails.
+5. **Failure.** A failed or empty answer reopens settling. A refused delivery, a stale settle (1 hour) or a missed settle (6 hours after `ends_at`) ends in a cancelled auction: every deposit is credited back and the share returns to the seller.
+
+What you can and cannot trust:
+
+- Real in the tests: the registry, vault and mock USDC wasm, the auction contract, and the WASI module (run under Node's WASI). Simulated in the tests: OutLayer itself (`contracts/mock-outlayer`), and all money is mock USDC.
+- Bid secrecy rests on the TEE and on OutLayer's operators. OutLayer's own docs describe single operator keys today (UNVERIFIED for testnet). A NEAR contract cannot verify an attestation; verification is off chain with `outlayer-verify`.
+- The contract has no admin method. A bug can only be fixed while the auction account's full-access key exists.
+- Unclaimed vault money travels with the share, like any registry transfer. Sellers should claim before they list.
+- Not yet proven on testnet (UNVERIFIED): that OutLayer accepts a hash-bound secret for a WasmUrl run, the fee for one settle (the `estimate_execution_cost` view gave 0.0040001 NEAR for the default limits on 2026-11-14 UTC), and that the dashboard can build the tightest access condition.
+
+Tests: 38 contract unit tests, 10 WASI host tests, 12 Node tests, 11 sandbox tests (`contracts/tests/tests/auction.rs`, a01 to a11, including one with eight bids at 300 Tgas). Threat rows T-A1 to T-A12 are in [THREAT_MODEL.md](THREAT_MODEL.md).
 
 ## Roadmap
 
@@ -391,6 +421,10 @@ contracts/registry       Rust, near-sdk: NEP-171/177/181 shares, vault factory, 
 contracts/vault          Rust, raw host functions: the keyless vault (withdraw, ft_on_transfer)
 contracts/mock-usdc      Rust: Mock USDC (testnet), NEP-141, 6 decimals
 contracts/test-receiver  Rust: member contract used by the sandbox bounce test
+contracts/auction        Rust, near-sdk: sealed-bid share auction (not deployed)
+contracts/mock-outlayer  Rust: TEST ONLY stand-in for OutLayer (Simulated), used by the auction sandbox tests
+tee/auction-wasi         Rust, wasm32 WASI module that opens bids inside the TEE (own Cargo workspace)
+scripts/auction          Node: bid encryption script, WASI runner, tests
 contracts/tests          near-workspaces sandbox tests; fixtures/ holds the registry wasm deployed on testnet (upgrade test)
 scripts/build-wasm.sh    builds every contract into contracts/res/ with local paths remapped, checks no local path is left, prints sha256
 scripts/verify-testnet.mjs  read-only check of the live deployment against deployments/testnet.json
