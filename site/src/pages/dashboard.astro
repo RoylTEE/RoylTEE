@@ -3,18 +3,19 @@ import App from '../layouts/App.astro';
 import ActivityTable from '../components/ActivityTable.astro';
 import { SPLIT_SCENE } from '../data/scene-labels';
 import { txUrl } from '../data/testnet';
+import { PROJECT_NAME } from '../consts';
 ---
 <App area="overview" title="Overview" intro="The registry statement since mint and what needs attention, read live from NEAR testnet with view calls.">
   <section class="panel start" aria-labelledby="start-h">
-    <div class="panel-head"><h2 id="start-h">Start here</h2><div class="end"><span class="badge sim">Simulated money</span> <a class="btn sm" href="/whitepaper">Whitepaper</a></div></div>
+    <div class="panel-head"><h2 id="start-h">Start here</h2></div>
     <ol class="panel-body start-list">
-      <li><strong>What this is.</strong> A registry of music rights shares on NEAR testnet. Each share is an NFT that owns a money account with no keys, and one payment is split between the shares by the registry code.</li>
-      <li><strong>The one click to try.</strong> <a class="link" href="/share?id=s15">Open share s15</a> to see a split sheet go from pending to approved, with the money that was held and then released.</li>
-      <li><strong>What is Simulated.</strong> The money is Mock USDC with no value, the payer is a test account and the payment agent is scripted. The shares, the accounts without keys and the transactions are real testnet records.</li>
+      <li><strong>What is {PROJECT_NAME}.</strong> {PROJECT_NAME} is a registry of music rights shares on NEAR testnet. Each share of a song is minted as an NEP-171 NFT, and minting it also creates a payout account on NEAR that has no keys. Payments for a song arrive at the registry, which splits them between its shares by their recorded percentages and credits each share's account. Only the account that holds the share NFT can collect that money, so selling the NFT moves the right to be paid with it.</li>
+      <li><strong>Try it in one click.</strong> <a class="link" href="/share?id=s15">Open share s15</a> to see a split sheet that every writer must approve before money can move. While it is pending, the share's money is held, and once every writer approves, the money is released to the share's account.</li>
+      <li><strong>What is Simulated.</strong> Payments use Mock USDC on testnet, the payer is a test account and the payment agent is scripted. The share NFTs, their keyless accounts and every transaction are real testnet records.</li>
     </ol>
   </section>
   <section aria-labelledby="stmt-h" class="stack">
-    <div class="row-head"><h2 id="stmt-h">Statement, since mint</h2><span class="caption">All share accounts together, in Mock USDC (testnet)</span></div>
+    <div class="row-head"><h2 id="stmt-h">Statement since mint</h2><span class="caption">Totals for every share account combined</span></div>
     <div class="figures kpi" data-statement><p class="loading figure">Reading testnet</p></div>
   </section>
   <section aria-labelledby="tot-h" class="stack">

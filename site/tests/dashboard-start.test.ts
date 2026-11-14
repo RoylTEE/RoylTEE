@@ -39,8 +39,12 @@ describe('dashboard Start here and scene labels', () => {
   it('the Overview page has the three line Start here strip, the live split sheet table and explorer links', () => {
     const page = read('src/pages/dashboard.astro');
     expect(page).toContain('Start here');
-    expect(page).toContain('What this is.');
-    expect(page).toContain('The one click to try.');
+    expect(page).toContain('What is {PROJECT_NAME}.');
+    expect(page).toContain('NEP-171 NFT');
+    expect(page).toContain('Try it in one click.');
+    expect(page).not.toContain('Simulated money');
+    expect(page).toContain('Statement since mint');
+    expect(page).toContain('Totals for every share account combined');
     expect(page).toContain('What is Simulated.');
     expect(page).toContain('href="/share?id=s15"');
     expect(page).toContain('data-split-rows');
