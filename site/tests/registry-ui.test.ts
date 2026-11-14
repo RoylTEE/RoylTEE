@@ -120,10 +120,10 @@ describe('verify page', () => {
     expect(base58ToHex(DEPLOY_RECORD.mockUsdc.codeHash)).toBe(DEPLOY_RECORD.mockUsdc.sha256);
     expect(base58ToHex(DEPLOY_RECORD.vault.codeHash)).toBe(DEPLOY_RECORD.vault.sha256);
   });
-  it('shows the verify command and labels key deletion as planned, not done', () => {
+  it('shows the verify command and labels the kept keys as a decision, not as deleted', () => {
     const v = src('pages/verify.astro');
     expect(v).toMatch(/npm run verify:testnet/);
-    expect(v).toMatch(/Deleting them is planned after that update \(roadmap\)/);
+    expect(v).toMatch(/They stay on testnet by decision, so late fixes remain possible/);
     expect(v).toMatch(/UNVERIFIED/);
   });
 });

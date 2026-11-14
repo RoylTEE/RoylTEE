@@ -17,7 +17,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
   <section class="panel" aria-labelledby="k-h">
     <div class="panel-head"><h2 id="k-h">Keys still on contract accounts</h2></div>
     <div class="table-wrap" data-keys><p class="loading panel-body">Reading keys</p></div>
-    <p class="panel-foot">The registry and the Mock USDC contract each keep one full access key; both registry updates were deployed in place with it. Deleting them is planned after that update (roadmap), once the code is final. Until then the registry itself is not keyless; the share accounts are.</p>
+    <p class="panel-foot">The registry and the Mock USDC contract each keep one full access key; both registry updates were deployed in place with it. They stay on testnet by decision, so late fixes remain possible. On mainnet both keys would be deleted after the final deploy (or upgrades handed to a multisig or DAO), and the same zero-keys check the share accounts pass would prove it. Until then the registry itself is not keyless; the share accounts are.</p>
   </section>
   <section class="panel" aria-labelledby="cmd-h">
     <div class="panel-head"><h2 id="cmd-h">From your own machine</h2><span class="caption">No wallet needed</span></div>

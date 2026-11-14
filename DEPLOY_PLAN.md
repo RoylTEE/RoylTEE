@@ -24,8 +24,8 @@ Status: steps 1 to 5 and 7 to 13 were run on testnet on 2026-11-13 (UTC). Accoun
 | `ROOT` | `royltee-dev.testnet` | faucet account, parent and funder of every project account |
 | `FUND1` | `royltee-fund-1.testnet` | faucet account, only forwards its NEAR to `ROOT` |
 | `FUND2` | `royltee-fund-2.testnet` | faucet account, only forwards its NEAR to `ROOT` |
-| `REG` | `reg.royltee-dev.testnet` | registry contract; key deletion (step 6) parked, full-access key still present |
-| `USDC` | `usdc.royltee-dev.testnet` | mock USDC (testnet); key deletion (step 6) parked, full-access key still present |
+| `REG` | `reg.royltee-dev.testnet` | registry contract; step 6 (key deletion) not run by owner decision, full-access key kept |
+| `USDC` | `usdc.royltee-dev.testnet` | mock USDC (testnet); step 6 (key deletion) not run by owner decision, full-access key kept |
 | `REGISTRAR` | `registrar.royltee-dev.testnet` | registrar |
 | `WA` | `writer-a.royltee-dev.testnet` | member, writer |
 | `WB` | `writer-b.royltee-dev.testnet` | member, writer, dispute claimant |

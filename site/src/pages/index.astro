@@ -173,7 +173,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
             <tbody>{real.map(([a, b]) => <tr><td class="p-wrap">{a}</td><td class="m wrap"><span class="only-narrow">Simulated: </span>{b}</td></tr>)}</tbody>
           </table>
         </div>
-        <div class="panel-foot">The registrar is a trusted role: every registrar action that moves a share or money carries a document hash and emits an event. The registry and token accounts still hold one full access key each, so the registry itself is not keyless yet. The contracts use no trusted execution environment.</div>
+        <div class="panel-foot">The registrar is a trusted role: every registrar action that moves a share or money carries a document hash and emits an event. The registry and token accounts still hold one full access key each, so the registry itself is not keyless (kept on testnet by decision, so late fixes stay possible). The contracts use no trusted execution environment.</div>
       </div>
     </div>
   </section>
