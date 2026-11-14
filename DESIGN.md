@@ -342,8 +342,8 @@ pub fn release_stale_forward(&mut self, token_id: TokenId);
 // Anyone, STALE_FORWARD_BLOCKS (about a day) after the busy period start, inbound_pending equal to
 // the recorded count (T19b). Reads no balance, credits and resends nothing: the amount moves to
 // written_off and inbound_pending to 0. sync is refused while written_off > 0.
-#[payable] pub fn resolve_written_off(&mut self, token_id: TokenId, delivered_amount: U128, failed_amount: U128, doc_hash: Hash32);
-#[payable] pub fn resolve_stale_payout(&mut self, token_id: TokenId, paid: bool, doc_hash: Hash32);
+#[payable] pub fn resolve_written_off(&mut self, token_id: TokenId, delivered_amount: U128, failed_amount: U128, expected_seq: U64, doc_hash: Hash32);
+#[payable] pub fn resolve_stale_payout(&mut self, token_id: TokenId, paid: bool, expected_since_block: U64, doc_hash: Hash32);
 // Registrar only, 1 yocto, final public receipt outcome. delivered + failed <= written_off; the rest
 // stays quarantined; resolved_through = released_through fences old callbacks. See T12, T19, T19b.
 #[private] pub fn assert_quiescent(&self);
