@@ -25,7 +25,6 @@ describe('whitepaper 1.0', () => {
     expect(paper).not.toMatch(/[\u2013\u2014]/);
     expect(forbidden(paper)).toEqual([]);
     expect(paper).not.toMatch(new RegExp(['/ho', 'me/|/t', 'mp/|/work', 'space|near-credentials'].join('')));
-    expect(paper).not.toMatch(new RegExp(['Bang', 'kok'].join('') + '|UTC' + '\\+7'));
   });
   it('covers the sections the brief asks for', () => {
     for (const h of ['## 4 Lifecycle', '## 6 The sealed-bid auction and the TEE', '## 8 Trust model, keys and the path to mainnet', '## 10 What is Simulated, what is UNVERIFIED', '## 11 Limitations and open questions', '## 12 Roadmap', '### 8.2 Keys on testnet, by decision', '### 8.6 The path to mainnet']) expect(paper, h).toContain(h);

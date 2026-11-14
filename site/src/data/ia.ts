@@ -58,3 +58,7 @@ export const AREAS: Area[] = [
 ];
 
 export const area = (key: string) => AREAS.find((a) => a.key === key)!;
+
+/** Browser tab title: the page, then its area, then the project. The area is left out when it is the page's own name. */
+export const tabTitle = (page: string, areaLabel: string, project: string) =>
+  page.trim().toLowerCase() === areaLabel.trim().toLowerCase() ? `${page} . ${project}` : `${page} . ${areaLabel} . ${project}`;

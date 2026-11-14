@@ -28,7 +28,7 @@ States: **fixed** (changed in code, script or record, with a test or a run), **d
 | I3 storage prefix collision | FALSE. Collection prefixes are the Borsh index of `Key` (0x00 to 0x0D) and the NFT per-owner sets start with 0x00; raw slots start with `a` or `l`. | fixed (wording) | DESIGN section 19 explains why. |
 | I4 `revoke_role` keeps `l2t:` slot | REAL, minor. The role record itself is also kept (revoked flag), by design. | deferred | Small storage only. |
 | I5 verify fails after step 6, 15 or 16 | REAL. | fixed (wording) | DEPLOY_PLAN step 15 note. |
-| I6 "verified" tagline | REAL. The tagline is fixed by the build prompt. | fixed (wording) | README bullet: "verified" means a registrar credential; the identity check is Simulated. |
+| I6 "verified" tagline | REAL. The tagline is fixed by the brief. | fixed (wording) | README bullet: "verified" means a registrar credential; the identity check is Simulated. |
 | I7 LICENSE holder | UNVERIFIED that "RoylTEE Labs" is a legal entity. | deferred | Owner decision. |
 | I8 positives | n/a | n/a | |
 

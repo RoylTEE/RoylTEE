@@ -3,6 +3,7 @@
   "record": {
     "written_at_utc": "2026-11-14T11:30:00Z",
     "git_branch": "feat/tee-auction",
+    "git_branch_note": "This branch is now merged into main; build from main.",
     "cli": {
       "name": "near-cli-rs",
       "version": "0.31.1"
@@ -111,7 +112,7 @@
   },
   "transactions": [
     {
-      "step": "related: registry final redeploy (recorded in full on branch fix/final-contract)",
+      "step": "related: registry final redeploy (recorded in full on branch fix/final-contract, now merged into main)",
       "transaction_hash": "52jp95BVJCk6a9bUGyYtYEQq99R56Xiz5zxJ1vCHBJrD",
       "signer": "reg.royltee-dev.testnet",
       "receiver": "reg.royltee-dev.testnet",

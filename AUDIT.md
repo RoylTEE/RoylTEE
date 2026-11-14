@@ -1,6 +1,6 @@
 # Audit
 
-Manual audit pass, 2026-11-13, by the builder, over the code at the commit that adds this file. It is not an independent review. The bundled `near-contract-audit` skill named in the build prompt is not available in this environment (DECISIONS_LOG row 60), so this pass follows the checklist the owner set: access control, deposits, callbacks and locks, reentrancy across promises, integer overflow and rounding, storage staking, gas on loops, events, the solvency invariant, the zero full-access-keys plan, and every THREAT_MODEL row mapped to a test or marked as a gap. After this pass, review passes 03a to 03d were run by reviewers other than the builder, from review packs (contracts, site and server, README); each finding and its state are in [docs/reviews/03a-status.md](docs/reviews/03a-status.md) to [03d-status.md](docs/reviews/03d-status.md). They were read-only reviews of the code and docs, not a formal audit. A formal audit is still recommended before any mainnet use (none is planned: testnet only).
+Manual audit pass, 2026-11-13, by the builder, over the code at the commit that adds this file. It is not an independent review. The bundled `near-contract-audit` skill named in the brief is not available in this environment (DECISIONS_LOG row 60), so this pass follows the checklist the owner set: access control, deposits, callbacks and locks, reentrancy across promises, integer overflow and rounding, storage staking, gas on loops, events, the solvency invariant, the zero full-access-keys plan, and every THREAT_MODEL row mapped to a test or marked as a gap. After this pass, review passes 03a to 03d were run by reviewers other than the builder, from review packs (contracts, site and server, README); each finding and its state are in [docs/reviews/03a-status.md](docs/reviews/03a-status.md) to [03d-status.md](docs/reviews/03d-status.md). They were read-only reviews of the code and docs, not a formal audit. A formal audit is still recommended before any mainnet use (none is planned: testnet only).
 
 Scope: `contracts/registry`, `contracts/vault`, `contracts/mock-usdc`. `contracts/test-receiver` is a test helper and is never deployed.
 
@@ -157,7 +157,7 @@ Legend. Deposit: `1y` exactly 1 yoctoNEAR; `>=1` any nonzero deposit that also c
 | T37 | t09, t10, t11 | residual risk accepted |
 | T38 | t14b; unit `over_allocation_rules`, `failed_claimant_mint_cancels_dispute_and_escrow_goes_to_undelivered` | covered |
 
-## Contract review fixes (2026-11-13, branch `fix/contract-review`)
+## Contract review fixes (2026-11-13, branch `fix/contract-review`, now merged into `main`)
 
 An external review of the contracts (H1 to H3, M1, M2, L1 to L9) and Security Suite F-04 and F-12 were worked on this branch; see THREAT_MODEL.md (rows marked "review", new T39) and DESIGN.md section 19. Fixed in code: H1 (holder or registrar only sync; new vaults export `ft_on_transfer`), H2 (explicit minimal contests, pruning), H3 (registrar cannot hold a credential), M2 (on-chain split sheet approval), L2, L4 (F-04), L5, L6, L8, L9, M1 for stuck mints plus 10 Tgas forward callback gas. Not fixed in code at that time: a lost `on_forward` (later fixed, T19b); vaults created before the fix keep the old code (T21); registrar trust (T12, M2 above). The vault is now 7478 bytes.
 

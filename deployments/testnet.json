@@ -3,6 +3,7 @@
   "record": {
     "written_at_utc": "2026-11-14T02:50:33Z",
     "git_branch": "fix/audit",
+    "git_branch_note": "This branch is now merged into main; build from main.",
     "git_head_when_written": "b8c1b8f",
     "cli": {
       "name": "near-cli-rs",
@@ -21,7 +22,7 @@
       "Testnet only. No mainnet deploys or transactions.",
       "Public keys only. No private keys or seed phrases are recorded.",
       "Step 6 (delete full-access keys of the registry and mock USDC) is parked until the owner says go. Those full-access keys are still present, so in-place upgrades remain possible. Both registry redeploys (step 15 and the audit F1 redeploy) used the registry's full-access key.",
-      "contracts/res/*.wasm is gitignored. The local sha256 of each built wasm used for this record matches the on-chain code hash. A build of branch fix/audit with scripts/build-wasm.sh gives the sha256 of the deployed registry and of the vault code it embeds; the contract sources are unchanged from commit 57b35b5 onward. Two clones at different paths on one machine gave the same bytes; other machines are UNVERIFIED. The mock USDC on chain is an older build (see wasm.mock_usdc.note).",
+      "contracts/res/*.wasm is gitignored. The local sha256 of each built wasm used for this record matches the on-chain code hash. A build of branch fix/audit (now merged into main) with scripts/build-wasm.sh gives the sha256 of the deployed registry and of the vault code it embeds; the contract sources are unchanged from commit 57b35b5 onward. Two clones at different paths on one machine gave the same bytes; other machines are UNVERIFIED. The mock USDC on chain is an older build (see wasm.mock_usdc.note).",
       "The first pay_from_allowance in step 12 (7DJThzgCgnZYf9uNhPgH5ZsuJKx8mJqHkiLcqszdRSTu) was signed with the agent's full-access key before that key was deleted. The report, the refused duplicate pay, and the client-side refused claim used the function-call key.",
       "The agent's claim on s4 with a deposit was refused by the protocol rule (deposit not allowed with a function-call access key) and produced no transaction.",
       "An extra 0.5 NEAR transfer from royltee-dev.testnet to outsider.royltee-dev.testnet ran during step 11, before the refused outsider claim. It is recorded under step 11.",
@@ -72,7 +73,7 @@
       "on_chain_code_hash_base58": "47ybTZxhaJ9ZW3FC9jwaDdLfwgkJ59cCrnkSn5oop67t",
       "sha256_matches_on_chain": true,
       "in_git": false,
-      "note": "Not redeployed. A local build at fix/audit gives 048a2390242486408b4756feb4cfe05dd4e6ca667ef0b2b4ad57f9f509bee8b6, which differs because the deployed build predates the path remap in scripts/build-wasm.sh (decision 98)."
+      "note": "Not redeployed. A local build at fix/audit (now merged into main) gives 048a2390242486408b4756feb4cfe05dd4e6ca667ef0b2b4ad57f9f509bee8b6, which differs because the deployed build predates the path remap in scripts/build-wasm.sh (decision 98)."
     },
     "vault": {
       "local_path": "contracts/res/vault.wasm",

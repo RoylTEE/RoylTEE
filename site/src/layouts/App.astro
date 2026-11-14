@@ -11,7 +11,7 @@ import '../styles/tour.css';
 import Logo from '../components/Logo.astro';
 import RegistryHeader from '../components/RegistryHeader.astro';
 import { PROJECT_NAME } from '../consts';
-import { GROUPS, AREAS, area as findArea } from '../data/ia';
+import { GROUPS, AREAS, area as findArea, tabTitle } from '../data/ia';
 import { REGISTRY, accountUrl } from '../data/testnet';
 interface Props { area: string; tab?: string; title: string; intro?: string; crumb?: string; period?: boolean; description?: string }
 const { area: areaKey, tab, title, intro, crumb, period = true, description } = Astro.props;
@@ -23,7 +23,7 @@ const cspNonce = Astro.locals.cspNonce;
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{`${title} . ${area.label} . ${PROJECT_NAME}`}</title>
+    <title>{tabTitle(title, area.label, PROJECT_NAME)}</title>
     <meta name="description" content={description ?? intro ?? area.purpose} />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     {cspNonce && <script is:inline nonce={cspNonce} data-csp-nonce></script>}

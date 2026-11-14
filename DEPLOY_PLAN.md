@@ -328,7 +328,7 @@ Proves: the deployed state reads back unchanged under the new code. The same upg
 
 ### Step 15b. Redeploy the registry in place with the audit fix F1 (run on 2026-11-14 at 02:43 UTC, decision 110)
 
-Same commands as step 15, with the wasm built from branch `fix/audit` (local sha256 `423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a`, 712958 bytes; vault unchanged, `9e9ef97840a3a3e6967565b43a9c2a467c1925153ea8c5577d666c9b16966cda`). Transaction `BGBUJDTnnjpevSUZkdmfeVASxbKHn1FQDAZqj75kH5rU`, fee 0.0051480829649394 NEAR, code hash `5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo`. Read back after: accounting, owners and approvals unchanged; `deployments/testnet.json` was resynced and `npm run verify:testnet` passed. The upgrade from the step 15 build was not rehearsed in the sandbox (UNVERIFIED there).
+Same commands as step 15, with the wasm built from branch `fix/audit` (now merged into `main`) (local sha256 `423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a`, 712958 bytes; vault unchanged, `9e9ef97840a3a3e6967565b43a9c2a467c1925153ea8c5577d666c9b16966cda`). Transaction `BGBUJDTnnjpevSUZkdmfeVASxbKHn1FQDAZqj75kH5rU`, fee 0.0051480829649394 NEAR, code hash `5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo`. Read back after: accounting, owners and approvals unchanged; `deployments/testnet.json` was resynced and `npm run verify:testnet` passed. The upgrade from the step 15 build was not rehearsed in the sandbox (UNVERIFIED there).
 
 ### Step 15c. Redeploy the registry in place with the final contract fixes (run on 2026-11-14 at 09:09 UTC, decision 114)
 
