@@ -418,6 +418,23 @@
       ],
       "key_count": 1
     },
+    "probe.royltee-dev.testnet": {
+      "variable": "PROBE",
+      "account_id": "probe.royltee-dev.testnet",
+      "role": "throwaway OutLayer probe, not part of the registry",
+      "balance_yocto": "2498340335000271700000000",
+      "balance_near": "2.4983403350002717",
+      "storage_usage_bytes": 185021,
+      "code_hash_base58": "HCaVhK4CVa7eF6VufsexRckEtsLAyfRcEwtL8HPEUs1o",
+      "keys": [
+        {
+          "public_key": "ed25519:3vSHK273p4gXTuKBQj5v3iUEm4vHxBdmYkP4MPX3EroF",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1,
+      "note": "Balances and storage from view_account (finality final) at block 277614955 on 2026-11-14 (05:35 UTC). Other accounts in this object were recorded at 02:50 UTC the same day. Not part of the registry and not checked by scripts/verify-testnet.mjs."
+    },
     "s1.reg.royltee-dev.testnet": {
       "variable": "S1",
       "account_id": "s1.reg.royltee-dev.testnet",

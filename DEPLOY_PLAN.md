@@ -33,6 +33,7 @@ Status: steps 1 to 5 and 7 to 13 were run on testnet on 2026-11-13 (UTC). Accoun
 | `AGENT` | `pay-agent.buyer-pub.royltee-dev.testnet` | payment agent, function-call keys only |
 | `PAYER` | `payer.royltee-dev.testnet` | simulated payer and mock USDC minter |
 | `OUTSIDER` | `outsider.royltee-dev.testnet` | no credential, used to show refusals |
+| `PROBE` | `probe.royltee-dev.testnet` | throwaway OutLayer call-path probe, not part of the registry (added after steps 1 to 13). Public key `ed25519:3vSHK273p4gXTuKBQj5v3iUEm4vHxBdmYkP4MPX3EroF` (full access). This key is not in the earlier key backup archive. |
 
 Vaults are created by the registry as `s<n>.reg.royltee-dev.testnet` (longest expected id 31 characters, limit 64). If `royltee-dev.testnet` is taken, stop and ask; do not pick another name silently.
 

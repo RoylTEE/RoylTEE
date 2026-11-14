@@ -25,11 +25,12 @@ RoylTEE is a permissioned, business to business registry of music rights shares 
 10. [Website and help chat](#website-and-help-chat)
 11. [Simulated vs real](#simulated-vs-real)
 12. [What the token legally is](#what-the-token-legally-is)
-13. [Roadmap](#roadmap)
-14. [Known limits](#known-limits)
-15. [Libraries, templates and AI-written code](#libraries-templates-and-ai-written-code)
-16. [Repository layout](#repository-layout)
-17. [Built at NEAR HACKATHON](#built-at-near-hackathon)
+13. [TEE roadmap: verified call path on testnet](#tee-roadmap-verified-call-path-on-testnet)
+14. [Roadmap](#roadmap)
+15. [Known limits](#known-limits)
+16. [Libraries, templates and AI-written code](#libraries-templates-and-ai-written-code)
+17. [Repository layout](#repository-layout)
+18. [Built at NEAR HACKATHON](#built-at-near-hackathon)
 
 ## Try it: do X, see Y
 
@@ -231,6 +232,7 @@ The live demo below ran on the first build up to the dispute resolve, and on the
 | [`pay-agent.buyer-pub.royltee-dev.testnet`](https://testnet.nearblocks.io/address/pay-agent.buyer-pub.royltee-dev.testnet) | Scripted payment agent, function-call key only | |
 | [`payer.royltee-dev.testnet`](https://testnet.nearblocks.io/address/payer.royltee-dev.testnet) | **Simulated** payer and Mock USDC minter | |
 | [`outsider.royltee-dev.testnet`](https://testnet.nearblocks.io/address/outsider.royltee-dev.testnet) | No credential, used to show refusals | |
+| [`probe.royltee-dev.testnet`](https://testnet.nearblocks.io/address/probe.royltee-dev.testnet) | Throwaway OutLayer call-path probe, not part of the registry. Public key `ed25519:3vSHK273p4gXTuKBQj5v3iUEm4vHxBdmYkP4MPX3EroF` (full access). This key is not in the earlier key backup archive. See [TEE roadmap: verified call path on testnet](#tee-roadmap-verified-call-path-on-testnet). | Account and code hash are in `deployments/testnet.json`. On chain the code hash is `HCaVhK4CVa7eF6VufsexRckEtsLAyfRcEwtL8HPEUs1o` (sha256 `f0b24099cb5e37b7d416eba3988995cfa2b18ebee6d15d16e1be3c466c5bf77e`). |
 
 On-chain demo, in order (all on 2026-11-13 UTC; amounts in mUSDC):
 
@@ -330,6 +332,18 @@ Mock USDC (testnet) is used instead of Circle USDC because a Circle USDC address
 
 A share NFT records an assignment as declared by members, with document hashes of the evidence (in this demo the identity checks and evidence are Simulated), plus the payment instruction it routes. The registry does not check that a signed legal assignment exists: that verification, and any binding legal effect, are UNVERIFIED and planned. It is evidence and a payout address, not legal title. Legal effect in production would come from a participation agreement: paying the registered share account discharges the payer, claimants indemnify payers, and disputes follow the registry process. That agreement is **roadmap**; it does not exist today. Nothing here is legal advice.
 
+## TEE roadmap: verified call path on testnet
+
+The registry contracts do not use a TEE. The help chat TEE label is unchanged: the app reads what NEAR AI Cloud reports (`signature_kind: provider_tee`) and does not verify an attestation itself.
+
+A throwaway testnet probe, not part of the registry, was used to check one OutLayer call path. The contract at `probe.royltee-dev.testnet` called `request_execution` on `outlayer.testnet` with a small WASI echo module. The callback stored the echo of `{"hello":"tee"}`. `outlayer-verify` (git `90c27d9`) then returned PROVEN on all five checks for transaction [`7LFZ3MoTENEP8cJfGYAcrgPhJ81es2CZkYDWjpfXzfQ1`](https://testnet.nearblocks.io/txns/7LFZ3MoTENEP8cJfGYAcrgPhJ81es2CZkYDWjpfXzfQ1): Authenticity (genuine Intel TDX, TCB UpToDate), Identity (the worker build is approved on `worker.outlayer.testnet`), Binding, Input (the request bytes `{"hello":"tee"}` hash to `409dcbcaf2467885300523cda3cfba1fc4f5a02c11dac1e930aad5202aeb40de`), and Output (hash `69249e97227b6c576a795b2cf000fcba3e804258c1b9386fba0e4f89fdf344c1`).
+
+This is a call-path proof only. The sealed-bid auction is not built.
+
+OutLayer's own docs say it runs on single operator keys today (UNVERIFIED beyond those docs). A NEAR contract cannot check the quote itself.
+
+How to rebuild, re-test and re-verify the probe and the echo module, including the online command (which needs `--api https://testnet-api.outlayer.ai` because the tool's default API address is retired) and `outlayer-verify bundle verify-bundle.json --offline`, is in [spike/outlayer/README.md](spike/outlayer/README.md).
+
 ## Roadmap
 
 Not built, in no particular order:
@@ -340,6 +354,7 @@ Not built, in no particular order:
 - Selective disclosure of split percentages (a known open problem: today the bps are public on chain).
 - Voice and training licenses (and the sync license, cut from this build).
 - TEE-attested payer statements.
+- A sealed-bid auction in a TEE is not built. A testnet call-path check against OutLayer is recorded under [TEE roadmap: verified call path on testnet](#tee-roadmap-verified-call-path-on-testnet).
 - NEAR Intents for cross-chain payers.
 - DDEX and CWR import.
 - Period allocation using `effective_from` (recorded on every transfer today, not used by payout logic).
@@ -365,7 +380,7 @@ Disclosed as the hackathon rules ask (Q-005). No pre-hackathon code: the first c
 - Contracts (Rust): `near-sdk` 5.30.1, `near-contract-standards` 5.30.1 (NEP-171, NEP-177, NEP-181, NEP-141, NEP-145 helpers), `near-sys` 0.4.1 (the vault is written against raw host functions, no SDK).
 - Contract tests: `near-workspaces` 0.24.0 (downloads the NEAR sandbox node), `tokio`, `anyhow`, `serde_json`. Exact versions in `Cargo.lock`.
 - Site: Astro with `@astrojs/vercel` and `@astrojs/check`, `@hot-labs/near-connect` (wallet connection), `near-api-js`, `@scure/base`, `@scure/bip39`, `gsap`, `@fontsource-variable/inter-tight` and `@fontsource-variable/jetbrains-mono`, TypeScript, Vitest, and `wasmoon` (a Lua engine, tests only: it runs the Redis counter scripts in `site/tests/audit-f6-store-counter.test.ts`). Exact versions in `site/package-lock.json`.
-- Services: NEAR testnet RPC, NEAR AI Cloud (help chat model), Upstash Redis (chat and ticket storage, called over its REST API with `fetch`, no client library), Vercel (hosting).
+- Services: NEAR testnet RPC, NEAR AI Cloud (help chat model), Upstash Redis (chat and ticket storage, called over its REST API with `fetch`, no client library), Vercel (hosting), OutLayer on NEAR testnet (call-path spike only; see [spike/outlayer/README.md](spike/outlayer/README.md)).
 - Templates and boilerplate: no starter template repository was used (`site/package.json` has no scaffold marks, but whether a CLI scaffold such as `npm create astro` was used for the first site commit is UNVERIFIED). Standard library patterns (for example the NEP-171 and NEP-141 helpers above) are used as the libraries document them.
 - AI-written code: the contracts, tests, scripts, site and docs in this repository were written with AI coding agents, directed and reviewed by the team, and checked by the tests above, a manual audit pass ([AUDIT.md](AUDIT.md)) and separate review passes. The help chat itself calls a model on NEAR AI Cloud at run time.
 
@@ -387,6 +402,7 @@ site/src/server          server side: help chat, tickets, sign in, admin checks,
 site/src/data/testnet.ts accounts and the recorded demo, copied from deployments/testnet.json
 site/tests               Vitest tests for the site (219 in 18 files)
 .github/workflows/ci.yml CI: wasm build, fmt, clippy, Rust tests, site typecheck, tests and build, gitleaks
+spike/outlayer/          throwaway OutLayer call-path spike (its own Cargo workspace, not a root workspace member): echo module, probe contract, evidence bundle
 docs/reviews/            status of each external review finding (fixed, documented, deferred or false)
 README.md  THREAT_MODEL.md  DESIGN.md  AUDIT.md  DEPLOY_PLAN.md  DECISIONS_LOG.md  SPEND_LOG.md  LICENSE
 ```
