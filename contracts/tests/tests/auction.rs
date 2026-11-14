@@ -1037,7 +1037,7 @@ async fn a13_a_direct_request_from_another_caller_is_refused() -> anyhow::Result
 /// open auction keeps a storage reserve at listing, so the callback fits. (An
 /// earlier version of this test drained the account to make the callback fail
 /// and then recovered with `reconcile`; with the ciphertexts dropped that
-/// failure cannot be produced here, so `reconcile` is covered by unit tests.)
+/// failure cannot be produced here, so the delivery recovery calls are covered by unit tests.)
 #[tokio::test]
 async fn a14_a_sale_completes_with_almost_no_spare_near() -> anyhow::Result<()> {
     let a = setup_auction().await?;

@@ -185,14 +185,13 @@ impl AuctionContract {
     /// of how long something took or who holds the share now: elapsed time
     /// does not prove that an earlier transfer will never land.
     ///
-    /// - Delivering and the owner is the winner: the delivery attempt's own
-    ///   callback was lost and the share is where the sale put it. Pay the
-    ///   sale.
-    /// - Anything else: nothing changes and `reconcile_pending` is emitted.
-    ///   The auction stays Delivering (or `returning`) until the operator
-    ///   resolves it with `resolve_delivery` or `resolve_return` from the
-    ///   final receipt outcome. The auction account's own key is kept for this
-    ///   on purpose; it is a stated trust (README).
+    /// It never finishes, cancels, refunds or pays anything. It reads the
+    /// share's owner and emits `reconcile_pending` with the observed owner as
+    /// a diagnostic. A delivery is settled only by its own `on_delivered`
+    /// callback or by the operator's `resolve_delivery`; a return only by its
+    /// own `on_returned` callback or by `resolve_return`. The auction
+    /// account's own key is kept for this on purpose; it is a stated trust
+    /// (README).
     ///
     /// If the payout cannot be written, add NEAR to this account and call it
     /// again; nothing is lost in between.
@@ -227,6 +226,8 @@ impl AuctionContract {
             )
     }
 
+    /// Returns true when a diagnostic was emitted, false when the callback
+    /// was stale or unreadable. It never changes the auction.
     #[private]
     pub fn on_reconciled(&mut self, auction_id: u64, stage: u8, op: u64) -> bool {
         let Some(owner) = registry_owner() else {
@@ -242,19 +243,13 @@ impl AuctionContract {
         if !current {
             return false;
         }
-        if stage == 0 && a.winner.as_ref().is_some_and(|w| w.as_str() == owner) {
-            self.finish_sale(auction_id);
-            emit(
-                "reconciled",
-                json!({ "auction_id": U64(auction_id), "op": U64(op), "owner": owner }),
-            );
-            return true;
-        }
+        // A diagnostic only. Who holds the share now does not say what this
+        // attempt's transfer did, so nothing is settled from it.
         emit(
             "reconcile_pending",
             json!({ "auction_id": U64(auction_id), "op": U64(op), "stage": stage, "owner": owner }),
         );
-        false
+        true
     }
 
     /// Operator call (this account's own key only, `predecessor == current

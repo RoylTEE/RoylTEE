@@ -1208,35 +1208,54 @@ fn reconcile_with_owner(c: &mut AuctionContract, owner: &str) -> bool {
     c.on_reconciled(0, 0, op)
 }
 
-/// N-M1: the one case reconcile pays on its own: the winner holds the share
-/// and the delivery attempt's callback never arrived.
+/// N-M1 and AR-1: `reconcile` never settles anything, whoever holds the share.
+/// Even when the winner holds it, the sale is not paid: only the real
+/// `on_delivered(op)` or the operator's `resolve_delivery` settles a delivery.
 #[test]
-fn reconcile_pays_the_sale_only_when_the_winner_holds_the_share() {
+fn reconcile_never_settles_even_when_the_winner_holds_the_share() {
     fresh(|| {
         let mut c = delivering();
         assert!(reconcile_with_owner(&mut c, "bob.testnet"));
-        assert!(reconciled_logs_contain("\"reconciled\""));
-        assert_eq!(c.auction(0).status, Status::Sold);
-        assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
-        assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX - 30_000_000);
-        assert_eq!(c.get_owed(acc("carol.testnet")).0, MAX);
-        assert_eq!(c.owed_total, 2 * MAX);
-        assert_eq!(c.escrow_total, 0);
-        assert_eq!(c.auction_for_token("s1".into()), None);
-        // The late callback of the same attempt does nothing.
+        assert!(reconciled_logs_contain("reconcile_pending"));
+        assert!(reconciled_logs_contain("bob.testnet"), "the owner is shown");
+        assert!(!reconciled_logs_contain("\"reconciled\""));
+        let a = c.auction(0);
+        assert_eq!(a.status, Status::Delivering);
+        assert!(a.share_held);
+        assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
+        assert_eq!(c.get_owed(acc("bob.testnet")).0, 0);
+        assert_eq!(c.owed_total, 0);
+        assert_eq!(c.escrow_total, 2 * MAX);
+        assert_eq!(c.auction_for_token("s1".into()), Some(U64(0)));
+        // The attempt's own callback is what pays.
         ctx_result(
             "auction.root.testnet",
             after_end() + 21 * 60 * SEC,
             PromiseResult::Successful(vec![]),
         );
-        assert!(!c.on_delivered(0, delivery_op(&c)));
+        assert!(c.on_delivered(0, delivery_op(&c)));
+        assert_eq!(c.auction(0).status, Status::Sold);
+        assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
+        assert_eq!(c.get_owed(acc("bob.testnet")).0, MAX - 30_000_000);
         assert_eq!(c.owed_total, 2 * MAX);
+    });
+    // With the winner holding the share, only the operator can settle it too.
+    fresh(|| {
+        let mut c = delivering();
+        assert!(reconcile_with_owner(&mut c, "bob.testnet"));
+        ctx("auction.root.testnet", after_end() + 3600 * SEC, 0);
+        let op = delivery_op(&c);
+        assert!(c
+            .resolve_delivery(U64(0), U64(op), true, HASH_EV.into())
+            .is_none());
+        assert_eq!(c.auction(0).status, Status::Sold);
+        assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
     });
     // Any other holder: nothing is paid, nothing is cancelled.
     for owner in ["unrelated.testnet", "seller.testnet", "carol.testnet"] {
         fresh(move || {
             let mut c = delivering();
-            assert!(!reconcile_with_owner(&mut c, owner));
+            assert!(reconcile_with_owner(&mut c, owner));
             assert!(reconciled_logs_contain("reconcile_pending"));
             assert_eq!(c.auction(0).status, Status::Delivering, "{owner}");
             assert_eq!(c.owed_total, 0);
@@ -1263,7 +1282,7 @@ fn reconcile_pays_the_sale_only_when_the_winner_holds_the_share() {
 fn a_delayed_delivery_is_not_cancelled_by_an_early_reconcile() {
     let mut c = delivering();
     // 15 minutes on, the registry still shows the share in the auction.
-    assert!(!reconcile_with_owner(&mut c, "auction.root.testnet"));
+    assert!(reconcile_with_owner(&mut c, "auction.root.testnet"));
     assert!(reconciled_logs_contain("reconcile_pending"));
     let a = c.auction(0);
     assert_eq!(a.status, Status::Delivering);
@@ -1287,7 +1306,7 @@ fn a_delayed_delivery_is_not_cancelled_by_an_early_reconcile() {
 #[test]
 fn ar1_case1_an_unrelated_holder_does_not_make_a_sale() {
     let mut c = delivering();
-    assert!(!reconcile_with_owner(&mut c, "unrelated.testnet"));
+    assert!(reconcile_with_owner(&mut c, "unrelated.testnet"));
     assert_eq!(c.auction(0).status, Status::Delivering);
     assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
     // The operator, from the receipt outcome (the transfer failed), cancels.
@@ -1308,7 +1327,7 @@ fn ar1_case1_an_unrelated_holder_does_not_make_a_sale() {
 #[test]
 fn ar1_case2_a_share_sent_back_by_the_winner_is_still_a_sale() {
     let mut c = delivering();
-    assert!(!reconcile_with_owner(&mut c, "seller.testnet"));
+    assert!(reconcile_with_owner(&mut c, "seller.testnet"));
     assert_eq!(c.auction(0).status, Status::Delivering);
     assert_eq!(c.owed_total, 0);
     ctx("auction.root.testnet", after_end() + 3600 * SEC, 0);
@@ -1334,7 +1353,7 @@ fn ar1_case4_a_pending_return_blocks_retry_and_relisting() {
         after_end() + 20 * 60 * SEC,
         nft_token_owner("auction.root.testnet"),
     );
-    assert!(!c.on_reconciled(0, 1, op));
+    assert!(c.on_reconciled(0, 1, op));
     assert!(reconciled_logs_contain("reconcile_pending"));
     assert!(c.auction(0).returning && c.auction(0).share_held);
     ctx("anyone.testnet", after_end() + 21 * 60 * SEC, 0);
