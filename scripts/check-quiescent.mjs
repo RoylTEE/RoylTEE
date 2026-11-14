@@ -21,7 +21,9 @@
 // This is a precheck for people. The atomic guarantee is the on-chain
 // assert_quiescent call in the same transaction as the deploy (DEPLOY_PLAN
 // step 15c). Run this script once more after the deploy: the registry should
-// still be quiet and holding no watch entries unless a payment came in.
+// still be quiet. Run it then with AFTER_DEPLOY=1: the new code may hold a
+// settled watch entry, so the check reads each token's get_forward_watch
+// instead of counting fwd: keys.
 //
 // Check 4 exists because the watch layout changed between builds (36, 60 and
 // now 68 bytes). The new code must never meet an older entry, and the live
@@ -107,14 +109,27 @@ fif === '0' || fif === 0
   ? pass('forwards_in_flight_total is 0')
   : fail(`forwards_in_flight_total is ${JSON.stringify(fif)}, expected 0`);
 
-const watched = await rpc('query', {
-  block_id, request_type: 'view_state', account_id: reg.account_id,
-  prefix_base64: Buffer.from('fwd:').toString('base64'),
-});
-const nWatch = Array.isArray(watched.values) ? watched.values.length : -1;
-nWatch === 0
-  ? pass('no fwd: watch entries in storage')
-  : fail(`fwd: watch entries in storage: ${nWatch}, expected 0`);
+if (process.env.AFTER_DEPLOY === '1') {
+  // New code is live: a settled forward watch (a tombstone of an earlier
+  // quarantine keeps its settlement sequence) is normal. Every token's watch
+  // must be absent or hold nothing in flight or quarantined.
+  for (const t of tokens) {
+    const w = await view(reg.account_id, 'get_forward_watch', { token_id: t.token_id });
+    const settled = w === null || (w.count === 0 && w.amount === '0' && w.written_off === '0');
+    settled
+      ? pass(`token ${t.token_id} forward watch is settled`)
+      : fail(`token ${t.token_id} forward watch is not settled: ${JSON.stringify(w)}`);
+  }
+} else {
+  const watched = await rpc('query', {
+    block_id, request_type: 'view_state', account_id: reg.account_id,
+    prefix_base64: Buffer.from('fwd:').toString('base64'),
+  });
+  const nWatch = Array.isArray(watched.values) ? watched.values.length : -1;
+  nWatch === 0
+    ? pass('no fwd: watch entries in storage')
+    : fail(`fwd: watch entries in storage: ${nWatch}, expected 0`);
+}
 
 console.log(`\n${failures === 0 ? 'SNAPSHOT QUIET at block ' + head.header.height + ': SAFE TO REDEPLOY' : `${failures} CHECK(S) FAILED: DO NOT REDEPLOY YET`}`);
 process.exit(failures === 0 ? 0 : 1);

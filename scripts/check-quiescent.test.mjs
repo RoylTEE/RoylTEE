@@ -14,7 +14,7 @@ const ids = Object.keys(record.token_owners.owners);
 const lock = { account: 'a.testnet', amount: '1', since_block: '1' };
 const quiet = { inbound_pending: 0, payout_in_flight: null, transfer_pending: null };
 
-async function run({ ledgers = {}, fif = '0', tokens = ids, fwd = [] } = {}) {
+async function run({ ledgers = {}, fif = '0', tokens = ids, fwd = [], watches = {}, env = {} } = {}) {
   const seen = { blocks: new Set(), unpinned: 0 };
   const server = createServer((req, res) => {
     let body = '';
@@ -38,6 +38,7 @@ async function run({ ledgers = {}, fif = '0', tokens = ids, fwd = [] } = {}) {
       let out;
       if (p.method_name === 'nft_tokens') out = tokens.slice(Number(args.from_index), Number(args.from_index) + args.limit).map((token_id) => ({ token_id }));
       else if (p.method_name === 'get_ledger') out = { ...quiet, ...(ledgers[args.token_id] || {}) };
+      else if (p.method_name === 'get_forward_watch') out = watches[args.token_id] ?? null;
       else if (p.method_name === 'get_accounting') out = { forwards_in_flight_total: fif };
       res.setHeader('content-type', 'application/json');
       res.end(JSON.stringify({ jsonrpc: '2.0', id: 'quiet', result: { result: [...Buffer.from(JSON.stringify(out))] } }));
@@ -46,7 +47,7 @@ async function run({ ledgers = {}, fif = '0', tokens = ids, fwd = [] } = {}) {
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${server.address().port}`;
   const out = await new Promise((resolve) => {
-    const child = spawn(process.execPath, [join(here, 'check-quiescent.mjs')], { env: { ...process.env, NEAR_RPC_URL: url } });
+    const child = spawn(process.execPath, [join(here, 'check-quiescent.mjs')], { env: { ...process.env, NEAR_RPC_URL: url, ...env } });
     let text = '';
     child.stdout.on('data', (c) => { text += c; });
     child.stderr.on('data', (c) => { text += c; });
@@ -96,4 +97,18 @@ test('reads tokens past the first page of 100', async () => {
   const r = await run({ tokens: many, ledgers: { x119: { inbound_pending: 2 } } });
   assert.equal(r.code, 1);
   assert.match(r.text, /token x119 is not quiet/);
+});
+
+const settled = { count: 0, amount: '0', written_off: '0', settle_seq: '2' };
+
+test('after the deploy a settled watch (a tombstone) is quiet', async () => {
+  const r = await run({ fwd: [{ key: 'ZndkOng=', value: 'AA==' }], watches: { [ids[0]]: settled }, env: { AFTER_DEPLOY: '1' } });
+  assert.equal(r.code, 0, r.text);
+  assert.match(r.text, /SNAPSHOT QUIET/);
+});
+
+test('after the deploy a watch with an open quarantine is not quiet', async () => {
+  const r = await run({ watches: { [ids[0]]: { ...settled, written_off: '80000' } }, env: { AFTER_DEPLOY: '1' } });
+  assert.equal(r.code, 1);
+  assert.match(r.text, /forward watch is not settled/);
 });
