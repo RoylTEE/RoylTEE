@@ -7,10 +7,19 @@
 //! Caller check: OutLayer gives the guest the account that called it on chain
 //! in `NEAR_PREDECESSOR_ID` (the worker writes it from the request receipt;
 //! it is empty over HTTPS and a secret cannot set it). Every mode fails unless
-//! that account equals the `contract` field of the request. The auction
-//! contract is the only code that builds a request with its own name in that
-//! field, so a direct request from any other account cannot use the secret
-//! as a decryption oracle.
+//! that account equals `EXPECTED_CONTRACT`, the auction account compiled into
+//! this module (default `auction.royltee-dev.testnet`, set at build time with
+//! `ROYLTEE_AUCTION_ACCOUNT`, and so part of the pinned hash), and the
+//! request's own `contract` field names the same account. The name is not
+//! taken from the request alone: an attacker contract that names itself in the
+//! request still fails, so a direct request cannot use the secret as a
+//! decryption oracle.
+//!
+//! Key identity: `settle` requests carry the published public key and
+//! `KEY_VERSION`. The module derives its own key from the master secret and
+//! fails with an explicit error when it differs from the published one (for
+//! example after the master was replaced), instead of silently reading every
+//! bid as invalid.
 //!
 //! Modes:
 //! - `pubkey`: prints the public key bidders encrypt to. The private key is
@@ -44,6 +53,13 @@ pub const MAX_BIDS: usize = 16;
 pub const AMOUNT_WIDTH: usize = 38;
 /// Version tag inside every bid plaintext and every output.
 pub const VERSION: u64 = 1;
+/// Version of the key and bid format. The auction contract must send the same.
+pub const KEY_VERSION: u64 = 1;
+/// The auction account this build serves. Fixed when the module is built.
+pub const EXPECTED_CONTRACT: &str = match option_env!("ROYLTEE_AUCTION_ACCOUNT") {
+    Some(a) => a,
+    None => "auction.royltee-dev.testnet",
+};
 
 const KEY_SALT: &[u8] = b"royltee-auction-v1";
 const KEY_INFO: &[u8] = b"x25519-secret";
@@ -57,6 +73,11 @@ struct Request {
     auction_id: String,
     #[serde(default)]
     contract: String,
+    /// The public key the contract published (settle only).
+    #[serde(default)]
+    pubkey: String,
+    #[serde(default)]
+    key_version: u64,
     #[serde(default)]
     reserve: String,
     #[serde(default)]
@@ -223,9 +244,20 @@ pub fn pick_winner(valid: &[(usize, u128)], reserve: u128) -> Option<(usize, u12
     Some((wi, second.unwrap_or(reserve).max(reserve)))
 }
 
-/// Handles one request. `master` is the value of `PROTECTED_AUCTION_MASTER`
-/// and `caller` the value of `NEAR_PREDECESSOR_ID`.
+/// Handles one request for the auction account compiled into this build.
 pub fn handle(input: &str, master: Option<&str>, caller: Option<&str>) -> String {
+    handle_for(input, master, caller, EXPECTED_CONTRACT)
+}
+
+/// Handles one request. `master` is the value of `PROTECTED_AUCTION_MASTER`,
+/// `caller` the value of `NEAR_PREDECESSOR_ID` and `expected` the auction
+/// account this module serves.
+pub fn handle_for(
+    input: &str,
+    master: Option<&str>,
+    caller: Option<&str>,
+    expected: &str,
+) -> String {
     if input.len() > MAX_INPUT {
         return fail("input too large");
     }
@@ -233,10 +265,11 @@ pub fn handle(input: &str, master: Option<&str>, caller: Option<&str>) -> String
         Ok(r) => r,
         Err(_) => return fail("bad request json"),
     };
-    // The account that called OutLayer must be the contract the request names.
-    // Empty or missing (HTTPS, an old worker) fails closed.
+    // The account that called OutLayer must be the auction account this
+    // module is built for, and the request must name the same account. Empty
+    // or missing (HTTPS, an old worker) fails closed.
     match caller {
-        Some(c) if !c.is_empty() && !req.contract.is_empty() && c == req.contract => {}
+        Some(c) if !expected.is_empty() && c == expected && req.contract == expected => {}
         _ => return fail("caller is not the auction contract"),
     }
     let Some(master) = master.filter(|m| m.len() >= 32) else {
@@ -244,7 +277,8 @@ pub fn handle(input: &str, master: Option<&str>, caller: Option<&str>) -> String
     };
     match req.mode.as_str() {
         "pubkey" => serde_json::json!({
-            "v": VERSION, "ok": true, "pubkey": public_key_hex(master)
+            "v": VERSION, "ok": true, "key_version": KEY_VERSION,
+            "pubkey": public_key_hex(master)
         })
         .to_string(),
         "settle" => settle(&req, master),
@@ -263,6 +297,12 @@ fn settle(req: &Request, master: &str) -> String {
     }
     if reserve == 0 || reserve > max_deposit {
         return fail("bad reserve");
+    }
+    if req.key_version != KEY_VERSION {
+        return fail("unknown key version");
+    }
+    if req.pubkey != public_key_hex(master) {
+        return fail("key mismatch: the published key is not the key of this secret");
     }
     let sk = derive_secret(master);
     let pairs: Vec<(String, String)> = req
@@ -485,9 +525,16 @@ mod tests {
         )
     }
 
+    /// The module under test serves `CONTRACT` (the shipped build serves the
+    /// account compiled in as `EXPECTED_CONTRACT`).
+    fn handle(input: &str, master: Option<&str>, caller: Option<&str>) -> String {
+        handle_for(input, master, caller, CONTRACT)
+    }
+
     fn req(bids: &[(&str, String)], reserve: &str, max: &str) -> String {
         serde_json::json!({
             "mode": "settle", "auction_id": "3", "contract": CONTRACT,
+            "pubkey": public_key_hex(MASTER), "key_version": KEY_VERSION,
             "reserve": reserve, "max_deposit": max,
             "bids": bids.iter().map(|(b, c)| serde_json::json!({"bidder": b, "ct": c})).collect::<Vec<_>>(),
         })
@@ -706,6 +753,45 @@ mod tests {
         assert_eq!(out["bids_hash"], bids_hash("3", &pairs));
     }
 
+    /// B-02: an attacker contract that names itself in the request is not
+    /// the account this module was built for, even though caller and the
+    /// request's `contract` field agree.
+    #[test]
+    fn a_request_naming_another_contract_is_refused_even_from_that_contract() {
+        let attacker = "attacker.example.testnet";
+        let bids = [("a.testnet", seal(&plain("3", "a.testnet", "50"), 1, 1))];
+        let r = req(&bids, "10", "100").replace(CONTRACT, attacker);
+        let out: serde_json::Value =
+            serde_json::from_str(&handle(&r, Some(MASTER), Some(attacker))).unwrap();
+        assert_eq!(out["ok"], false);
+        assert!(out.get("winner").is_none());
+        // The build default is a real account, never empty.
+        assert!(!EXPECTED_CONTRACT.is_empty());
+        assert!(handle_for(&r, Some(MASTER), Some(attacker), "").contains("\"ok\":false"));
+    }
+
+    /// B-08: a key that is not the published one fails loudly, never as a
+    /// silent no sale.
+    #[test]
+    fn a_wrong_or_unversioned_key_fails_explicitly() {
+        let bids = [("a.testnet", seal(&plain("3", "a.testnet", "50"), 1, 1))];
+        let good = req(&bids, "10", "100");
+        assert_eq!(run(&good)["ok"], true);
+        let mut v: serde_json::Value = serde_json::from_str(&good).unwrap();
+        v["pubkey"] = serde_json::json!(public_key_hex(&MASTER.replace('0', "1")));
+        let out = run(&v.to_string());
+        assert_eq!(out["ok"], false);
+        assert!(out["error"].as_str().unwrap().contains("key mismatch"));
+        let mut v: serde_json::Value = serde_json::from_str(&good).unwrap();
+        v["key_version"] = serde_json::json!(2);
+        assert_eq!(run(&v.to_string())["ok"], false);
+        let mut v: serde_json::Value = serde_json::from_str(&good).unwrap();
+        v.as_object_mut().unwrap().remove("pubkey");
+        assert_eq!(run(&v.to_string())["ok"], false);
+        // The key answer names its version.
+        assert_eq!(run(&pubkey_req())["key_version"], KEY_VERSION);
+    }
+
     /// C1: the secret is never used for a request that did not come from the
     /// auction contract named inside it.
     #[test]
@@ -748,7 +834,11 @@ mod tests {
             let r = req(&[("a.testnet", seal(&unpadded(amount), 1, 1))], "10", "100");
             assert!(run(&r)["winner"].is_null(), "width {}", amount.len());
         }
-        let r = req(&[("a.testnet", seal(&unpadded(&pad("50")), 1, 1))], "10", "100");
+        let r = req(
+            &[("a.testnet", seal(&unpadded(&pad("50")), 1, 1))],
+            "10",
+            "100",
+        );
         assert_eq!(run(&r)["winner"], "a.testnet");
         assert_eq!(pad("50").len(), AMOUNT_WIDTH);
     }

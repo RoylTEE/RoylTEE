@@ -37,6 +37,15 @@ cargo build --manifest-path tee/auction-wasi/Cargo.toml --target "$TARGET" --rel
   --target-dir tee/auction-wasi/target
 cp "tee/auction-wasi/target/$TARGET/release/auction_wasi.wasm" contracts/res/auction_wasi.wasm
 
+# The module serves one auction account, fixed when it is built (so it is part
+# of the pinned hash). The file above serves the planned account
+# auction.royltee-dev.testnet. The sandbox tests deploy the auction as
+# auction.test.near, so they use a second build that differs only in that one
+# constant. It is never deployed.
+ROYLTEE_AUCTION_ACCOUNT=auction.test.near cargo build --manifest-path tee/auction-wasi/Cargo.toml \
+  --target "$TARGET" --release --locked --target-dir tee/auction-wasi/target/test-variant
+cp "tee/auction-wasi/target/test-variant/$TARGET/release/auction_wasi.wasm" contracts/res/auction_wasi_test.wasm
+
 # Fail if a machine path is still in any built wasm. A pattern that is empty
 # or just "/" (for example HOME=/ in a container) is skipped, since it would
 # match any wasm.

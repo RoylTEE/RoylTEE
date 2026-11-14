@@ -61,9 +61,29 @@ export function bidPlaintext({ auctionId, contract, bidder, amount, salt }) {
   });
 }
 
+// X25519 points of small order (zero, one, two of order 8, and the three
+// encodings of the field prime and its neighbours). A bid sealed to one of
+// them could be opened by anyone, so refuse them. Matches the contract.
+const LOW_ORDER = [
+  "0000000000000000000000000000000000000000000000000000000000000000",
+  "0100000000000000000000000000000000000000000000000000000000000000",
+  "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
+  "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
+  "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+  "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+  "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+];
+
+/** True for a usable X25519 public key: 64 lowercase hex characters, not a low order point. */
+export function isUsablePubkey(hex) {
+  if (!/^[0-9a-f]{64}$/.test(hex)) return false;
+  const top = (parseInt(hex.slice(62), 16) & 0x7f).toString(16).padStart(2, "0");
+  return !LOW_ORDER.includes(hex.slice(0, 62) + top);
+}
+
 /** Encrypts a bid plaintext to the TEE public key (64 hex characters). */
 export function sealBid(pubkeyHex, plaintext) {
-  if (!/^[0-9a-f]{64}$/.test(pubkeyHex)) throw new Error("pubkey must be 64 lowercase hex characters");
+  if (!isUsablePubkey(pubkeyHex)) throw new Error("pubkey must be 64 lowercase hex characters and not a low order point");
   const recipient = Buffer.from(pubkeyHex, "hex");
   const eph = generateKeyPairSync("x25519");
   const ephPub = rawPublic(eph.publicKey);

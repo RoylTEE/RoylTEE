@@ -18,13 +18,18 @@ import { readFileSync } from "node:fs";
 import { bidPlaintext, sealBid } from "./bid-crypto.mjs";
 import { runWasi } from "./run-wasi.mjs";
 
-const WASM = new URL("../../contracts/res/auction_wasi.wasm", import.meta.url).pathname;
+// The sandbox deploys the auction as auction.test.near, so this uses the test
+// build of the module (contracts/res/auction_wasi_test.wasm), which differs
+// from the shipped one only in the auction account compiled into it.
+const WASM = new URL("../../contracts/res/auction_wasi_test.wasm", import.meta.url).pathname;
 const TEST_MASTER = "5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed5eed";
 
 const [cmd, ...a] = process.argv.slice(2);
 if (cmd === "pubkey") {
   const { out } = await runWasi(WASM, { mode: "pubkey", contract: a[0] }, TEST_MASTER, a[0]);
-  console.log(JSON.parse(out).pubkey);
+  const k = JSON.parse(out);
+  if (!k.ok) throw new Error(`pubkey request failed: ${out}`);
+  console.log(k.pubkey);
 } else if (cmd === "seal") {
   const [pubkey, auctionId, contract, bidder, amount] = a;
   console.log(sealBid(pubkey, bidPlaintext({ auctionId, contract, bidder, amount })));

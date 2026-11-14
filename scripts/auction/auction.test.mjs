@@ -7,12 +7,13 @@ import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
 import { spawnSync } from "node:child_process";
-import { AMOUNT_WIDTH, bidMsg, bidPlaintext, checkBidAmount, sealBid } from "./bid-crypto.mjs";
+import { AMOUNT_WIDTH, bidMsg, bidPlaintext, checkBidAmount, isUsablePubkey, sealBid } from "./bid-crypto.mjs";
 import { runWasi } from "./run-wasi.mjs";
 
 const WASM = new URL("../../contracts/res/auction_wasi.wasm", import.meta.url).pathname;
 const MASTER = "00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff";
-const CONTRACT = "auction.example.testnet";
+// The shipped module serves this account (compiled in as the default).
+const CONTRACT = "auction.royltee-dev.testnet";
 
 assert.ok(existsSync(WASM), "build first: npm run build:wasm");
 
@@ -26,7 +27,8 @@ const run = async (req, master = MASTER, caller = CONTRACT) => {
 };
 
 const PK_REQ = { mode: "pubkey", contract: CONTRACT };
-const pubkey = async () => (await run(PK_REQ)).json.pubkey;
+const PUBKEY = (await run(PK_REQ)).json.pubkey;
+const pubkey = async () => PUBKEY;
 
 const bid = (pk, auctionId, bidder, amount, over = {}) => ({
   bidder,
@@ -37,6 +39,8 @@ const settle = (bids, extra = {}) => ({
   mode: "settle",
   auction_id: "5",
   contract: CONTRACT,
+  pubkey: PUBKEY,
+  key_version: 1,
   reserve: "10000000",
   max_deposit: "100000000",
   bids,
@@ -153,6 +157,42 @@ test("a direct request from another caller is refused (C1)", async () => {
     assert.equal((await run(PK_REQ, MASTER, caller)).json.ok, false);
   }
   assert.equal((await run(req)).json.price, "50000000", "the contract itself is admitted");
+});
+
+test("a request naming another contract is refused even from that contract (B-02)", async () => {
+  const pk = await pubkey();
+  const other = "attacker.testnet";
+  const req = settle([bid(pk, 5, "a.testnet", "50000000")], { contract: other });
+  assert.equal((await run(req, MASTER, other)).json.ok, false, "attacker names itself");
+  assert.equal((await run({ mode: "pubkey", contract: other }, MASTER, other)).json.ok, false);
+  // Right caller but a request that names someone else is refused too.
+  assert.equal((await run(req, MASTER, CONTRACT)).json.ok, false);
+});
+
+test("a key that is not the published one fails explicitly (B-08)", async () => {
+  const pk = await pubkey();
+  const req = settle([bid(pk, 5, "a.testnet", "50000000")]);
+  assert.equal((await run(req)).json.ok, true);
+  const wrongKey = await run(req, MASTER.replace("0", "1"));
+  assert.equal(wrongKey.json.ok, false);
+  assert.match(wrongKey.json.error, /key mismatch/);
+  assert.equal((await run({ ...req, key_version: 2 })).json.ok, false);
+  assert.equal((await run({ ...req, pubkey: undefined })).json.ok, false);
+  assert.equal((await run(PK_REQ)).json.key_version, 1);
+});
+
+test("low order public keys are refused by the bid script (B-08)", () => {
+  assert.equal(isUsablePubkey(PUBKEY), true);
+  for (const k of [
+    "0".repeat(64),
+    `01${"0".repeat(62)}`,
+    "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b880",
+    `ed${"ff".repeat(30)}ff`,
+    "A".repeat(64),
+  ]) {
+    assert.equal(isUsablePubkey(k), false, k);
+    assert.throws(() => sealBid(k, "x"));
+  }
 });
 
 test("amounts are padded to 38 digits and the module rejects other widths", async () => {
