@@ -56,14 +56,14 @@ scripts/check-probe.sh 7LFZ3MoTENEP8cJfGYAcrgPhJ81es2CZkYDWjpfXzfQ1 royltee-dev.
 
 ## What ran on testnet
 
-All times below are also given in Asia/Bangkok (UTC+7). Fees are the sum of `tokens_burnt` on every outcome in NEAR RPC `EXPERIMENTAL_tx_status`.
+All times below are UTC. Fees are the sum of `tokens_burnt` on every outcome in NEAR RPC `EXPERIMENTAL_tx_status`.
 
 | Step | Transaction | When (UTC) | Fee (NEAR) |
 |---|---|---|---|
-| Root created `probe.royltee-dev.testnet` with 2.5 NEAR | [`4GEXsjmgjmxEf979z98n9o9hTqHjXBUxgRkuScYjzgUs`](https://testnet.nearblocks.io/txns/4GEXsjmgjmxEf979z98n9o9hTqHjXBUxgRkuScYjzgUs) | 2026-11-13 20:23:23 (14 Nov 03:23:23 Asia/Bangkok) | 0.0071149895375, paid by `royltee-dev.testnet` |
-| FastFS upload of `echo_wasi.wasm`. The call fails out of gas by design; the indexer then serves the file at the URL below. | [`Ht2ebzCBd8NpVAqcLWPRz4bQNoQqeyf2evLksghB4hDi`](https://testnet.nearblocks.io/txns/Ht2ebzCBd8NpVAqcLWPRz4bQNoQqeyf2evLksghB4hDi) | 2026-11-13 20:29:54 (14 Nov 03:29:54 Asia/Bangkok) | 0.0001450760736569, paid by the probe account |
-| Deploy and init of `tee_probe` in one transaction | [`jT8VwctJf5Z1Sr4rmC9hg2qofGxsB7cUVubdpYVi3j5`](https://testnet.nearblocks.io/txns/jT8VwctJf5Z1Sr4rmC9hg2qofGxsB7cUVubdpYVi3j5) | 2026-11-13 20:30:26 (14 Nov 03:30:26 Asia/Bangkok) | 0.0015145889260714, paid by the probe account |
-| `probe({"hello":"tee"})`, signed by `royltee-dev.testnet`, 0.01 NEAR attached | [`7LFZ3MoTENEP8cJfGYAcrgPhJ81es2CZkYDWjpfXzfQ1`](https://testnet.nearblocks.io/txns/7LFZ3MoTENEP8cJfGYAcrgPhJ81es2CZkYDWjpfXzfQ1) | 2026-11-13 20:31:07 (14 Nov 03:31:07 Asia/Bangkok) | gas 0.0010867809661522, paid by `royltee-dev.testnet`. OutLayer charged 0.0010626 NEAR and refunded 0.0089374 NEAR. |
+| Root created `probe.royltee-dev.testnet` with 2.5 NEAR | [`4GEXsjmgjmxEf979z98n9o9hTqHjXBUxgRkuScYjzgUs`](https://testnet.nearblocks.io/txns/4GEXsjmgjmxEf979z98n9o9hTqHjXBUxgRkuScYjzgUs) | 2026-11-13 20:23:23 | 0.0071149895375, paid by `royltee-dev.testnet` |
+| FastFS upload of `echo_wasi.wasm`. The call fails out of gas by design; the indexer then serves the file at the URL below. | [`Ht2ebzCBd8NpVAqcLWPRz4bQNoQqeyf2evLksghB4hDi`](https://testnet.nearblocks.io/txns/Ht2ebzCBd8NpVAqcLWPRz4bQNoQqeyf2evLksghB4hDi) | 2026-11-13 20:29:54 | 0.0001450760736569, paid by the probe account |
+| Deploy and init of `tee_probe` in one transaction | [`jT8VwctJf5Z1Sr4rmC9hg2qofGxsB7cUVubdpYVi3j5`](https://testnet.nearblocks.io/txns/jT8VwctJf5Z1Sr4rmC9hg2qofGxsB7cUVubdpYVi3j5) | 2026-11-13 20:30:26 | 0.0015145889260714, paid by the probe account |
+| `probe({"hello":"tee"})`, signed by `royltee-dev.testnet`, 0.01 NEAR attached | [`7LFZ3MoTENEP8cJfGYAcrgPhJ81es2CZkYDWjpfXzfQ1`](https://testnet.nearblocks.io/txns/7LFZ3MoTENEP8cJfGYAcrgPhJ81es2CZkYDWjpfXzfQ1) | 2026-11-13 20:31:07 | gas 0.0010867809661522, paid by `royltee-dev.testnet`. OutLayer charged 0.0010626 NEAR and refunded 0.0089374 NEAR. |
 
 FastFS URL:
 
@@ -89,7 +89,7 @@ Offline, against the evidence bundle in this directory (no network):
 outlayer-verify bundle verify-bundle.json --offline
 ```
 
-The recorded run (see `verify.log`) returned PROVEN on all five checks, for task 97995, executed at 2026-11-13 20:31:17 UTC (14 Nov 03:31:17 Asia/Bangkok):
+The recorded run (see `verify.log`) returned PROVEN on all five checks, for task 97995, executed at 2026-11-13 20:31:17 UTC:
 
 - Authenticity: the quote is genuine Intel TDX. The Intel signature chain is valid and the TCB status is UpToDate.
 - Identity: the worker build is on the approved list on `worker.outlayer.testnet`.
