@@ -106,9 +106,12 @@ async fn resolve_payout(
     paid: bool,
     deposit: NearToken,
 ) -> anyhow::Result<near_workspaces::result::ExecutionFinalResult> {
+    // The registrar names the lock it reviewed.
+    let l = e.ledger(s).await?;
+    let expected_since = l["payout_in_flight"]["since_block"].clone();
     Ok(who
         .call(e.reg.id(), "resolve_stale_payout")
-        .args_json(json!({ "token_id": s, "paid": paid, "doc_hash": hash('e') }))
+        .args_json(json!({ "token_id": s, "paid": paid, "expected_since_block": expected_since, "doc_hash": hash('e') }))
         .deposit(deposit)
         .max_gas()
         .transact()
@@ -321,6 +324,7 @@ async fn f04_a_written_off_forward_is_quarantined_then_resolved_and_resent_once(
     watch.extend_from_slice(&0u64.to_le_bytes()); // released_through
     watch.extend_from_slice(&0u64.to_le_bytes()); // resolved_through
     watch.extend_from_slice(&0u128.to_le_bytes()); // written_off
+    watch.extend_from_slice(&0u64.to_le_bytes()); // settle_seq
     let mut watch_key = b"fwd:".to_vec();
     watch_key.extend_from_slice(s.as_bytes());
     e.worker.patch_state(e.reg.id(), &watch_key, &watch).await?;
@@ -372,13 +376,26 @@ async fn f04_a_written_off_forward_is_quarantined_then_resolved_and_resent_once(
         .await?
         .is_failure());
     // Only the registrar settles it, with 1 yocto and a document hash.
-    let resolve = |who: &near_workspaces::Account, deposit| {
+    let seq = |n: &str| json!(n);
+    let resolve_seq = |who: &near_workspaces::Account, deposit, expected_seq: Value| {
         who.call(e.reg.id(), "resolve_written_off")
-            .args_json(json!({ "token_id": s, "delivered_amount": "0", "failed_amount": "80000", "doc_hash": hash('d') }))
+            .args_json(json!({ "token_id": s, "delivered_amount": "0", "failed_amount": "80000", "expected_seq": expected_seq, "doc_hash": hash('d') }))
             .deposit(deposit)
             .max_gas()
             .transact()
     };
+    let resolve = |who: &near_workspaces::Account, deposit| resolve_seq(who, deposit, seq("1"));
+    // The release moved the settlement sequence to 1; an older review fails.
+    let w: Value = e
+        .reg
+        .view("get_forward_watch")
+        .args_json(json!({ "token_id": s }))
+        .await?
+        .json()?;
+    assert_eq!(w["settle_seq"], "1");
+    assert!(resolve_seq(&e.registrar, ONE_YOCTO, seq("0"))
+        .await?
+        .is_failure());
     assert!(resolve(&e.outsider, ONE_YOCTO).await?.is_failure());
     assert!(resolve(&e.registrar, NearToken::from_yoctonear(0))
         .await?

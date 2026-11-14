@@ -304,6 +304,7 @@ pub struct ForwardWatchView {
     pub released_through: U64,
     pub resolved_through: U64,
     pub written_off: U128,
+    pub settle_seq: U64,
 }
 
 #[near(serializers = [json])]

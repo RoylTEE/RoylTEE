@@ -50,9 +50,36 @@ fn watch(c: &Registry, t: &TokenId) -> ForwardWatchView {
     c.get_forward_watch(t.clone()).unwrap()
 }
 
-fn resolve_amounts(c: &mut Registry, t: &TokenId, delivered: u128, failed: u128) {
+/// A new evidence hash on every call (a receipt id is never reused).
+fn new_hash() -> String {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static N: AtomicU64 = AtomicU64::new(1);
+    format!("{:064x}", N.fetch_add(1, Ordering::Relaxed))
+}
+
+/// The registrar's call with an explicit reviewed sequence and evidence.
+fn resolve_with(
+    c: &mut Registry,
+    t: &TokenId,
+    delivered: u128,
+    failed: u128,
+    seq: u64,
+    hash: &str,
+) {
     call(&registrar(), NearToken::from_yoctonear(1));
-    c.resolve_written_off(t.clone(), U128(delivered), U128(failed), h('d'));
+    c.resolve_written_off(
+        t.clone(),
+        U128(delivered),
+        U128(failed),
+        U64(seq),
+        hash.to_string(),
+    );
+}
+
+/// The registrar reads the watch just before the call, with fresh evidence.
+fn resolve_amounts(c: &mut Registry, t: &TokenId, delivered: u128, failed: u128) {
+    let seq = watch(c, t).settle_seq.0;
+    resolve_with(c, t, delivered, failed, seq, &new_hash());
 }
 
 /// Settles the whole quarantine of the share in one direction.
@@ -67,7 +94,11 @@ fn resolve_wo(c: &mut Registry, t: &TokenId, delivered: bool) {
 
 fn resolve_payout(c: &mut Registry, t: &TokenId, paid: bool, height: u64) {
     at(&registrar(), NearToken::from_yoctonear(1), 0, height);
-    c.resolve_stale_payout(t.clone(), paid, h('e'));
+    let since = ledger(c, t)
+        .payout_in_flight
+        .expect("a payout lock")
+        .since_block;
+    c.resolve_stale_payout(t.clone(), paid, since, new_hash());
 }
 
 /// Share with one lost forward of `amount` started at block 500, released.
@@ -330,7 +361,7 @@ fn a_write_off_settled_as_not_delivered_moves_to_undelivered_once() {
 fn only_the_registrar_with_one_yocto_and_a_hash_can_resolve() {
     let (mut c, t) = quarantined(80_000);
     let r = |c: &mut Registry, d: u128, f: u128, hash: &str| {
-        c.resolve_written_off(t.clone(), U128(d), U128(f), hash.to_string())
+        c.resolve_written_off(t.clone(), U128(d), U128(f), U64(1), hash.to_string())
     };
     call(&anyone(), NearToken::from_yoctonear(1));
     assert_panics("registrar", || r(&mut c, 80_000, 0, &h('d')));
@@ -721,7 +752,7 @@ fn a_failed_payout_plus_a_deposit_keeps_the_lock_and_never_inflates_earned() {
     assert_panics("", || drop(c.sync(t.clone())));
     assert_panics("registrar", || {
         call(&anyone(), NearToken::from_yoctonear(1));
-        c.resolve_stale_payout(t.clone(), false, h('e'));
+        c.resolve_stale_payout(t.clone(), false, U64(100), h('e'));
     });
     resolve_payout(&mut c, &t, false, 100 + STALE_LOCK_BLOCKS);
     assert!(sync_with(&mut c, &t, 120_000));
@@ -817,7 +848,7 @@ fn resolve_stale_payout_needs_a_stale_lock() {
         100 + STALE_LOCK_BLOCKS - 1,
     );
     assert_panics("no stale payout lock", || {
-        c.resolve_stale_payout(t.clone(), true, h('e'))
+        c.resolve_stale_payout(t.clone(), true, U64(100), h('e'))
     });
     at(
         &registrar(),
@@ -825,10 +856,10 @@ fn resolve_stale_payout_needs_a_stale_lock() {
         0,
         100 + STALE_LOCK_BLOCKS,
     );
-    c.resolve_stale_payout(t.clone(), true, h('e'));
+    c.resolve_stale_payout(t.clone(), true, U64(100), h('e'));
     assert_eq!(lock_and_debit(&c, &t), (false, 0, 700_000));
     assert_panics("no stale payout lock", || {
-        c.resolve_stale_payout(t.clone(), true, h('e'))
+        c.resolve_stale_payout(t.clone(), true, U64(100), h('e'))
     });
 }
 
@@ -1047,4 +1078,233 @@ fn assert_quiescent_refuses_a_watch_in_another_format() {
     env::storage_write(&key, &[0u8; 36]);
     self_call();
     assert_panics("malformed forward watch", || c.assert_quiescent());
+}
+
+// ---------- audit RF-H1: expected sequence and consumed evidence ----------
+
+/// Share with two lost forwards, A (40000, block 500) and B (60000, block
+/// 510), quarantined together: written off 100000, sequence 1.
+fn two_lost_forwards() -> (Registry, TokenId) {
+    let (mut c, t) = fresh();
+    pay_open(&mut c, &t, 40_000, 500);
+    pay_open(&mut c, &t, 60_000, 510);
+    release_fwd(&mut c, &t, 500 + STALE_F);
+    assert_eq!(
+        (watch(&c, &t).written_off.0, watch(&c, &t).settle_seq.0),
+        (100_000, 1)
+    );
+    (c, t)
+}
+
+/// The reviewer's sequence (RF-H1). The registrar reviewed A's true failure
+/// receipt at sequence 1. A's real failed callback lands first. The
+/// registrar's transaction, which still carries sequence 1, must fail: it
+/// would count A a second time against B's part of the quarantine.
+#[test]
+fn callback_before_registrar_cannot_double_settle_a_failed_receipt() {
+    let (mut c, t) = two_lost_forwards();
+    let reviewed_seq = watch(&c, &t).settle_seq.0;
+    // A's real failed callback.
+    assert!(!settle_at(&mut c, &t, 40_000, 500, false));
+    assert_eq!(ledger(&c, &t).undelivered.0, 40_000);
+    assert_eq!(watch(&c, &t).written_off.0, 60_000);
+    assert_eq!(watch(&c, &t).settle_seq.0, reviewed_seq + 1);
+    // The registrar's stale transaction is refused.
+    let ev_a = new_hash();
+    assert_panics("changed since it was reviewed", || {
+        resolve_with(&mut c, &t, 0, 40_000, reviewed_seq, &ev_a)
+    });
+    assert_eq!(ledger(&c, &t).undelivered.0, 40_000, "A counted once");
+    assert_eq!(watch(&c, &t).written_off.0, 60_000, "B untouched");
+    assert_eq!(acct(&c), (60_000, 40_000));
+    assert!(
+        c.get_used_evidence(t.clone()).is_empty(),
+        "nothing consumed by a refused call"
+    );
+    // After re-review, only B remains: its receipt shows it landed.
+    let seq = watch(&c, &t).settle_seq.0;
+    resolve_with(&mut c, &t, 60_000, 0, seq, &new_hash());
+    let l = ledger(&c, &t);
+    assert_eq!((l.known_balance.0, l.undelivered.0), (60_000, 40_000));
+    assert_eq!(acct(&c), (0, 40_000));
+    // Retry sends exactly what failed, once.
+    at(
+        &anyone(),
+        NearToken::from_yoctonear(0),
+        0,
+        500 + STALE_F + 5,
+    );
+    c.retry_forward(t.clone());
+    assert_eq!(ledger(&c, &t).undelivered.0, 0);
+    assert_eq!(acct(&c), (40_000, 0));
+}
+
+/// The other order: the registrar acts first, then A's callback. It is
+/// fenced and counts nothing.
+#[test]
+fn registrar_before_callback_fences_the_callback_of_the_same_receipt() {
+    let (mut c, t) = two_lost_forwards();
+    resolve_amounts(&mut c, &t, 0, 40_000);
+    assert_eq!(watch(&c, &t).settle_seq.0, 2);
+    assert!(!settle_at(&mut c, &t, 40_000, 500, false));
+    assert!(get_logs()
+        .join("\n")
+        .contains("late_forward_callback_fenced"));
+    assert_eq!(ledger(&c, &t).undelivered.0, 40_000);
+    assert_eq!(watch(&c, &t).written_off.0, 60_000);
+    assert_eq!(
+        watch(&c, &t).settle_seq.0,
+        2,
+        "a fenced callback changes nothing"
+    );
+}
+
+#[test]
+fn the_same_evidence_can_never_settle_twice() {
+    let (mut c, t) = two_lost_forwards();
+    let ev = new_hash();
+    resolve_with(&mut c, &t, 0, 40_000, 1, &ev);
+    let seq = watch(&c, &t).settle_seq.0;
+    assert_panics("already used", || {
+        resolve_with(&mut c, &t, 0, 40_000, seq, &ev)
+    });
+    assert_eq!(c.get_used_evidence(t.clone()), vec![ev.clone()]);
+    assert_eq!(ledger(&c, &t).undelivered.0, 40_000);
+    // The same receipt cannot settle a payout lock of the share either.
+    {
+        let l = c.ledgers.get_mut(&t).unwrap();
+        l.payout_in_flight = Some(Lock {
+            account: acc("bob.near"),
+            amount: U128(5),
+            since_block: U64(1),
+        });
+    }
+    at(
+        &registrar(),
+        NearToken::from_yoctonear(1),
+        0,
+        1 + STALE_LOCK_BLOCKS,
+    );
+    assert_panics("already used", || {
+        c.resolve_stale_payout(t.clone(), true, U64(1), ev.clone())
+    });
+    // Another receipt does.
+    c.resolve_stale_payout(t.clone(), true, U64(1), new_hash());
+    assert_eq!(c.get_used_evidence(t.clone()).len(), 2);
+}
+
+#[test]
+fn the_evidence_list_is_bounded_and_refuses_more_at_the_limit() {
+    let (mut c, t) = quarantined(80_000);
+    for _ in 0..forwards::MAX_EVIDENCE_PER_SHARE {
+        resolve_amounts(&mut c, &t, 0, 1);
+    }
+    assert_eq!(
+        c.get_used_evidence(t.clone()).len(),
+        forwards::MAX_EVIDENCE_PER_SHARE
+    );
+    assert_panics("is full", || resolve_amounts(&mut c, &t, 0, 1));
+    assert_eq!(
+        watch(&c, &t).written_off.0,
+        80_000 - forwards::MAX_EVIDENCE_PER_SHARE as u128
+    );
+}
+
+#[test]
+fn the_registrar_must_name_the_payout_lock_it_reviewed() {
+    let (mut c, t) = fresh();
+    claim_and_go_stale(&mut c, &t, 700_000, 100);
+    at(
+        &registrar(),
+        NearToken::from_yoctonear(1),
+        0,
+        100 + STALE_LOCK_BLOCKS,
+    );
+    assert_panics("not the one that was reviewed", || {
+        c.resolve_stale_payout(t.clone(), true, U64(99), new_hash())
+    });
+    assert!(ledger(&c, &t).payout_in_flight.is_some());
+    assert!(c.get_used_evidence(t.clone()).is_empty());
+    c.resolve_stale_payout(t.clone(), true, U64(100), new_hash());
+    assert!(ledger(&c, &t).payout_in_flight.is_none());
+}
+
+/// A partial resolution moves the sequence, so a second call that was
+/// prepared before the first one is refused; the remainder is then settled
+/// from a fresh review.
+#[test]
+fn a_partial_remainder_needs_a_fresh_sequence() {
+    let (mut c, t) = two_lost_forwards();
+    resolve_with(&mut c, &t, 40_000, 0, 1, &new_hash());
+    assert_eq!(watch(&c, &t).written_off.0, 60_000);
+    assert_panics("changed since it was reviewed", || {
+        resolve_with(&mut c, &t, 0, 60_000, 1, &new_hash())
+    });
+    assert_eq!(watch(&c, &t).written_off.0, 60_000);
+    resolve_with(&mut c, &t, 0, 60_000, 2, &new_hash());
+    assert_eq!(watch(&c, &t).written_off.0, 0);
+    assert_eq!(watch(&c, &t).settle_seq.0, 3);
+    assert_eq!(acct(&c), (0, 60_000));
+}
+
+#[test]
+fn a_mixed_outcome_in_one_call_uses_one_sequence_and_one_evidence() {
+    let (mut c, t) = two_lost_forwards();
+    resolve_with(&mut c, &t, 40_000, 60_000, 1, &new_hash());
+    let l = ledger(&c, &t);
+    assert_eq!(
+        (l.known_balance.0, l.total_routed_in.0, l.undelivered.0),
+        (40_000, 40_000, 60_000)
+    );
+    assert_eq!(acct(&c), (0, 60_000));
+    assert_eq!(watch(&c, &t).settle_seq.0, 2);
+}
+
+/// A later generation: the sequence of an old review is dead once anything
+/// moves, and the old receipt's callback is fenced, so neither can touch the
+/// new quarantine.
+#[test]
+fn a_later_generation_cannot_be_settled_with_an_older_review() {
+    let (mut c, t) = fresh();
+    pay_open(&mut c, &t, 80_000, 500);
+    release_fwd(&mut c, &t, 500 + STALE_F);
+    let old_seq = watch(&c, &t).settle_seq.0;
+    let old_ev = new_hash();
+    resolve_with(&mut c, &t, 0, 80_000, old_seq, &old_ev);
+    let b_start = 600 + STALE_F;
+    pay_open(&mut c, &t, 50_000, b_start);
+    release_fwd(&mut c, &t, b_start + STALE_F);
+    let new_seq = watch(&c, &t).settle_seq.0;
+    assert_eq!(
+        new_seq,
+        old_seq + 2,
+        "resolve and the second release both moved it"
+    );
+    // Old review, old evidence: refused on the sequence first.
+    assert_panics("changed since it was reviewed", || {
+        resolve_with(&mut c, &t, 0, 50_000, old_seq + 1, &new_hash())
+    });
+    assert_panics("already used", || {
+        resolve_with(&mut c, &t, 0, 50_000, new_seq, &old_ev)
+    });
+    assert_eq!(watch(&c, &t).written_off.0, 50_000);
+    // The old failed callback is fenced and moves nothing.
+    assert!(!settle_at(&mut c, &t, 80_000, 500, false));
+    assert_eq!(watch(&c, &t).written_off.0, 50_000);
+    assert_eq!(watch(&c, &t).settle_seq.0, new_seq);
+    // A fresh review of B settles it.
+    resolve_with(&mut c, &t, 50_000, 0, new_seq, &new_hash());
+    assert_eq!(acct(&c), (0, 80_000));
+}
+
+/// The sequence is part of the watch, which stays once a quarantine has
+/// happened, so it never restarts at zero.
+#[test]
+fn the_sequence_survives_a_fully_settled_quarantine_and_the_quiet_check_still_passes() {
+    let (mut c, t) = quarantined(80_000);
+    resolve_wo(&mut c, &t, false);
+    let w = c.get_forward_watch(t.clone()).expect("the entry stays");
+    assert_eq!((w.settle_seq.0, w.written_off.0), (2, 0));
+    self_call();
+    c.assert_quiescent();
 }

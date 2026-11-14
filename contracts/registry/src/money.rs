@@ -237,7 +237,13 @@ impl Registry {
     /// `STALE_LOCK_BLOCKS`. A wrong answer is a registrar error, see
     /// THREAT_MODEL T12 and T19. A later `sync` then reads the vault balance.
     #[payable]
-    pub fn resolve_stale_payout(&mut self, token_id: TokenId, paid: bool, doc_hash: Hash32) {
+    pub fn resolve_stale_payout(
+        &mut self,
+        token_id: TokenId,
+        paid: bool,
+        expected_since_block: U64,
+        doc_hash: Hash32,
+    ) {
         assert_one_yocto();
         self.assert_registrar();
         require!(
@@ -254,6 +260,12 @@ impl Registry {
         let Some(lock) = lock else {
             env::panic_str("no stale payout lock");
         };
+        require!(
+            lock.since_block == expected_since_block,
+            "the payout lock is not the one that was reviewed: read get_ledger again"
+        );
+        forwards::consume_evidence(&token_id, &doc_hash);
+        let l = self.ledger_mut(&token_id);
         l.payout_in_flight = None;
         l.epoch += 1;
         if !paid {

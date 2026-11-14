@@ -373,8 +373,7 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_
     // The forward started "a day ago": block 1 for the watch, so no
     // fast-forward of 150000 blocks is needed. Borsh `ForwardWatch`: since,
     // latest (u64), amount (u128), count (u32), released_through,
-    // resolved_through (u64),
-    // written_off (u128).
+    // resolved_through (u64), written_off (u128), settle_seq (u64).
     let mut watch_raw = vec![];
     watch_raw.extend_from_slice(&1u64.to_le_bytes());
     watch_raw.extend_from_slice(&1u64.to_le_bytes());
@@ -383,6 +382,7 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_
     watch_raw.extend_from_slice(&0u64.to_le_bytes()); // released_through
     watch_raw.extend_from_slice(&0u64.to_le_bytes()); // resolved_through
     watch_raw.extend_from_slice(&0u128.to_le_bytes()); // written_off
+    watch_raw.extend_from_slice(&0u64.to_le_bytes()); // settle_seq
     let mut watch_key = b"fwd:".to_vec();
     watch_key.extend_from_slice(s3.as_bytes());
     e.worker
@@ -439,6 +439,7 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_
         .json()?;
     assert_eq!(watch["written_off"], "80000");
     assert_eq!(watch["count"], 0);
+    assert_eq!(watch["settle_seq"], "1");
     // The vault really holds the 80000, yet nothing is credited: a balance
     // proves nothing about where it came from.
     let l = e.ledger(&s3).await?;
@@ -469,7 +470,7 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_
     let r = ok(e
         .registrar
         .call(e.reg.id(), "resolve_written_off")
-        .args_json(json!({ "token_id": s3, "delivered_amount": "80000", "failed_amount": "0", "doc_hash": hash('d') }))
+        .args_json(json!({ "token_id": s3, "delivered_amount": "80000", "failed_amount": "0", "expected_seq": "1", "doc_hash": hash('d') }))
         .deposit(ONE_YOCTO)
         .max_gas()
         .transact()

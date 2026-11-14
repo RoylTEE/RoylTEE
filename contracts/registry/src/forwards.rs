@@ -19,6 +19,17 @@
 use crate::*;
 
 const WATCH_PREFIX: &[u8] = b"fwd:";
+/// Raw storage key of the consumed evidence of one share: `evd:<token_id>`.
+/// First byte 0x65: no clash with `Key` (0 to 13), `STATE` (0x53) or `fwd:` (0x66).
+const EVIDENCE_PREFIX: &[u8] = b"evd:";
+
+/// Most evidence hashes one share can ever consume (registrar settlements
+/// of quarantined forwards and of stale payout locks together). Storage:
+/// 4 bytes of length plus 32 bytes per hash, so at most 2052 bytes (about
+/// 0.021 NEAR) for each share, paid by the registry, and nothing for a share
+/// that never needed a registrar settlement. At the limit the registrar can
+/// not settle that share again (stated in THREAT_MODEL T19b).
+pub const MAX_EVIDENCE_PER_SHARE: usize = 64;
 
 /// What the registry still waits for on one share's forwards, and what a
 /// release quarantined. The format may change until the first entry exists on
@@ -49,6 +60,14 @@ pub(crate) struct ForwardWatch {
     /// `forwards_in_flight_total`, in no other bucket: not credited, not
     /// undelivered, never resent. `sync` is refused while it is above zero.
     pub written_off: u128,
+    /// Settlement sequence of the quarantine. Bumped by every change to it:
+    /// a release, a late callback that settles part of it, a registrar
+    /// resolution. The registrar passes the value it reviewed as
+    /// `expected_seq`, so a callback or another settlement that lands between
+    /// its review and its transaction makes the transaction fail instead of
+    /// counting the same receipt twice (audit RF-H1). An entry with a
+    /// nonzero sequence is never removed, so the sequence never restarts.
+    pub settle_seq: u64,
 }
 
 fn watch_key(token_id: &TokenId) -> Vec<u8> {
@@ -73,7 +92,12 @@ pub(crate) fn written_off(token_id: &TokenId) -> u128 {
 }
 
 pub(crate) fn write_watch(token_id: &TokenId, w: &ForwardWatch) {
-    if w.count == 0 && w.released_through == 0 && w.resolved_through == 0 && w.written_off == 0 {
+    if w.count == 0
+        && w.released_through == 0
+        && w.resolved_through == 0
+        && w.written_off == 0
+        && w.settle_seq == 0
+    {
         env::storage_remove(&watch_key(token_id));
         return;
     }
@@ -141,6 +165,54 @@ pub(crate) fn watch_settle(token_id: &TokenId, amount: u128, since: Option<u64>)
     Settle::Normal
 }
 
+fn evidence_key(token_id: &TokenId) -> Vec<u8> {
+    let mut k = EVIDENCE_PREFIX.to_vec();
+    k.extend_from_slice(token_id.as_bytes());
+    k
+}
+
+fn read_evidence(token_id: &TokenId) -> Vec<[u8; 32]> {
+    env::storage_read(&evidence_key(token_id)).map_or_else(Vec::new, |b| {
+        near_sdk::borsh::from_slice(&b)
+            .unwrap_or_else(|_| env::panic_str("malformed evidence list"))
+    })
+}
+
+fn hex32(h: &[u8; 32]) -> String {
+    h.iter().map(|b| format!("{b:02x}")).collect()
+}
+
+/// `doc_hash` is validated as 64 lowercase hex characters first.
+fn unhex32(s: &str) -> [u8; 32] {
+    let v = |c: u8| if c <= b'9' { c - b'0' } else { c - b'a' + 10 };
+    let b = s.as_bytes();
+    let mut out = [0u8; 32];
+    for (i, o) in out.iter_mut().enumerate() {
+        *o = v(b[2 * i]) * 16 + v(b[2 * i + 1]);
+    }
+    out
+}
+
+/// Records `doc_hash` as consumed evidence of this share. Panics if it was
+/// used before or if the share has used up `MAX_EVIDENCE_PER_SHARE`. A
+/// registrar settlement cites one receipt, so the same receipt can never
+/// settle twice (audit RF-H1).
+pub(crate) fn consume_evidence(token_id: &TokenId, doc_hash: &str) {
+    let h = unhex32(doc_hash);
+    let mut list = read_evidence(token_id);
+    require!(
+        !list.contains(&h),
+        "this evidence was already used for this share"
+    );
+    require!(
+        list.len() < MAX_EVIDENCE_PER_SHARE,
+        "evidence list of this share is full"
+    );
+    list.push(h);
+    let bytes = near_sdk::borsh::to_vec(&list).unwrap_or_else(|_| env::panic_str("borsh"));
+    env::storage_write(&evidence_key(token_id), &bytes);
+}
+
 /// A late callback of a quarantine the registrar already resolved: nothing
 /// changes (its amount left `forwards_in_flight_total` at the decision).
 pub(crate) fn emit_fenced(token_id: &TokenId, amount: u128, ok: bool) {
@@ -169,6 +241,9 @@ impl Registry {
         let mut w = read_watch(token_id).unwrap_or_default();
         let matched = amount.min(w.written_off);
         w.written_off -= matched;
+        if matched > 0 {
+            w.settle_seq += 1;
+        }
         write_watch(token_id, &w);
         self.forwards_in_flight_total = self.forwards_in_flight_total.saturating_sub(matched);
         if !ok {
@@ -203,7 +278,14 @@ impl Registry {
             released_through: U64(w.released_through),
             resolved_through: U64(w.resolved_through),
             written_off: U128(w.written_off),
+            settle_seq: U64(w.settle_seq),
         })
+    }
+
+    /// Evidence hashes this share has consumed (registrar settlements). A
+    /// hash in the list is refused for this share.
+    pub fn get_used_evidence(&self, token_id: TokenId) -> Vec<Hash32> {
+        read_evidence(&token_id).iter().map(hex32).collect()
     }
 
     /// Deploy barrier (audit RR-4, R-L3). The redeploy runs it in the same
@@ -281,6 +363,7 @@ impl Registry {
                 released_through: w.released_through.max(w.latest),
                 resolved_through: w.resolved_through,
                 written_off: w.written_off + w.amount,
+                settle_seq: w.settle_seq + 1,
             },
         );
         emit(
@@ -315,6 +398,7 @@ impl Registry {
         token_id: TokenId,
         delivered_amount: U128,
         failed_amount: U128,
+        expected_seq: U64,
         doc_hash: Hash32,
     ) {
         near_sdk::assert_one_yocto();
@@ -326,6 +410,10 @@ impl Registry {
         let (delivered, failed) = (delivered_amount.0, failed_amount.0);
         let mut w = read_watch(&token_id).unwrap_or_default();
         require!(w.written_off > 0, "nothing written off");
+        require!(
+            w.settle_seq == expected_seq.0,
+            "the quarantine changed since it was reviewed: read get_forward_watch again"
+        );
         let total = delivered
             .checked_add(failed)
             .unwrap_or_else(|| env::panic_str("amounts overflow"));
@@ -341,8 +429,10 @@ impl Registry {
                 "share is not approved by the work registrant"
             );
         }
+        consume_evidence(&token_id, &doc_hash);
         w.written_off -= total;
         w.resolved_through = w.released_through;
+        w.settle_seq += 1;
         write_watch(&token_id, &w);
         self.forwards_in_flight_total = self.forwards_in_flight_total.saturating_sub(total);
         self.undelivered_total += failed;
@@ -353,7 +443,7 @@ impl Registry {
         l.undelivered += failed;
         emit(
             "written_off_resolved",
-            json!({ "token_id": token_id, "delivered_amount": delivered_amount, "failed_amount": failed_amount, "remaining": U128(w.written_off), "doc_hash": doc_hash }),
+            json!({ "token_id": token_id, "delivered_amount": delivered_amount, "failed_amount": failed_amount, "remaining": U128(w.written_off), "settle_seq": U64(w.settle_seq), "doc_hash": doc_hash }),
         );
     }
 }
