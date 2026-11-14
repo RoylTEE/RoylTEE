@@ -11,7 +11,7 @@ Track: NFTs That Do Something (`nfts`). Testnet only, no real money. No wallet a
 1. **Open the check page:** https://royltee.vercel.app/verify. It reads NEAR testnet live in your browser (view calls only) and lists every claim with its code, its test and its transaction.
 2. **Or run one command** (Node 18 or newer, no install, read only): `git clone https://github.com/RoylTEE/RoylTEE.git && cd RoylTEE && npm run verify:testnet`
 3. **What you should see.** The command prints one `PASS` line per check and ends with `ALL CHECKS PASSED`: 15 share vaults with `0 access keys`, every code hash equal to `deployments/testnet.json`, the recorded owner of every share, and the solvency line. The page shows `3/3` code hashes matching, `15/15` vaults keyless and `8/8` claims passing a live check. Three rows say Recorded on chain (the registry redeploy, the split sheet and the auction); they show transactions but are not counted in the live total.
-4. **Then read:** [Every claim, checked](#every-claim-checked), [Try to break it](#try-to-break-it) and [The track brief, item by item](#the-track-brief-item-by-item).
+4. **Then read:** [Every claim, checked](#every-claim-checked), [Try to break it](#try-to-break-it), [The track brief, item by item](#the-track-brief-item-by-item) and the [design whitepaper](docs/WHITEPAPER.md) (version 1.0, 14 November 2026; PDF in [site/public/royltee-whitepaper.pdf](site/public/royltee-whitepaper.pdf)).
 
 UNVERIFIED (pre-submission item): on 2026-11-14 08:07 UTC the hosted site answered with a redirect to a Vercel login page. Open the project to the public, check the `/verify` link in a private window, then delete this note.
 
@@ -412,7 +412,8 @@ The site is an Astro app in `site/`, hosted at https://royltee.vercel.app (hoste
 | `/docs` | The accounts, the contract methods the pages read, and how to check the demo without a wallet | None |
 | `/help` | Help chat and wallet support tickets | None |
 | `/admin` | Support admin: the server checks the admin wallet on every request and answers 401 when not signed in | None |
-| `/whitepaper` | Placeholder until the whitepaper is approved | None |
+| `/whitepaper` | The design whitepaper, version 1.0 of 14 November 2026, with a PDF download (`/royltee-whitepaper.pdf`) | None |
+| `/auction` | The sealed-bid auction run on testnet: timeline with transaction links, the `outlayer-verify` proof and what runs in the TEE | None (recorded run) |
 
 - Marked Simulated on the pages: payer steps in the recorded demo (badge "Simulated payer"), the identity checks behind member credentials, dispute documents and arbitration (hashes of dummy documents), and the document hashes in registrar events (placeholder test values). Live values are the real testnet state of these demo accounts.
 - Split sheet approval (`approve_share`) is deployed on testnet since step 15. The site checks live whether the method exists and says so when it does not.
@@ -588,6 +589,7 @@ site/src/data/testnet.ts accounts and the recorded demo, copied from deployments
 site/tests               Vitest tests for the site (243 in 23 files)
 .github/workflows/ci.yml CI: wasm build, fmt, clippy, Rust tests, site typecheck, tests and build, gitleaks
 spike/outlayer/          throwaway OutLayer call-path spike (its own Cargo workspace, not a root workspace member): echo module, probe contract, evidence bundle
+docs/WHITEPAPER.md       design whitepaper, version 1.0 (14 November 2026); site/public/royltee-whitepaper.pdf is made from the same text
 docs/reviews/            status of each external review finding (fixed, documented, deferred or false)
 README.md  THREAT_MODEL.md  DESIGN.md  AUDIT.md  DEPLOY_PLAN.md  DECISIONS_LOG.md  SPEND_LOG.md  LICENSE
 ```

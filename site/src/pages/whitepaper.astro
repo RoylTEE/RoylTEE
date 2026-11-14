@@ -1,10 +1,51 @@
 ---
 import App from '../layouts/App.astro';
+import { Content, getHeadings } from '../data/whitepaper.md';
+// The text is docs/WHITEPAPER.md, copied by scripts/sync-whitepaper.mjs. The PDF is made from the same file.
+const toc = getHeadings().filter((x) => x.depth === 2);
 ---
-<App area="docs" tab="whitepaper" title="Whitepaper" intro="The design whitepaper is a placeholder until it is approved." period={false}>
-  <div class="empty">
-    <span class="badge plain">Placeholder</span>
-    <p>It will cover the problem, the design goals, the share lifecycle, the NEAR and privacy design, the trust model and the path from testnet to mainnet. Until then, the registry pages show the live contracts, and the help chat answers from the project notes.</p>
-    <div class="actions"><a class="btn primary" href="/dashboard/">Open the registry</a><a class="btn" href="/help#chat">Ask the help chat</a></div>
+<App area="docs" tab="whitepaper" title="Whitepaper" intro="Design whitepaper, version 1.0, 14 November 2026. Testnet only." period={false}>
+  <div class="actions wp-actions">
+    <a class="btn primary" href="/royltee-whitepaper.pdf" download>Download the PDF</a>
+    <a class="btn" href="/verify">Check the claims</a>
+    <a class="btn" href="/auction">Sealed-bid auction</a>
+  </div>
+  <div class="wp-grid">
+    <nav class="panel wp-toc" aria-label="Sections">
+      <div class="panel-head"><h2>Sections</h2></div>
+      <ol class="panel-body">
+        {toc.map((x) => <li><a class="link" href={`#${x.slug}`}>{x.text.replace(/^\d+ /, '')}</a></li>)}
+      </ol>
+    </nav>
+    <article class="panel wp" aria-label="Whitepaper text">
+      <div class="panel-body wp-body"><Content /></div>
+    </article>
   </div>
 </App>
+<style is:global>
+  .wp-actions { margin-bottom: var(--s5); }
+  .wp-grid { display: grid; grid-template-columns: 14rem minmax(0, 1fr); gap: var(--s5); align-items: start; }
+  .wp-toc { position: sticky; top: var(--s5); }
+  .wp-toc ol { margin: 0; padding-left: var(--s6, 1.5rem); display: grid; gap: var(--s2); font-size: var(--fs-14); }
+  .wp-body { max-width: 52rem; line-height: 1.6; }
+  .wp-body h1 { display: none; }
+  .wp-body h2 { margin-top: var(--s7, 2.5rem); scroll-margin-top: var(--s5); }
+  .wp-body h3 { margin-top: var(--s5); }
+  .wp-body table { display: block; overflow-x: auto; border-collapse: collapse; font-size: var(--fs-14); margin: var(--s4) 0; }
+  .wp-body th, .wp-body td { border: 1px solid var(--rule); padding: var(--s2) var(--s3); text-align: left; vertical-align: top; }
+  .wp-body code { font-family: var(--mono); font-size: .9em; overflow-wrap: anywhere; }
+  .wp-body a { overflow-wrap: anywhere; }
+  @page { size: A4; margin: 16mm; }
+  @media print {
+    .app-top, .side, .side-backdrop, .wp-toc, .wp-actions, .app-foot, .page-top, .area-tabs { display: none !important; }
+    body.app, .app-body, .wp-grid { display: block !important; }
+    .wp.panel { border: 0; box-shadow: none; }
+    .wp-body { max-width: none; font-size: 10.5pt; line-height: 1.45; padding: 0; }
+    .wp-body h1 { display: block; font-size: 22pt; margin: 0 0 6pt; }
+    .wp-body h2 { break-after: avoid; font-size: 14pt; margin-top: 18pt; }
+    .wp-body h3 { break-after: avoid; font-size: 11.5pt; }
+    .wp-body table { display: table; font-size: 9pt; width: 100%; break-inside: avoid; }
+    .wp-body tr { break-inside: avoid; }
+  }
+  @media (max-width: 1199px) { .wp-grid { grid-template-columns: minmax(0, 1fr); } .wp-toc { position: static; } }
+</style>

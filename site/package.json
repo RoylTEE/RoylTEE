@@ -10,7 +10,7 @@
     "typecheck": "astro check",
     "test:samples": "vitest run tests/samples.test.ts",
     "scan:wording": "node scripts/check-wording.mjs",
-    "sync:evidence": "node scripts/sync-evidence.mjs && node scripts/sync-auction.mjs"
+    "sync:evidence": "node scripts/sync-evidence.mjs && node scripts/sync-auction.mjs && node scripts/sync-whitepaper.mjs"
   },
   "keywords": [],
   "author": "RoylTEE Labs <dev@royltee.invalid>",

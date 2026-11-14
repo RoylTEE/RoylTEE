@@ -64,7 +64,7 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 
 ## The registry pages
 
-- The registry is an app with a menu by purpose. Registry: Overview (statement since mint and what needs attention), Catalog (works and rights, split sheets), Shares (ledger, share accounts with their live keys and NEAR against the storage minimum, claims), Activity (the recorded demo, filterable), Verify (code hashes against the deploy record, keyless share accounts, the full access keys still on the registry and Mock USDC accounts), Auction (a read only page for the one sealed-bid sale that ran in a TEE, with its timeline, transactions and attestation proof). Oversight: Governance (agents, disputes, registrar). You: Your shares. Support: Help (chat, support, docs, whitepaper). Balances, owners, keys and code hashes are read live from NEAR testnet with view calls; Activity, the Registrar log, share holders and history, and the landing split sheet are the recorded demo.
+- The registry is an app with a menu by purpose. Registry: Overview (statement since mint and what needs attention), Catalog (works and rights, split sheets), Shares (ledger, share accounts with their live keys and NEAR against the storage minimum, claims), Activity (the recorded demo, filterable), Verify (code hashes against the deploy record, keyless share accounts, the full access keys still on the registry and Mock USDC accounts), Auction (a read only page for the one sealed-bid sale that ran in a TEE, with its timeline, transactions and attestation proof). Oversight: Governance (agents, disputes, registrar). You: Your shares. Support: Help (chat, support, docs, whitepaper). The whitepaper (version 1.0, 14 November 2026) is a page of its own at /whitepaper, with a PDF download. Balances, owners, keys and code hashes are read live from NEAR testnet with view calls; Activity, the Registrar log, share holders and history, and the landing split sheet are the recorded demo.
 - Your shares: look up any account read only, or connect a testnet wallet. A connected holder can claim, a work registrant can approve or reject a pending share (on the deployed build), and a member can draft a split sheet with a review step before signing. Sending these from the site has not been run on testnet yet, so it is UNVERIFIED.
 - Statements on these pages use Opening balance, activity and Closing balance since mint. A view by statement period needs an event indexer, which is roadmap.
 
@@ -112,6 +112,6 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 - [Verify the deployment](/verify)
 - [Sealed-bid auction](/auction)
 - [Docs](/docs)
-- [Whitepaper placeholder](/whitepaper)
+- [Whitepaper, version 1.0](/whitepaper)
 - [Help chat](/help#chat)
 - [Contact support](/help#support)

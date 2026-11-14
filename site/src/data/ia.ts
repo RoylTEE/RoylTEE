@@ -52,7 +52,7 @@ export const AREAS: Area[] = [
   ] },
   { key: 'docs', label: 'Docs', group: 'Support', purpose: 'Accounts, methods, whitepaper', href: '/docs', tabs: [
     { key: 'docs', label: 'Docs', href: '/docs' },
-    { key: 'whitepaper', label: 'Whitepaper (placeholder)', href: '/whitepaper' },
+    { key: 'whitepaper', label: 'Whitepaper', href: '/whitepaper' },
   ] },
   { key: 'how', label: 'How it works', group: 'Support', purpose: 'The project site', href: '/#how', tabs: [] },
 ];

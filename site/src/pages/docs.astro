@@ -9,7 +9,8 @@ const accounts: [string, string][] = [
   ...['writer-a', 'writer-b', 'buyer-pub'].map((a): [string, string] => [`${a}.royltee-dev.testnet`, `${ROLE_OF[`${a}.royltee-dev.testnet`]}, verified member`]),
   [AGENTS[0], 'Payment agent, function call key only'],
   [PAYER, 'Payer (Simulated)'],
-  ['s1.reg.royltee-dev.testnet to s7', 'One share account per share NFT, zero access keys'],
+  ['s1.reg.royltee-dev.testnet to s15', 'One share account per share NFT, zero access keys'],
+  ['auction.royltee-dev.testnet', 'Sealed-bid share auction contract, settled through a TEE once on testnet'],
 ];
 const views = ['get_config', 'nft_tokens', 'nft_token', 'get_work', 'get_share', 'get_ledger', 'get_accounting', 'list_disputes', 'get_role', 'get_credential', 'is_payer', 'ft_balance_of'];
 const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \\
@@ -39,6 +40,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
   <section class="panel" aria-labelledby="c-h">
     <div class="panel-head"><h2 id="c-h">Check it yourself</h2><span class="caption">No wallet needed</span></div>
     <div class="panel-body">
+      <p class="small">The design is written up in the <a class="link" href="/whitepaper">whitepaper</a> (version 1.0, 14 November 2026, <a class="link" href="/royltee-whitepaper.pdf" download>PDF</a>). The sealed-bid sale has its own page: <a class="link" href="/auction">Auction</a>.</p>
       <p class="small">Ask a public testnet node for the access keys of the share account that was sold. The answer is an empty list.</p>
       <pre class="code"><code>{curl}</code></pre>
       <p class="small muted">From a clone of the repository, <code class="mono">npm run verify:testnet</code> checks all 15 share accounts, the code hashes and the balances.</p>
