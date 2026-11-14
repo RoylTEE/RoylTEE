@@ -29,7 +29,7 @@ async function load() {
       fig('Contract code matches the record', 'Code matches', `${rows.filter((r) => r[3]).length}/${rows.length}`, '', rows.every((r) => r[3]) ? badge('All match', 'ok') : badge('Check', 'bad'), { keep: true }),
       fig('Share accounts running the vault code', 'Vault code', `${vaultOk.filter(Boolean).length}/${tokens.length}`),
       fig('Share accounts with 0 keys', 'Keyless', `${keyless}/${tokens.length}`, '', keyless === tokens.length ? badge('All keyless', 'ok') : badge('Check keys', 'bad'), { keep: true }),
-      fig('Full access keys on contract accounts', 'Contract keys', String(full(regKeys) + full(usdcKeys)), '', badge('Deletion planned', 'warn'), { keep: true }),
+      fig('Full access keys on contract accounts', 'Contract keys', String(full(regKeys) + full(usdcKeys)), '', badge('Kept on testnet', 'warn'), { keep: true }),
     );
     $('[data-code]').replaceChildren(h('table', { class: 'ledger rows-sm' },
       h('thead', {}, h('tr', {}, ...['Contract', 'Deploy record', 'On chain now', 'Result'].map((x) => h('th', { text: x })))),

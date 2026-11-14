@@ -10,6 +10,6 @@ export function keyStatus(ks: AccessKey[]): KeyStatus {
     ? `${k.public_key}: full access`
     : `${k.public_key}: function call to ${k.access_key.permission.FunctionCall.receiver_id}, ${k.access_key.permission.FunctionCall.method_names.length ? k.access_key.permission.FunctionCall.method_names.join(', ') : 'any method'}`);
   const full = ks.filter((k) => k.access_key.permission === 'FullAccess').length;
-  if (full) return { text: 'Deletion planned', tone: 'warn', detail };
+  if (full) return { text: 'Kept on testnet', tone: 'warn', detail };
   return { text: `${ks.length} function call key${ks.length === 1 ? '' : 's'}`, tone: 'warn', detail };
 }
