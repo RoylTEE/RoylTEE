@@ -13,6 +13,8 @@ const record = JSON.parse(readFileSync(join(here, '..', 'deployments', 'testnet.
 const accounts = Object.values(record.accounts);
 const reg = accounts.find((a) => a.variable === 'REG');
 const owners = record.token_owners.owners;
+const auctionRecord = JSON.parse(readFileSync(join(here, '..', 'deployments', 'auction-testnet.json'), 'utf8'));
+const auction = auctionRecord.contract;
 
 function liveKeys(a) {
   return (a.keys || []).map((k) => ({
@@ -23,11 +25,11 @@ function liveKeys(a) {
 
 function chain(change = {}) {
   const tokenIds = change.tokens || Object.keys(owners);
-  const tokens = tokenIds.map((id) => ({ token_id: id, owner_id: owners[id] || 'someone.testnet', metadata: { extra: JSON.stringify({ vault: `${id}.${reg.account_id}`, status: 'active', earned: '0', paid_out: '0' }) } }));
+  const tokens = tokenIds.map((id) => ({ token_id: id, owner_id: (change.owners && change.owners[id]) || owners[id] || 'someone.testnet', metadata: { extra: JSON.stringify({ vault: `${id}.${reg.account_id}`, status: 'active', earned: '0', paid_out: '0' }) } }));
   const vaultHash = record.wasm.vault.on_chain_code_hash_base58;
   return {
-    keys: (id) => (change.keys && change.keys[id]) || liveKeys(record.accounts[id] || { keys: [] }),
-    account: (id) => ({ code_hash: (record.accounts[id] && record.accounts[id].code_hash_base58) || vaultHash }),
+    keys: (id) => (change.keys && change.keys[id]) || liveKeys(id === auction.account ? auction : record.accounts[id] || { keys: [] }),
+    account: (id) => ({ code_hash: id === auction.account ? (change.auctionHash || auction.code_hash_base58) : (record.accounts[id] && record.accounts[id].code_hash_base58) || vaultHash }),
     nft_tokens: ({ from_index, limit }) => tokens.slice(Number(from_index), Number(from_index) + limit),
     get_accounting: () => change.accounting || { allowance_total: '0', unallocated_total: '0', escrow_total: '400000', undelivered_total: '0', forwards_in_flight_total: '0' },
     ft_balance_of: () => '400000',
@@ -131,7 +133,34 @@ test('fails when the registry embeds a vault build that is not the recorded one'
 
 test('fails when a vault keeps a code hash other than the recorded one', async () => {
   const s8 = record.accounts['s8.reg.royltee-dev.testnet'];
-  const r = await run({ ...chain(), account: (id) => ({ code_hash: id === s8.account_id ? record.wasm.vault.earlier_builds[0].on_chain_code_hash_base58 : record.accounts[id].code_hash_base58 }) });
+  const r = await run({ ...chain(), account: (id) => (id === s8.account_id ? { code_hash: record.wasm.vault.earlier_builds[0].on_chain_code_hash_base58 } : chain().account(id)) });
   assert.equal(r.code, 1);
   assert.match(r.text, /s8\.reg\.royltee-dev\.testnet code hash BBLu\w+, record says BgC1pQ/);
+});
+
+test('passes the auction checks: account, code hash, keys and the sold token owner', async () => {
+  const r = await run(chain());
+  assert.equal(r.code, 0, r.text);
+  assert.match(r.text, new RegExp(`${auction.account} exists, code hash ${auction.code_hash_base58} matches the record`));
+  assert.match(r.text, new RegExp(`${auction.account} access keys match the record: full_access`));
+  assert.match(r.text, /token s10 sold in auction 0 is owned by buyer-pub\.royltee-dev\.testnet, as both records say/);
+});
+
+test('fails when the auction account runs other code than the recorded one', async () => {
+  const r = await run(chain({ auctionHash: record.wasm.vault.on_chain_code_hash_base58 }));
+  assert.equal(r.code, 1);
+  assert.match(r.text, new RegExp(`${auction.account} code hash ${record.wasm.vault.on_chain_code_hash_base58}, record says ${auction.code_hash_base58}`));
+});
+
+test('fails when the auction account gains a key', async () => {
+  const extra = { public_key: 'ed25519:11111111111111111111111111111111', access_key: { nonce: 1, permission: 'FullAccess' } };
+  const r = await run(chain({ keys: { [auction.account]: [...liveKeys(auction), extra] } }));
+  assert.equal(r.code, 1);
+  assert.match(r.text, new RegExp(`${auction.account} has key not in the record: ed25519:1111`));
+});
+
+test('fails when the sold share is not owned by the recorded buyer', async () => {
+  const r = await run(chain({ owners: { s10: 'outsider.royltee-dev.testnet' } }));
+  assert.equal(r.code, 1);
+  assert.match(r.text, /token s10 owner outsider\.royltee-dev\.testnet, auction record says buyer-pub/);
 });

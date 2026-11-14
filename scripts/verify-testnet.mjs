@@ -19,9 +19,14 @@
 //     with wasm.registry (T13)
 //  6. solvency: all five accounting counters must be present as nonnegative
 //     integers, and their sum must be <= the registry's mock USDC balance (T31)
+//  7. the sealed-bid auction (deployments/auction-testnet.json): its account
+//     exists, its code hash equals the record, its access keys equal the
+//     record, and share s10 is owned by the buyer the auction record names
+//     (the winner of auction 0), the same owner testnet.json records
 //
 // RPC endpoint: NEAR_RPC_URL, default https://rpc.testnet.near.org.
-// VERIFY_RECORD overrides the record path (used by the script's own tests).
+// VERIFY_RECORD and VERIFY_AUCTION_RECORD override the record paths (used by
+// the script's own tests).
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -29,6 +34,8 @@ import { dirname, join } from 'node:path';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const recordPath = process.env.VERIFY_RECORD || join(root, 'deployments', 'testnet.json');
 const record = JSON.parse(readFileSync(recordPath, 'utf8'));
+const auctionRecordPath = process.env.VERIFY_AUCTION_RECORD || join(root, 'deployments', 'auction-testnet.json');
+const auctionRecord = JSON.parse(readFileSync(auctionRecordPath, 'utf8'));
 const RPC = process.env.NEAR_RPC_URL || 'https://rpc.testnet.near.org';
 const PAGE = 100;
 
@@ -168,6 +175,33 @@ for (const id of Object.keys(owners)) {
 }
 for (const v of vaults) {
   if (!tokens.some((t) => `${t.token_id}.${reg.account_id}` === v.account_id)) fail(`vault ${v.account_id} is in the record but no token names it`);
+}
+
+// The auction account. Its contract block has the same shape as the registry
+// entries (account, code hash, keys), so the same key comparison is used.
+const auction = auctionRecord.contract;
+const auctionAcc = await viewAccount(auction.account);
+auctionAcc.code_hash === auction.code_hash_base58
+  ? pass(`${auction.account} exists, code hash ${auctionAcc.code_hash} matches the record`)
+  : fail(`${auction.account} code hash ${auctionAcc.code_hash}, record says ${auction.code_hash_base58}`);
+{
+  const live = (await keyList(auction.account)).map(liveKey).sort();
+  const expected = (auction.keys || []).map(recordedKey).sort();
+  const same = live.length === expected.length && live.every((k, i) => k === expected[i]);
+  if (same) {
+    pass(`${auction.account} access keys match the record: ${live.map((k) => k.split(' ').slice(1).join(' ')).join('; ') || 'none'}`);
+  } else {
+    for (const k of live) if (!expected.includes(k)) fail(`${auction.account} has key not in the record: ${k}`);
+    for (const k of expected) if (!live.includes(k)) fail(`${auction.account} is missing recorded key: ${k}`);
+  }
+}
+const sold = auctionRecord.auction_0;
+const s10 = tokens.find((t) => t.token_id === sold.token_id);
+if (!s10) fail(`auction record names token ${sold.token_id} but nft_tokens does not return it`);
+else if (s10.owner_id === sold.token_owner_after && owners[sold.token_id] === s10.owner_id) {
+  pass(`token ${sold.token_id} sold in auction 0 is owned by ${s10.owner_id}, as both records say`);
+} else {
+  fail(`token ${sold.token_id} owner ${s10.owner_id}, auction record says ${sold.token_owner_after}, testnet record says ${owners[sold.token_id]}`);
 }
 
 const acct = await view(reg.account_id, 'get_accounting');
