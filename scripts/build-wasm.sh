@@ -30,6 +30,11 @@ for c in mock_usdc registry test_receiver; do
   cp "$OUT/$c.wasm" "contracts/res/$c.wasm"
 done
 
+# Test-only registry with a short forward release window, so the sandbox can
+# reach it (feature short-stale-forward, never deployed).
+cargo build -p registry --features short-stale-forward --target "$TARGET" --release --target-dir target/wasm-short
+cp "target/wasm-short/$TARGET/release/registry.wasm" contracts/res/registry_short_stale.wasm
+
 # Fail if a machine path is still in any built wasm. A pattern that is empty
 # or just "/" (for example HOME=/ in a container) is skipped, since it would
 # match any wasm.

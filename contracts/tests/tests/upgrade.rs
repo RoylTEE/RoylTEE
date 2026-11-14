@@ -270,8 +270,8 @@ fn ledger_key(token_id: &str) -> Vec<u8> {
 }
 
 #[tokio::test]
-async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_recovered() -> anyhow::Result<()>
-{
+async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_and_resolved(
+) -> anyhow::Result<()> {
     let e = setup_with_registry(&deployed_registry_wasm()).await?;
     assert_eq!(
         code_hash(&e, e.reg.id()).await?,
@@ -344,6 +344,16 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_recovered() 
         assert!(r.is_failure(), "{method} with nothing to release");
     }
 
+    // The release window is about a day (150000 blocks), more than a sandbox
+    // can fast-forward. The rest of this test runs on the same code built with
+    // a 1500 block window (cargo feature `short-stale-forward`, test builds
+    // only), deployed over the upgraded registry in place.
+    e.reg
+        .as_account()
+        .deploy(&wasm("registry_short_stale"))
+        .await?
+        .into_result()?;
+
     // Lost callback. A real node never loses it here, so the state a lost
     // callback leaves is written by hand: the ledger as it was while the
     // forward was out (nothing credited, one forward pending), the counter
@@ -360,12 +370,17 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_recovered() 
     let n = root.len();
     root[n - 40..n - 24].copy_from_slice(&80_000u128.to_le_bytes()); // forwards_in_flight_total
     e.worker.patch_state(e.reg.id(), b"STATE", &root).await?;
-    let since = e.worker.view_block().await?.height();
+    // The forward started "a day ago": block 1 for the watch, so no
+    // fast-forward of 150000 blocks is needed. Borsh `ForwardWatch`: since,
+    // latest (u64), amount (u128), count (u32), released_through (u64),
+    // written_off (u128).
     let mut watch_raw = vec![];
-    watch_raw.extend_from_slice(&since.to_le_bytes());
+    watch_raw.extend_from_slice(&1u64.to_le_bytes());
+    watch_raw.extend_from_slice(&1u64.to_le_bytes());
     watch_raw.extend_from_slice(&80_000u128.to_le_bytes());
     watch_raw.extend_from_slice(&1u32.to_le_bytes());
     watch_raw.extend_from_slice(&0u64.to_le_bytes());
+    watch_raw.extend_from_slice(&0u128.to_le_bytes());
     let mut watch_key = b"fwd:".to_vec();
     watch_key.extend_from_slice(s3.as_bytes());
     e.worker
@@ -389,7 +404,8 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_recovered() 
         .transact()
         .await?
         .is_failure());
-    // Too early.
+    // Too early on the test build: the watch says block 1, the chain is
+    // below block 1501.
     assert!(e
         .outsider
         .call(e.reg.id(), "release_stale_forward")
@@ -398,7 +414,7 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_recovered() 
         .transact()
         .await?
         .is_failure());
-    e.worker.fast_forward(1_300).await?;
+    e.worker.fast_forward(1_600).await?;
     let r = ok(e
         .outsider
         .call(e.reg.id(), "release_stale_forward")
@@ -407,8 +423,22 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_recovered() 
         .transact()
         .await?);
     let ev = event(&r, "forward_released_stale");
-    assert_eq!(ev["delivered"], "80000");
-    assert_eq!(ev["undelivered"], "0");
+    assert_eq!(ev["forwards"], 1);
+    assert_eq!(ev["quarantined"], "80000");
+    println!(
+        "GAS release_stale_forward {:.3} Tgas burnt in total (no callback)",
+        r.total_gas_burnt.as_gas() as f64 / 1e12
+    );
+    let watch: Value = e
+        .reg
+        .view("get_forward_watch")
+        .args_json(json!({ "token_id": s3 }))
+        .await?
+        .json()?;
+    assert_eq!(watch["written_off"], "80000");
+    assert_eq!(watch["count"], 0);
+    // The vault really holds the 80000, yet nothing is credited: a balance
+    // proves nothing about where it came from.
     let l = e.ledger(&s3).await?;
     assert_eq!(
         (
@@ -416,7 +446,37 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_recovered() 
             num(&l["total_routed_in"]),
             l["inbound_pending"].as_u64()
         ),
-        (80_000, 80_000, Some(0))
+        (0, 0, Some(0))
+    );
+    assert_eq!(e.balance(&e.vault(&s3)).await?, 80_000);
+    let acct: Value = e.reg.view("get_accounting").await?.json()?;
+    assert_eq!(num(&acct["forwards_in_flight_total"]), 80_000);
+    // Not asserted solvent here: the transfer did reach the vault, so the
+    // registry holds less than the quarantined counter until it is settled.
+    // sync stays refused while the quarantine is open, and nothing resends.
+    for (who, method) in [(&e.writer_a, "sync"), (&e.outsider, "retry_forward")] {
+        assert!(who
+            .call(e.reg.id(), method)
+            .args_json(json!({ "token_id": s3 }))
+            .max_gas()
+            .transact()
+            .await?
+            .is_failure());
+    }
+    // The registrar reads the public receipt: the transfer reached the vault.
+    let r = ok(e
+        .registrar
+        .call(e.reg.id(), "resolve_written_off")
+        .args_json(json!({ "token_id": s3, "delivered": true, "doc_hash": hash('d') }))
+        .deposit(ONE_YOCTO)
+        .max_gas()
+        .transact()
+        .await?);
+    assert_eq!(event(&r, "written_off_resolved")["delivered"], true);
+    let l = e.ledger(&s3).await?;
+    assert_eq!(
+        (num(&l["known_balance"]), num(&l["total_routed_in"])),
+        (80_000, 80_000)
     );
     let acct: Value = e.reg.view("get_accounting").await?.json()?;
     assert_eq!(num(&acct["forwards_in_flight_total"]), 0);

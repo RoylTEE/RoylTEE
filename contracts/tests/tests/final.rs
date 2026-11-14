@@ -6,7 +6,17 @@
 mod common;
 
 use common::*;
+use near_workspaces::types::NearToken;
 use serde_json::{json, Value};
+
+fn event(r: &near_workspaces::result::ExecutionFinalResult, name: &str) -> Value {
+    r.logs()
+        .iter()
+        .find(|l| l.contains(&format!("\"{name}\"")))
+        .map(|l| serde_json::from_str::<Value>(l.trim_start_matches("EVENT_JSON:")).unwrap())
+        .unwrap_or_else(|| panic!("{name} event"))["data"][0]
+        .clone()
+}
 
 fn u128_le(v: u128) -> [u8; 16] {
     v.to_le_bytes()
@@ -94,6 +104,21 @@ async fn f01_stale_payout_that_never_left_the_vault_is_undone() -> anyhow::Resul
         .logs()
         .iter()
         .any(|l| l.contains("withdraw_failed_debit_undone")));
+    let cb_gas: Vec<u64> = r
+        .receipt_outcomes()
+        .iter()
+        .filter(|o| {
+            o.executor_id.as_str() == e.reg.id().as_str()
+                && o.logs.iter().any(|l| l.contains("lock_released_stale"))
+        })
+        .map(|o| o.gas_burnt.as_gas())
+        .collect();
+    assert_eq!(cb_gas.len(), 1);
+    println!(
+        "GAS on_release_payout {:.3} Tgas (reserved 10)",
+        cb_gas[0] as f64 / 1e12
+    );
+    assert!(cb_gas[0] < 10_000_000_000_000);
     let l = e.ledger(&s).await?;
     assert_eq!(
         (
@@ -162,5 +187,187 @@ async fn f02_stale_payout_that_was_paid_keeps_its_debit() -> anyhow::Result<()> 
         (0, 80_000, 80_000)
     );
     assert!(l["payout_in_flight"].is_null());
+    e.assert_solvent().await
+}
+
+/// External review L6: the registry account calls `on_forward` with the two
+/// argument JSON that receipts created before the upgrade carry (no `since`).
+/// The method must accept it. Called directly it has no promise result, so it
+/// settles as a failed forward: the amount goes to `undelivered`.
+#[tokio::test]
+async fn f03_on_forward_accepts_the_two_argument_json_of_old_receipts() -> anyhow::Result<()> {
+    let e = setup().await?;
+    let w = e.register_work("USRC12600001").await?;
+    let s = e.mint(w, e.writer_a.id(), 10_000).await?;
+    let r = ok(e
+        .reg
+        .as_account()
+        .call(e.reg.id(), "on_forward")
+        .args_json(json!({ "token_id": s, "amount": "1000" }))
+        .max_gas()
+        .transact()
+        .await?);
+    assert!(r.logs().iter().any(|l| l.contains("forward_failed")));
+    let l = e.ledger(&s).await?;
+    assert_eq!(num(&l["undelivered"]), 1_000);
+    // The same call with the new third argument also works.
+    check(
+        e.reg
+            .as_account()
+            .call(e.reg.id(), "on_forward")
+            .args_json(json!({ "token_id": s, "amount": "500", "since": "7" }))
+            .max_gas()
+            .transact()
+            .await?,
+    );
+    assert_eq!(num(&e.ledger(&s).await?["undelivered"]), 1_500);
+    // Nobody else can call it.
+    assert!(e
+        .outsider
+        .call(e.reg.id(), "on_forward")
+        .args_json(json!({ "token_id": s, "amount": "1" }))
+        .max_gas()
+        .transact()
+        .await?
+        .is_failure());
+    Ok(())
+}
+
+/// External review H1, end to end on the test build with the short release
+/// window: a forward whose transfer the vault does not show is quarantined,
+/// never resent; the registrar settles it as not delivered; only then does
+/// `retry_forward` send it, once, and the registry stays solvent throughout.
+/// The lost callback is written with `patch_state` (the registry holds the
+/// 80000 as a plain deposit, which is what a failed transfer leaves).
+#[tokio::test]
+async fn f04_a_written_off_forward_is_quarantined_then_resolved_and_resent_once(
+) -> anyhow::Result<()> {
+    let e = setup().await?;
+    e.reg
+        .as_account()
+        .deploy(&wasm("registry_short_stale"))
+        .await?
+        .into_result()?;
+    let w = e.register_work("USRC12600001").await?;
+    let s = e.mint(w, e.writer_a.id(), 10_000).await?;
+    check(
+        e.payer
+            .call(e.usdc.id(), "ft_transfer")
+            .args_json(json!({ "receiver_id": e.reg.id(), "amount": "80000" }))
+            .deposit(ONE_YOCTO)
+            .transact()
+            .await?,
+    );
+    let key = ledger_key(&s);
+    let state = e.worker.view_state(e.reg.id()).await?;
+    let mut raw = state.get(&key).expect("ledger entry").clone();
+    raw[80..84].copy_from_slice(&1u32.to_le_bytes()); // inbound_pending
+    e.worker.patch_state(e.reg.id(), &key, &raw).await?;
+    let mut root = state.get(&b"STATE"[..]).expect("root state").clone();
+    let n = root.len();
+    root[n - 40..n - 24].copy_from_slice(&80_000u128.to_le_bytes()); // forwards_in_flight_total
+    e.worker.patch_state(e.reg.id(), b"STATE", &root).await?;
+    let mut watch = vec![];
+    watch.extend_from_slice(&1u64.to_le_bytes()); // since
+    watch.extend_from_slice(&1u64.to_le_bytes()); // latest
+    watch.extend_from_slice(&80_000u128.to_le_bytes());
+    watch.extend_from_slice(&1u32.to_le_bytes());
+    watch.extend_from_slice(&0u64.to_le_bytes());
+    watch.extend_from_slice(&0u128.to_le_bytes()); // written_off
+    let mut watch_key = b"fwd:".to_vec();
+    watch_key.extend_from_slice(s.as_bytes());
+    e.worker.patch_state(e.reg.id(), &watch_key, &watch).await?;
+    e.assert_solvent().await?;
+
+    e.worker.fast_forward(1_600).await?;
+    let r = ok(e
+        .outsider
+        .call(e.reg.id(), "release_stale_forward")
+        .args_json(json!({ "token_id": s }))
+        .max_gas()
+        .transact()
+        .await?);
+    let ev = event(&r, "forward_released_stale");
+    assert_eq!(
+        (ev["forwards"].as_u64(), ev["quarantined"].as_str()),
+        (Some(1), Some("80000"))
+    );
+    // No balance was read and nothing was credited.
+    let l = e.ledger(&s).await?;
+    assert_eq!(
+        (num(&l["known_balance"]), l["inbound_pending"].as_u64()),
+        (0, Some(0))
+    );
+    // sync stays refused while the quarantine is open.
+    assert!(e
+        .writer_a
+        .call(e.reg.id(), "sync")
+        .args_json(json!({ "token_id": s }))
+        .max_gas()
+        .transact()
+        .await?
+        .is_failure());
+    let acct: Value = e.reg.view("get_accounting").await?.json()?;
+    assert_eq!(
+        num(&acct["forwards_in_flight_total"]),
+        80_000,
+        "quarantined"
+    );
+    assert_eq!(num(&acct["undelivered_total"]), 0);
+    e.assert_solvent().await?;
+    // Nothing can be resent while it is quarantined.
+    assert!(e
+        .outsider
+        .call(e.reg.id(), "retry_forward")
+        .args_json(json!({ "token_id": s }))
+        .max_gas()
+        .transact()
+        .await?
+        .is_failure());
+    // Only the registrar settles it, with 1 yocto and a document hash.
+    let resolve = |who: &near_workspaces::Account, deposit| {
+        who.call(e.reg.id(), "resolve_written_off")
+            .args_json(json!({ "token_id": s, "delivered": false, "doc_hash": hash('d') }))
+            .deposit(deposit)
+            .max_gas()
+            .transact()
+    };
+    assert!(resolve(&e.outsider, ONE_YOCTO).await?.is_failure());
+    assert!(resolve(&e.registrar, NearToken::from_yoctonear(0))
+        .await?
+        .is_failure());
+    let r = ok(resolve(&e.registrar, ONE_YOCTO).await?);
+    assert_eq!(event(&r, "written_off_resolved")["amount"], "80000");
+    let acct: Value = e.reg.view("get_accounting").await?.json()?;
+    assert_eq!(
+        (
+            num(&acct["forwards_in_flight_total"]),
+            num(&acct["undelivered_total"])
+        ),
+        (0, 80_000)
+    );
+    e.assert_solvent().await?;
+    // Now the retry sends it, once.
+    check(
+        e.outsider
+            .call(e.reg.id(), "retry_forward")
+            .args_json(json!({ "token_id": s }))
+            .max_gas()
+            .transact()
+            .await?,
+    );
+    let l = e.ledger(&s).await?;
+    assert_eq!(num(&l["known_balance"]), 80_000);
+    assert_eq!(e.balance(&e.vault(&s)).await?, 80_000);
+    assert!(e
+        .outsider
+        .call(e.reg.id(), "retry_forward")
+        .args_json(json!({ "token_id": s }))
+        .max_gas()
+        .transact()
+        .await?
+        .is_failure());
+    e.assert_solvent().await?;
+    check(e.claim(&e.writer_a, &s).await?);
     e.assert_solvent().await
 }
