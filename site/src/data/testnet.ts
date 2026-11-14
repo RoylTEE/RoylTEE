@@ -65,9 +65,9 @@ export function categoriesOf(s: Scene): string[] {
   return [...c];
 }
 
-/** Code hashes from deployments/testnet.json in the contracts repository (resynced 2026-11-14 02:50 UTC, after the audit redeploy). */
+/** Code hashes from deployments/testnet.json in the contracts repository (updated 2026-11-14 09:30 UTC, after the final contract fixes redeploy). */
 export const DEPLOY_RECORD = {
-  registry: { account: 'reg.royltee-dev.testnet', codeHash: '5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo', sha256: '423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a' },
+  registry: { account: 'reg.royltee-dev.testnet', codeHash: '5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG', sha256: '4378568f0459560130cdb56fa05152f9946116d3332d6c3f7f53e939005dc271' },
   mockUsdc: { account: 'usdc.royltee-dev.testnet', codeHash: '47ybTZxhaJ9ZW3FC9jwaDdLfwgkJ59cCrnkSn5oop67t', sha256: '2e5c896b2ead7d1bd12a2944971d6a393902084cf47616c54d18e7a577efc0bb' },
   vault: { codeHash: 'BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP', sha256: '9e9ef97840a3a3e6967565b43a9c2a467c1925153ea8c5577d666c9b16966cda' },
   /**

@@ -25,19 +25,20 @@
       "The first pay_from_allowance in step 12 (7DJThzgCgnZYf9uNhPgH5ZsuJKx8mJqHkiLcqszdRSTu) was signed with the agent's full-access key before that key was deleted. The report, the refused duplicate pay, and the client-side refused claim used the function-call key.",
       "The agent's claim on s4 with a deposit was refused by the protocol rule (deposit not allowed with a function-call access key) and produced no transaction.",
       "An extra 0.5 NEAR transfer from royltee-dev.testnet to outsider.royltee-dev.testnet ran during step 11, before the refused outsider claim. It is recorded under step 11.",
-      "Resynced to the chain on 2026-11-14T02:50:33Z with read-only RPC (view_account, view_access_key_list, nft_tokens, get_accounting, get_work, get_share_approval, get_vault_code_hash, ft_balance_of, and EXPERIMENTAL_tx_status for the new transactions). The root account balance fell by 2.5092643705036522 NEAR since the first record. All of it is the OutLayer probe spike on branch spike/outlayer: 2.5 NEAR to create probe.royltee-dev.testnet, two transaction fees (0.0071149895375 and 0.0010867809661522) and the 0.0010626 OutLayer charge. That spike is not part of the registry and is recorded on that branch. Both registry redeploys were paid by reg.royltee-dev.testnet."
+      "Resynced to the chain on 2026-11-14T02:50:33Z with read-only RPC (view_account, view_access_key_list, nft_tokens, get_accounting, get_work, get_share_approval, get_vault_code_hash, ft_balance_of, and EXPERIMENTAL_tx_status for the new transactions). The root account balance fell by 2.5092643705036522 NEAR since the first record. All of it is the OutLayer probe spike on branch spike/outlayer: 2.5 NEAR to create probe.royltee-dev.testnet, two transaction fees (0.0071149895375 and 0.0010867809661522) and the 0.0010626 OutLayer charge. That spike is not part of the registry and is recorded on that branch. Both registry redeploys were paid by reg.royltee-dev.testnet.",
+      "Updated on 2026-11-14T09:30:00Z after the final contract fixes redeploy (transaction 52jp95BVJCk6a9bUGyYtYEQq99R56Xiz5zxJ1vCHBJrD, 2026-11-14T09:09:40Z): wasm.registry, accounts.reg and the transaction list now describe code hash 5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG (sha256 4378568f0459560130cdb56fa05152f9946116d3332d6c3f7f53e939005dc271, 748115 bytes). The registry storage went from 731332 to 766489 bytes. The full-access keys of the registry and mock USDC are still present (step 6 parked). The registry has had three redeploys (step 15, the audit F1 redeploy, this one); all used its full-access key. Not re-read in this update: other accounts' balances, token owners and accounting_current."
     ]
   },
   "wasm": {
     "registry": {
       "local_path": "contracts/res/registry.wasm",
-      "size_bytes": 712958,
-      "local_sha256": "423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a",
-      "on_chain_sha256": "423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a",
-      "on_chain_code_hash_base58": "5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo",
+      "size_bytes": 748115,
+      "local_sha256": "4378568f0459560130cdb56fa05152f9946116d3332d6c3f7f53e939005dc271",
+      "on_chain_sha256": "4378568f0459560130cdb56fa05152f9946116d3332d6c3f7f53e939005dc271",
+      "on_chain_code_hash_base58": "5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG",
       "sha256_matches_on_chain": true,
       "in_git": false,
-      "deployed_in": "BGBUJDTnnjpevSUZkdmfeVASxbKHn1FQDAZqj75kH5rU",
+      "deployed_in": "52jp95BVJCk6a9bUGyYtYEQq99R56Xiz5zxJ1vCHBJrD",
       "earlier_deploys": [
         {
           "on_chain_code_hash_base58": "GZkyojcHYDip7pZsDYvkgkjEtgGakPZZcX28cgSyAVhq",
@@ -51,6 +52,13 @@
           "sha256": "0f31232563b1d031ee6d6b6a03060784a018a78fecd812fa68419cb8aabc9e4c",
           "deployed_in": "9oR5awwxiJPouDhpYdTxTquskc8YpoFHdmAJy4SrrAMp",
           "note": "step 15, contract review fixes; replaced by the audit F1 redeploy"
+        },
+        {
+          "on_chain_code_hash_base58": "5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo",
+          "sha256": "423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a",
+          "size_bytes": 712958,
+          "deployed_in": "BGBUJDTnnjpevSUZkdmfeVASxbKHn1FQDAZqj75kH5rU",
+          "note": "audit F1 redeploy; replaced by the final contract fixes redeploy; kept as contracts/tests/fixtures/registry-deployed-423e3799.wasm"
         }
       ]
     },
@@ -122,8 +130,8 @@
         "balance_near": "0.0999553634875"
       },
       "reg.royltee-dev.testnet": {
-        "balance_yocto": "8315306342985943199999993",
-        "balance_near": "8.315306342985943199999993"
+        "balance_yocto": "8309436090103712599999993",
+        "balance_near": "8.309436090103712599999993"
       },
       "usdc.royltee-dev.testnet": {
         "balance_yocto": "2520986807902146000000021",
@@ -264,10 +272,10 @@
       "variable": "REG",
       "account_id": "reg.royltee-dev.testnet",
       "role": "registry contract; full-access key kept (step 6 parked)",
-      "balance_yocto": "8315306342985943199999993",
-      "balance_near": "8.315306342985943199999993",
-      "storage_usage_bytes": 731332,
-      "code_hash_base58": "5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo",
+      "balance_yocto": "8309436090103712599999993",
+      "balance_near": "8.309436090103712599999993",
+      "storage_usage_bytes": 766489,
+      "code_hash_base58": "5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG",
       "keys": [
         {
           "public_key": "ed25519:7T5XuUzh1wUs3kqRw9bc8AUW8bETUZwrJZtXw7U5MTvn",
@@ -2160,6 +2168,32 @@
       "block_timestamp_utc": "2026-11-14T02:43:52.041Z",
       "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
       "note": "registry redeployed in place with the audit fixes (forward gas budget, F1), no init call; code hash 5Taw8Syz...; signed with the registry full-access key"
+    },
+    {
+      "step": "final contract fixes redeploy (atomic deploy and assert_quiescent)",
+      "transaction_hash": "52jp95BVJCk6a9bUGyYtYEQq99R56Xiz5zxJ1vCHBJrD",
+      "signer": "reg.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "DEPLOY_CONTRACT",
+          "method": null
+        },
+        {
+          "action": "FUNCTION_CALL",
+          "method": "assert_quiescent"
+        }
+      ],
+      "method": "DEPLOY_CONTRACT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "5870252882230600000000",
+      "fee_near": "0.0058702528822306",
+      "attached_deposit_yocto": "0",
+      "block_height": 277636549,
+      "block_timestamp_utc": "2026-11-14T09:09:40.509Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "registry redeployed in place with the final contract fixes (quarantine and registrar settlement, settlement sequence, assert_quiescent), one transaction: deploy action then assert_quiescent, so a busy registry would have rolled the deploy back; code hash 5YNk7mvm...; signed with the registry full-access key; the pre-deploy check:quiescent printed SNAPSHOT QUIET at block 277636451; gas 59.0 Tgas"
     }
   ],
   "step_6": {
