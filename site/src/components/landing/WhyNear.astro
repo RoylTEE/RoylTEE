@@ -1,0 +1,59 @@
+---
+import { REGISTRY, EXPLORER } from '../../data/testnet';
+import { AUCTION } from '../../data/auction';
+const passed = AUCTION.verify.checks.filter((c) => c.verdict === 'PASS').length;
+const total = AUCTION.verify.checks.length;
+const items = [
+  { t: 'Named accounts', job: 'Every vault is readable', d: 'Each share vault is a named account, for example s2.reg.royltee-dev.testnet. A label executive can open it in an explorer and see who holds it. Only the registry can create accounts under its name, and it has no control over them afterwards.' },
+  { t: 'Access keys', job: 'Nobody can move a share outside the rules', d: 'A NEAR account with no access keys is locked: nobody can sign for it. We created each vault with none and never add one, so nobody, including us, can move a share around the contract. Only the vault code can pay out, and it obeys only the registry. verify:testnet checks all 15 vaults and finds zero keys. An agent gets a limited key that can call two methods and cannot attach a deposit, which the protocol enforces.', core: true },
+  { t: 'Standards', job: 'Shares and money use published formats', d: 'Shares follow NEP-171 with NEP-177 metadata and NEP-181 enumeration. Money follows NEP-141 (Mock USDC, Simulated). These are published NEAR standards, so tools that follow them can read the shares and the token.' },
+  { t: 'Cost', job: 'Known up front, on testnet', d: 'All of the chain work ran on testnet and cost no real money. From the spend log: deploying the registry cost about 0.0052 NEAR in fees, and settling the auction through the TEE cost about 0.0010 NEAR in OutLayer charges, in testnet NEAR with no value. Storage is paid by locking NEAR at a fixed price, charged to whoever creates the vault. We have not measured mainnet costs.' },
+  { t: 'OutLayer TEE', job: 'Sealed bids, checked on chain', d: `The auction settles through OutLayer, which runs a module in Intel TDX hardware for a NEAR contract. The attestation checks against the chain passed ${passed} of ${total}. Fairness still rests on OutLayer as the executor; the contract bounds the answer but cannot prove the bids were opened honestly.` },
+  { t: 'Public explorer', job: 'Anyone can verify', d: 'Every account and transaction named on this page opens on the public nearblocks testnet explorer. You need no login and no wallet.', link: [EXPLORER, 'Open the explorer'], wide: true },
+];
+---
+<section class="l-sec near" id="near">
+  <div class="container">
+    <div class="l-split head">
+      <div class="l-head">
+        <p class="l-eyebrow">Why NEAR</p>
+        <h2 class="l-h2">What NEAR does for RoylTEE, job by job</h2>
+        <p class="lead">We did not pick NEAR for the name. Each feature below does one concrete job in the registry, and you can check each one yourself.</p>
+      </div>
+      <figure class="motif">
+        <img src="/art/near-vault.webp" width="470" height="388" alt="Flat retro illustration: a domed vault painted with the NEAR mark under a beam of light, with a music note crystal above it." loading="lazy" decoding="async" />
+      </figure>
+    </div>
+    <ul class="items">
+      {items.map((i) => (
+        <li class={i.core ? 'core' : i.wide ? 'wide' : ''}>
+          <p class="l-eyebrow">{i.t}</p>
+          <h3>{i.job}</h3>
+          <p class="muted">{i.d}</p>
+          {i.link && <a class="l-textlink" href={i.link[0]} target="_blank" rel="noopener">{i.link[1]}</a>}
+        </li>
+      ))}
+    </ul>
+    <div class="plan">
+      <span class="badge unv">Plan, not done</span>
+      <p><strong>One honest gap.</strong> On testnet the registry and the mock USDC accounts, {REGISTRY} among them, each still hold one full access key, kept by decision so late fixes stay possible. The vaults are keyless; the registry itself is not. For mainnet the plan is to delete those keys or hand upgrades to a multisig with a time delay. That has not been done, and nothing here has been deployed to mainnet.</p>
+    </div>
+  </div>
+</section>
+<style>
+  .near { background: var(--surface-2); }
+  .head { align-items: end; }
+  .motif { margin: 0; justify-self: end; max-width: 26rem; border-radius: var(--r-card); overflow: hidden; border: 1px solid var(--edge); background: var(--night); box-shadow: var(--shadow-1); }
+  .motif img { width: 100%; height: auto; }
+  .items { list-style: none; margin: var(--s7) 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s4); }
+  .items li { display: grid; gap: var(--s2); align-content: start; padding: var(--s5); background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-card); box-shadow: var(--shadow-1); }
+  .items li.core { grid-column: span 2; border-color: var(--ink); border-width: 2px; }
+  .items li.wide { grid-column: 1 / -1; grid-template-columns: 1fr; }
+  h3 { font-size: var(--fs-18); font-weight: 600; line-height: 1.25; }
+  .items p.muted { font-size: var(--fs-14); line-height: 1.6; }
+  .items a { justify-self: start; }
+  .plan { display: flex; gap: var(--s4); align-items: flex-start; margin-top: var(--s5); padding: var(--s4) var(--s5); border: 1px dashed var(--bad-line); border-radius: var(--r-card); background: var(--surface); font-size: var(--fs-14); line-height: 1.6; color: var(--ink-2); }
+  .plan .badge { flex: none; margin-top: .1rem; }
+  @media (max-width: 1023px) { .items { grid-template-columns: repeat(2, 1fr); } .items li.core, .items li.wide { grid-column: span 2; } .motif { justify-self: start; } }
+  @media (max-width: 639px) { .items { grid-template-columns: 1fr; } .items li.core, .items li.wide { grid-column: auto; } .plan { flex-direction: column; } }
+</style>

@@ -1,0 +1,26 @@
+---
+import { DASHBOARD_URL } from '../../consts';
+---
+<section class="close" id="start">
+  <img class="bg" src="/art/cta-closing.webp" width="1584" height="672" alt="Flat retro illustration: the doors of a domed vault stand open at dawn at the end of a winding path, with a music note crystal glowing above." loading="lazy" decoding="async" />
+  <div class="shade" aria-hidden="true"></div>
+  <div class="container inner">
+    <h2 class="l-h2">Come and check it yourself</h2>
+    <p class="lead">It already works on testnet. Open the demo, ask a public node for the keys of any share vault, or read how it is built. No wallet needed.</p>
+    <div class="actions">
+      <a class="btn l-btn-amber" href={DASHBOARD_URL}>Open the demo dashboard</a>
+      <a class="btn l-btn-ghost" href="/verify">Verify on testnet</a>
+      <a class="btn l-btn-ghost" href="/whitepaper">Read the whitepaper</a>
+    </div>
+  </div>
+</section>
+<style>
+  .close { position: relative; isolation: isolate; background: var(--night); color: var(--cream); padding: var(--s9) 0; overflow: hidden; min-height: 26rem; display: flex; align-items: center; }
+  .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: right center; z-index: -2; }
+  .shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(19,12,10,.92) 0%, rgba(19,12,10,.8) 38%, rgba(19,12,10,.1) 75%); }
+  .inner { display: grid; gap: var(--s4); justify-items: start; }
+  .inner > * { max-width: 34rem; }
+  .l-h2 { color: #fff; }
+  .lead { color: var(--cream); }
+  @media (max-width: 767px) { .close { padding: var(--s7) 0; } .shade { background: rgba(19,12,10,.8); } }
+</style>

@@ -1,12 +1,13 @@
 ---
-import '@fontsource-variable/inter-tight';
+import '@fontsource-variable/hanken-grotesk';
 import '@fontsource-variable/jetbrains-mono';
 import '../styles/global.css';
+import AnnounceBar from '../components/AnnounceBar.astro';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import { PROJECT_NAME, PITCH } from '../consts';
-interface Props { title?: string; description?: string; current?: string }
-const { title = PROJECT_NAME, description = PITCH, current = '' } = Astro.props;
+interface Props { title?: string; description?: string; current?: string; announce?: boolean }
+const { title = PROJECT_NAME, description = PITCH, current = '', announce = false } = Astro.props;
 /* Set by src/middleware.ts on wallet sign in pages only. The browser hides the nonce attribute from the DOM; scripts read it from the element. */
 const cspNonce = Astro.locals.cspNonce;
 ---
@@ -22,6 +23,7 @@ const cspNonce = Astro.locals.cspNonce;
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
+    {announce && <AnnounceBar />}
     <div class="testnet-bar" role="note">
       <span class="badge sim">Testnet</span>
       <span>NEAR testnet only. Payments use Mock USDC (testnet), a token with no value.</span>

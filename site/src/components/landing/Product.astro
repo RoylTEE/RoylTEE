@@ -1,0 +1,28 @@
+---
+import { DASHBOARD_URL } from '../../consts';
+---
+<section class="l-sec prod" id="product">
+  <div class="container">
+    <div class="l-head">
+      <p class="l-eyebrow">How it works, on screen</p>
+      <h2 class="l-h2">See it on the dashboard</h2>
+      <p class="lead">This is the live demo dashboard: totals, split sheets and what needs attention, read from NEAR testnet with view calls.</p>
+    </div>
+    <figure class="frame">
+      <div class="bar" aria-hidden="true"><span></span><span></span><span></span></div>
+      <img src="/art/dashboard-overview.webp" width="1440" height="820" alt="Screenshot of the demo dashboard Overview page: a Start here panel, then a statement with opening balance, payments in, claims and closing balance in Mock USDC, and a count of 15 share accounts with 0 keys." loading="lazy" decoding="async" />
+      <div class="tags"><span class="badge info">Testnet demo</span><span class="badge sim">Simulated money</span></div>
+    </figure>
+    <p class="caption cap">Screenshot of the demo dashboard, captured 2026-11-14 (UTC). Money is Mock USDC (testnet), a token with no value, and the payer is a test account (Simulated). <a class="link" href={DASHBOARD_URL}>Open the live dashboard</a>.</p>
+  </div>
+</section>
+<style>
+  .prod { border-top: 0 !important; padding-top: 0; }
+  .frame { position: relative; margin: 0; border: 1px solid var(--edge); border-radius: 12px; overflow: hidden; background: var(--surface); box-shadow: 0 24px 60px rgba(23,21,15,.16), var(--shadow-1); }
+  .bar { display: flex; gap: .4rem; padding: .7rem .9rem; background: var(--paper-2); border-bottom: 1px solid var(--rule); }
+  .bar span { width: .65rem; height: .65rem; border-radius: 50%; background: var(--edge); }
+  .frame img { width: 100%; height: auto; }
+  .tags { position: absolute; top: .5rem; right: .75rem; display: flex; gap: var(--s2); }
+  .cap { margin-top: var(--s4); max-width: 46rem; }
+  @media (max-width: 639px) { .tags { position: static; padding: var(--s3); background: var(--paper-2); border-top: 1px solid var(--rule); } .bar { display: none; } }
+</style>

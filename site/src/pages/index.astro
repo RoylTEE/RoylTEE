@@ -1,26 +1,21 @@
 ---
 import Base from '../layouts/Base.astro';
-import { DASHBOARD_URL, PITCH, PROJECT_NAME } from '../consts';
+import '../styles/landing.css';
+import { DASHBOARD_URL, PITCH } from '../consts';
 import { REGISTRY, SCENES, txUrl, accountUrl } from '../data/testnet';
-/* Work 0 as read from testnet view calls on 2026-11-13 (UTC). The registry pages show the live values. */
-const sheet = [
-  { id: 's1', holder: 'writer-a.royltee-dev.testnet', name: 'Writer A', role: 'Publishing', basis: 'copyright', bps: 5000, vault: 's1.reg.royltee-dev.testnet' },
-  { id: 's2', holder: 'buyer-pub.royltee-dev.testnet', name: 'Buyer publisher', role: 'Publishing', basis: 'copyright', bps: 5000, vault: 's2.reg.royltee-dev.testnet', sold: true },
-];
+import Problem from '../components/landing/Problem.astro';
+import Tech from '../components/landing/Tech.astro';
+import WhyNear from '../components/landing/WhyNear.astro';
+import Tracks from '../components/landing/Tracks.astro';
+import Origin from '../components/landing/Origin.astro';
+import Flow from '../components/landing/Flow.astro';
+import Product from '../components/landing/Product.astro';
+import Audience from '../components/landing/Audience.astro';
+import Compare from '../components/landing/Compare.astro';
+import Proof from '../components/landing/Proof.astro';
+import Latest from '../components/landing/Latest.astro';
+import Closing from '../components/landing/Closing.astro';
 const sale = SCENES.filter((s) => s.tokens.includes('s2') || (s.step === 'Refusal'));
-const people = [
-  { who: 'Songwriters and artists', job: 'Check the split on record, see what each share earned, claim it.', where: 'Your shares', href: '/member' },
-  { who: 'Publishers and labels', job: 'Hold shares, run a payment agent, and approve split sheets for works they registered.', where: 'Split sheets', href: '/catalog/splits/' },
-  { who: 'Catalog buyers', job: 'Confirm the share, the payout account, that the seller kept no key, and that unclaimed money came along.', where: 'Share accounts', href: '/shares/accounts/' },
-  { who: 'Payers and their agents', job: 'Pay a work once, inside fixed limits, without ever choosing the payee.', where: 'Agents', href: '/agents' },
-  { who: 'Registrar', job: 'Admit members, resolve disputes with a document hash, answer support.', where: 'Registrar', href: '/registrar' },
-];
-const steps = [
-  { t: 'Register the work and its shares', d: 'A member records the song by ISRC or ISWC, then one share per rightholder in basis points (100 basis points is 1 percent). Each share is minted as an NFT, and the registry opens a payout account for it with no access keys.', m: 'register_work, register_share' },
-  { t: 'Pay the work once', d: 'A payer sends Mock USDC (testnet) to the registry, naming the work, the period and a statement hash. The registry splits it by basis points into each share account in the same transaction. The parts add up to the payment exactly.', m: 'ft_transfer_call' },
-  { t: 'The holder claims', d: 'Whoever holds the share NFT at that moment can move its balance to themselves. Nobody else can, and there is no key on the account to steal.', m: 'claim' },
-  { t: 'Sell the share', d: 'Selling moves the NFT to another verified member. The payout address stays the same, so payers change nothing. Unclaimed money goes with the share.', m: 'nft_transfer' },
-];
 const holder = ['Claim the balance of its share account', 'Transfer the share to another verified member', 'Set a short public note on the share (CLI only in this demo)', 'Confirm a co-holder share of the same work (CLI only in this demo)'];
 const agent = ['Pay a work or share from its allowance', 'Report a statement line', 'Stay under a per payment limit, a 24 hour limit and a daily count'];
 const nobody = ['Choose where an agent payment goes', 'Change a split alone (except the registrar resolving a dispute, with a document hash)', 'Add a key to a share account', 'Pay the same statement line twice'];
@@ -34,91 +29,36 @@ const real = [
 const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application/json' \\
   -d '{"jsonrpc":"2.0","id":1,"method":"query","params":{"request_type":"view_access_key_list","finality":"final","account_id":"s2.reg.royltee-dev.testnet"}}'`;
 ---
-<Base current="home">
+<Base current="home" announce>
   <section class="hero">
-    <div class="container hero-grid">
+    <img class="hero-art" src="/art/hero.webp" width="1376" height="768" fetchpriority="high" decoding="async" alt="Flat retro illustration: a vintage ribbon microphone hovers over a domed vault marked with the NEAR logo, scanning a glowing music note crystal. Lit markers on nearby cliffs are joined to the vault by dotted lines." />
+    <div class="hero-scrim" aria-hidden="true"></div>
+    <div class="container">
       <div class="hero-copy">
-        <p class="eyebrow">Music rights registry, live on NEAR testnet</p>
+        <p class="l-eyebrow">A permissioned registry for music rights shares on NEAR</p>
         <h1>{PITCH}</h1>
-        <p class="lead">The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it. The registry account itself still holds one full access key on testnet; see Real and Simulated below.</p>
+        <p class="sub">The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.</p>
         <div class="actions">
-          <a class="btn primary" href={DASHBOARD_URL}>Open the registry</a>
-          <a class="btn" href="/verify">Verify every claim</a>
-          <a class="btn" href="#verify">Check it yourself</a>
+          <a class="btn l-btn-amber" href={DASHBOARD_URL}>Open the demo dashboard</a>
+          <a class="btn l-btn-ghost" href="/verify">Verify on testnet</a>
         </div>
-        <p class="caption">Registry contract <a class="acct-link" href={accountUrl(REGISTRY)} target="_blank" rel="noopener">{REGISTRY}</a></p>
-      </div>
-      <figure class="sheet" aria-labelledby="sheet-cap">
-        <div class="sheet-head">
-          <div>
-            <p class="eyebrow">Split sheet</p>
-            <p class="sheet-title">Work 0 <span class="mono dim">ISRC ZZRYL2600001</span></p>
-          </div>
-          <span class="badge ok">Complete</span>
-        </div>
-        <dl class="sheet-meta">
-          <div><dt>Provenance</dt><dd>Human</dd></div>
-          <div><dt>Right</dt><dd>Publishing</dd></div>
-          <div><dt>Territory</dt><dd>World</dd></div>
-        </dl>
-        <div class="table-wrap">
-          <table class="ledger">
-            <thead><tr><th>Rightholder</th><th>Share</th><th class="num">Percent</th><th class="num">Keys</th></tr></thead>
-            <tbody>
-              {sheet.map((r) => (
-                <tr>
-                  <td><span class="holder">{r.name}</span><span class="acct dim">{r.holder.replace('.royltee-dev.testnet', '')}</span>{r.sold && <span class="badge info">Bought in catalog sale</span>}</td>
-                  <td class="mono"><a class="link" href={`/share?id=${r.id}`}>{r.id}</a></td>
-                  <td class="num">{(r.bps / 100).toFixed(2)}%</td>
-                  <td class="num x">0</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot><tr><td colspan="2">Total</td><td class="num">100.00%</td><td></td></tr></tfoot>
-          </table>
-        </div>
-        <figcaption id="sheet-cap" class="caption">Read from testnet on 2026-11-13 (UTC). <a class="link" href={DASHBOARD_URL}>See the live values</a>.</figcaption>
-      </figure>
-    </div>
-  </section>
-
-  <section class="section" id="problem">
-    <div class="container">
-      <div class="section-head">
-        <p class="eyebrow">Who it is for</p>
-        <h2>Every song has many owners, and every payer keeps its own list</h2>
-        <p class="lead">Split sheets, contracts and payer databases often disagree, and a catalog sale has to reach every payer before money goes to the new owner. {PROJECT_NAME} keeps one record per share that every member reads.</p>
-      </div>
-      <div class="panel">
-        <div class="table-wrap">
-          <table class="ledger people rows-sm">
-            <thead><tr><th>Who</th><th>What they need to do</th><th>Where</th></tr></thead>
-            <tbody>{people.map((p) => <tr><td class="p"><strong>{p.who}</strong></td><td class="m wrap">{p.job}</td><td class="p-end"><a class="link" href={p.href}>{p.where}</a></td></tr>)}</tbody>
-          </table>
-        </div>
+        <p class="caption">Live on NEAR testnet. Registry contract <a class="acct-link" href={accountUrl(REGISTRY)} target="_blank" rel="noopener">{REGISTRY}</a>. The registry account itself still holds one full access key on testnet; see Real and Simulated below.</p>
       </div>
     </div>
   </section>
 
-  <section class="section" id="how">
-    <div class="container">
-      <div class="section-head">
-        <p class="eyebrow">How it works</p>
-        <h2>Four steps, all enforced by the contract</h2>
-      </div>
-      <ol class="steps">
-        {steps.map((s, i) => (
-          <li>
-            <span class="step-n mono">{String(i + 1).padStart(2, '0')}</span>
-            <div><h3>{s.t}</h3><p class="muted">{s.d}</p></div>
-            <code class="step-m">{s.m}</code>
-          </li>
-        ))}
-      </ol>
-    </div>
-  </section>
+  <Problem />
+  <Audience />
+  <Flow />
+  <Product />
+  <Tech />
+  <WhyNear />
+  <Tracks />
+  <Compare />
+  <Proof />
+  <Latest />
 
-  <section class="section" id="lifecycle">
+  <section class="section details" id="lifecycle">
     <div class="container">
       <div class="section-head">
         <p class="eyebrow">The catalog sale, on testnet</p>
@@ -191,33 +131,29 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
       <p class="muted">The <a class="link" href="/verify">Verify page</a> lists every claim with its code, its test and its transaction, runs the live checks in your browser, and shows what happens when someone tries to break it. The <a class="link" href="/whitepaper">whitepaper</a> (version 1.0, also as a <a class="link" href="/royltee-whitepaper.pdf" download>PDF</a>) explains the design and what is Simulated or UNVERIFIED. The <a class="link" href="/auction">Auction page</a> walks through the sealed-bid sale of a share that ran in a TEE, step by step, with its attestation proof.</p>
     </div>
   </section>
+  <Origin />
+  <Closing />
 </Base>
 
 <style>
-  .hero { padding: var(--s8) 0 var(--s9); }
-  .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: var(--s8); align-items: center; }
-  .hero-copy { display: grid; gap: var(--s5); justify-items: start; }
-  .hero-copy h1 { max-width: 15ch; }
-  .sheet { margin: 0; background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-card); box-shadow: var(--shadow-1); overflow: hidden; }
-  .sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s4); padding: var(--s5); border-bottom: 1px solid var(--rule); }
-  .sheet-title { font-size: var(--fs-22); font-weight: 600; margin-top: .25rem; }
-  .sheet-title .mono { font-size: var(--fs-14); font-weight: 500; margin-left: .5rem; }
-  .sheet-meta { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; border-bottom: 1px solid var(--rule); }
-  .sheet-meta div { padding: var(--s3) var(--s5); border-right: 1px solid var(--rule); }
-  .sheet-meta div:last-child { border-right: 0; }
-  .sheet-meta dt { font-size: var(--fs-12); color: var(--dim); }
-  .sheet-meta dd { margin: 0; font-weight: 600; font-size: var(--fs-14); }
-  .sheet .holder { display: block; font-weight: 600; }
-  .sheet .acct { display: block; font-size: var(--fs-12); }
-  .sheet .badge { margin-top: .35rem; }
-  .sheet figcaption { padding: var(--s3) var(--s5); border-top: 1px solid var(--rule); }
-  .people td:first-child { white-space: nowrap; }
-  .steps { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--ink); }
-  .steps li { display: grid; grid-template-columns: 4rem 1fr 14rem; gap: var(--s5); padding: var(--s5) 0; border-bottom: 1px solid var(--rule); align-items: start; }
-  .steps h3 { margin-bottom: .35rem; }
-  .steps p { max-width: 42rem; }
-  .step-n { font-size: var(--fs-22); font-weight: 600; color: var(--amber-ink); }
-  .step-m { font-family: var(--mono); font-size: var(--fs-14); color: var(--muted); justify-self: end; text-align: right; }
+  .hero { position: relative; isolation: isolate; background: var(--night); color: var(--cream); height: clamp(40rem, 55vw, 57.5rem); display: flex; align-items: center; overflow: hidden; }
+  .hero-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 72% 15%; z-index: -2; }
+  .hero-scrim { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(19,12,10,.92) 0%, rgba(19,12,10,.82) 34%, rgba(19,12,10,.4) 56%, rgba(19,12,10,0) 72%), linear-gradient(0deg, rgba(19,12,10,.35) 0%, rgba(19,12,10,0) 30%); }
+  .hero-copy { display: grid; gap: var(--s5); justify-items: start; max-width: 36rem; padding: var(--s8) 0; }
+  .hero-copy .l-eyebrow { color: var(--amber); }
+  .hero-copy h1 { font-size: clamp(2.5rem, 1.6rem + 2.6vw, 4rem); font-weight: 400; line-height: 1.04; letter-spacing: -.035em; color: #fff; }
+  .hero-copy .sub { font-size: var(--fs-18); line-height: 1.5; color: var(--cream); max-width: 32rem; }
+  .hero-copy .caption { color: var(--cream-dim); max-width: 32rem; line-height: 1.5; }
+  .hero-copy .caption a { color: var(--cream); }
+  .hero .btn.primary { min-height: 3rem; }
+  .hero .btn.l-btn-ghost { min-height: 3rem; }
+  @media (max-width: 767px) {
+    .hero { display: block; height: auto; }
+    .hero-art { position: relative; inset: auto; height: 17.5rem; object-position: 78% 20%; }
+    .hero-scrim { inset: 0 0 auto 0; height: 17.5rem; background: linear-gradient(0deg, rgba(19,12,10,1) 0%, rgba(19,12,10,0) 45%); }
+    .hero-copy { padding: var(--s2) 0 var(--s7); }
+    .hero-copy h1 { font-size: 2.375rem; }
+  }
   .powers { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s5); }
   .checks { list-style: none; margin: 0; padding: var(--s3) var(--s5) var(--s4); display: grid; }
   .checks li { padding: .6rem 0 .6rem 1.6rem; border-bottom: 1px solid var(--rule); position: relative; font-size: var(--fs-14); }
@@ -225,15 +161,9 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
   .checks li::before { content: ''; position: absolute; left: .1rem; top: .95rem; width: .7rem; height: .4rem; border-left: 2px solid var(--ok); border-bottom: 2px solid var(--ok); transform: rotate(-45deg); }
   .checks.no li::before { width: .75rem; height: 2px; border: 0; background: var(--bad); transform: none; top: 1.15rem; }
   .code { margin: 0 0 var(--s4); padding: var(--s4) var(--s5); background: var(--ink); color: #f1eee6; border-radius: var(--r-card); overflow-x: auto; font-family: var(--mono); font-size: var(--fs-14); line-height: 1.6; }
-  @media (max-width: 991px) {
-    .hero-grid { grid-template-columns: 1fr; gap: var(--s6); }
-    .powers { grid-template-columns: 1fr; }
-    .steps li { grid-template-columns: 3rem 1fr; }
-    .step-m { grid-column: 2; justify-self: start; text-align: left; }
-  }
-  @media (max-width: 767px) {
-    .hero { padding: var(--s6) 0 var(--s7); }
-    .sheet-head, .sheet-meta div, .sheet figcaption { padding-left: var(--s4); padding-right: var(--s4); }
-    .people td:first-child { white-space: normal; }
-  }
+  .details { border-top: 1px solid var(--rule); }
+  @media (max-width: 991px) { .powers { grid-template-columns: 1fr; } }
+</style>
+<style is:global>
+  html body footer.site-foot { margin-top: 0; }
 </style>

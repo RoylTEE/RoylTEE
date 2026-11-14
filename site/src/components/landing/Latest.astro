@@ -1,0 +1,34 @@
+---
+import { LATEST } from '../../data/landing';
+---
+<section class="l-sec" id="latest">
+  <div class="container">
+    <div class="l-head">
+      <p class="l-eyebrow">Latest on testnet</p>
+      <h2 class="l-h2">The newest recorded transactions</h2>
+      <p class="lead">Each card is a real transaction from the recorded demo, dated from the chain. Open it on the explorer.</p>
+    </div>
+    <ul class="latest">
+      {LATEST.map((l) => (
+        <li>
+          <div class="top"><span class="mono when">{l.when}</span><span class="badge info">{l.step}</span>{l.simulated && <span class="badge sim">Simulated</span>}</div>
+          <p class="what">{l.what}</p>
+          <p class="muted shows">{l.shows}</p>
+          <a class="acct-link" href={l.txHref} target="_blank" rel="noopener">{l.tx.slice(0, 8)}</a>
+        </li>
+      ))}
+    </ul>
+    <p class="more"><a class="l-textlink" href="/activity">All recorded activity</a></p>
+  </div>
+</section>
+<style>
+  .latest { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s4); }
+  .latest li { display: grid; gap: var(--s3); align-content: start; padding: var(--s5); background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-card); box-shadow: var(--shadow-1); min-width: 0; }
+  .top { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+  .when { font-size: var(--fs-12); color: var(--dim); width: 100%; }
+  .what { font-weight: 600; font-size: var(--fs-14); line-height: 1.45; }
+  .shows { font-size: var(--fs-14); line-height: 1.5; }
+  .more { margin-top: var(--s4); }
+  @media (max-width: 1099px) { .latest { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 599px) { .latest { grid-template-columns: 1fr; } }
+</style>

@@ -1,0 +1,23 @@
+---
+import { PROJECT_NAME, SOURCE_URL } from '../../consts';
+---
+<section class="l-sec" id="origin">
+  <div class="container origin">
+    <div class="l-head">
+      <p class="l-eyebrow">Where this started</p>
+      <h2 class="l-h2">Built at NEAR HACKATHON</h2>
+    </div>
+    <div class="txt">
+      <p>{PROJECT_NAME} was built at <a class="link" href="https://nearhackathon.com" rel="noopener">NEAR HACKATHON</a>, whose development phase ran from 2026-11-01 00:00 UTC to 2026-11-14 23:59 UTC. It is entered in three tracks: <span class="l-tag">nfts</span> <span class="l-tag">privacy</span> <span class="l-tag">security</span>.</p>
+      <p class="muted">It is an independent project that runs on NEAR testnet only. No endorsement by NEAR or the event organizers is implied. The code is open on <a class="link" href={SOURCE_URL} rel="noopener">GitHub</a> under the MIT license.</p>
+    </div>
+  </div>
+</section>
+<style>
+  .origin { display: grid; grid-template-columns: 1fr 1.3fr; gap: var(--s8); align-items: start; }
+  .origin .l-head { margin-bottom: 0; }
+  .txt { display: grid; gap: var(--s4); font-size: var(--fs-18); line-height: 1.55; max-width: 36rem; }
+  .txt .muted { font-size: var(--fs-16); }
+  .l-tag { vertical-align: .1em; margin-right: .25rem; }
+  @media (max-width: 899px) { .origin { grid-template-columns: 1fr; gap: var(--s5); } }
+</style>

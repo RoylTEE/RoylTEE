@@ -21,7 +21,7 @@ describe('grounding notes', () => {
       const page = path === '/' ? 'src/pages/index.astro' : path === '/dashboard/' ? 'src/pages/dashboard.astro' : path.endsWith('/') ? (existsSync(join(root, `src/pages${path}index.astro`)) ? `src/pages${path}index.astro` : `src/pages${path.slice(0, -1)}.astro`) : `src/pages${path}.astro`;
       expect(existsSync(join(root, page)), href).toBe(true);
       if (anchor) {
-        const source = readFileSync(join(root, page), 'utf8') + (anchor === 'notice' ? readFileSync(join(root, 'src/components/Footer.astro'), 'utf8') : '');
+        const source = readFileSync(join(root, page), 'utf8') + (anchor === 'notice' ? readFileSync(join(root, 'src/components/Footer.astro'), 'utf8') : '') + (page === 'src/pages/index.astro' ? readdirSync(join(root, 'src/components/landing')).map(f => readFileSync(join(root, 'src/components/landing', f), 'utf8')).join('\n') : '');
         expect(source, href).toMatch(new RegExp(`id="${anchor}"`));
       }
     }
