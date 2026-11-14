@@ -1,0 +1,521 @@
+{
+  "network": "testnet",
+  "record": {
+    "written_at_utc": "2026-11-14T11:30:00Z",
+    "git_branch": "feat/tee-auction",
+    "cli": {
+      "name": "near-cli-rs",
+      "version": "0.31.1"
+    },
+    "outlayer_verify": {
+      "tool": "outlayer-verify",
+      "git": "https://github.com/out-layer/outlayer-verify",
+      "rev": "90c27d9",
+      "api": "https://testnet-api.outlayer.ai",
+      "evidence_file": "deployments/auction-settle-verify.txt"
+    },
+    "notes": [
+      "Testnet only. Simulated money: all mock USDC amounts are Simulated. Public keys only; no private keys or seed phrases.",
+      "Steps 17a to 17m of DEPLOY_PLAN were run on 2026-11-14 UTC, each chain write after its own owner yes. Step 17e (the OutLayer secret access rule) was set by the owner in the OutLayer dashboard with a wallet; no transaction id is recorded by this project. It was read back from outlayer.testnet (secrets_exist true) and the rule is: Logic And[WasmHash(c4a29e55...), Predecessor Whitelist[auction.royltee-dev.testnet]]; storage deposit 0.00692 NEAR. Steps 17l (recovery calls) and 17n (delete the auction key) were NOT run: 17l was not needed, 17n is not run by decision (the key stays, review B).",
+      "17b ends in a failure on purpose: the FastFS upload is a 1 Tgas call to outlayer.testnet __fastdata_fastfs, signed by the auction account, which has no such method. The failure is MethodNotFound on the receiver; FastFS reads the transaction data and serves the module anyway (sha256 c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e).",
+      "17i ended the auction 20 minutes after sending (ends_at 1794652730000000000, 2026-11-14T10:38:50Z) instead of the 10 minutes in the plan, so that both bids fit.",
+      "17k: the transaction landed in block 277645673 at 10:39:05Z; the OutLayer execution happened later, at 10:41:00Z by the verifier's record, and its callback finished the sale.",
+      "When this file was written, the registry record in deployments/testnet.json on the auction branch was the audit F1 snapshot. The registry on chain was redeployed afterwards (final contract fixes, 52jp95BV..., code hash 5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG). After the branches were merged, deployments/testnet.json holds the up to date registry record, and npm run verify:testnet checks both records.",
+      "Read only checks were made with RPC view calls on 2026-11-14 at about 11:05 to 11:30 UTC (block heights 277648160 to 277649644)."
+    ]
+  },
+  "contract": {
+    "account": "auction.royltee-dev.testnet",
+    "role": "sealed-bid share auction, a credentialed member of the registry at a sibling account",
+    "code_sha256": "48d32c71de83d94a4225502a726b80bd678ac3dfb1471952c93c4c16595a8d09",
+    "code_hash_base58": "5uH7oSKPQqGs83CfHfuuqLJA4b3tgoJnaLATkVf683ma",
+    "storage_usage_bytes": 344490,
+    "balance_yocto": "5996289027553430999999996",
+    "balance_near": "5.996289027553430999999996",
+    "deployed_in": "EWWMu3chsa56hBybTpZ5hgiM6bazXRBekESv7KzpWYEt",
+    "keys": [
+      {
+        "public_key": "ed25519:3jmMtwTbYKBZJjEE7F9zRLZZsNx612unoMzEk9m9QsUF",
+        "permission": "full_access",
+        "note": "kept on purpose (review B, step 17n not run): the operator recovery calls need it"
+      }
+    ],
+    "key_count": 1,
+    "config_read_back": {
+      "registry": "reg.royltee-dev.testnet",
+      "usdc": "usdc.royltee-dev.testnet",
+      "outlayer": "outlayer.testnet",
+      "wasm_url": "https://test.fastfs.io/auction.royltee-dev.testnet/outlayer.testnet/c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e.wasm",
+      "wasm_hash": "c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e",
+      "secrets_account": "royltee-admin.testnet",
+      "secrets_profile": "royltee-auction",
+      "limits": {
+        "max_instructions": 1000000000,
+        "max_memory_mb": 64,
+        "max_execution_seconds": 30
+      },
+      "next_id": "1",
+      "pricing_rule": "second_price_with_reserve"
+    },
+    "tee_pubkey": "6260be000b604a3998c530ab429092285dc806d2712d138b90b2a5ec723a692f",
+    "key_version": 1,
+    "is_active_member": true
+  },
+  "wasi_module": {
+    "sha256": "c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e",
+    "url": "https://test.fastfs.io/auction.royltee-dev.testnet/outlayer.testnet/c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e.wasm",
+    "built_for_account": "auction.royltee-dev.testnet",
+    "build_target": "wasm32-wasip1",
+    "uploaded_in": "4c4xPqRuuhfcmj949aMzDB8VuvxGYFNiWK6B5cxMBrG1"
+  },
+  "outlayer": {
+    "account": "outlayer.testnet",
+    "secrets_ref": {
+      "account_id": "royltee-admin.testnet",
+      "profile": "royltee-auction"
+    },
+    "access_rule": "Logic And[WasmHash(c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e), Predecessor Whitelist[auction.royltee-dev.testnet]]",
+    "secrets_exist_read_back": true,
+    "requests": [
+      {
+        "step": "17f",
+        "request_id": 44227,
+        "what": "publish_key, key stored",
+        "charged_near": "0.0011308003"
+      },
+      {
+        "step": "17g1",
+        "request_id": 44242,
+        "what": "outsider names the auction as contract: refused by the keystore, return null, 0 instructions",
+        "charged_near": "0.001",
+        "refunded_near": "0.019"
+      },
+      {
+        "step": "17g2",
+        "request_id": 44261,
+        "what": "outsider names itself as contract: refused, return null, 0 instructions",
+        "charged_near": "0.001",
+        "refunded_near": "0.019"
+      },
+      {
+        "step": "17k",
+        "request_id": 44422,
+        "task": 106286,
+        "what": "settle, 18959851 instructions, 383 ms",
+        "charged_near": "0.0010383018",
+        "refunded_near": "0.0189616982"
+      }
+    ],
+    "secrets_row_created_at_utc": "2026-11-14T10:02:24Z",
+    "secrets_row_read_back": "get_secrets on outlayer.testnet, read only, 2026-11-14 about 11:30 UTC: accessor WasmHash c4a29e55..., profile royltee-auction, owner royltee-admin.testnet, access Logic And[WasmHash c4a29e55..., Predecessor Whitelist[auction.royltee-dev.testnet]], storage_deposit 6920000000000000000000 yocto (0.00692 NEAR); the encrypted payload was not recorded"
+  },
+  "transactions": [
+    {
+      "step": "related: registry final redeploy (recorded in full on branch fix/final-contract)",
+      "transaction_hash": "52jp95BVJCk6a9bUGyYtYEQq99R56Xiz5zxJ1vCHBJrD",
+      "signer": "reg.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "DEPLOY_CONTRACT",
+          "method": null
+        },
+        {
+          "action": "FUNCTION_CALL",
+          "method": "assert_quiescent"
+        }
+      ],
+      "method": "DEPLOY_CONTRACT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "5870252882230600000000",
+      "fee_near": "0.0058702528822306",
+      "attached_deposit_yocto": "0",
+      "block_height": 277636549,
+      "block_timestamp_utc": "2026-11-14T09:09:40.509Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "registry redeployed in place with the final contract fixes (quarantine and registrar settlement, settlement sequence, assert_quiescent), one transaction: deploy action then assert_quiescent, so a busy registry would have rolled the deploy back; code hash 5YNk7mvm...; signed with the registry full-access key; the pre-deploy check:quiescent printed SNAPSHOT QUIET at block 277636451; gas 59.0 Tgas"
+    },
+    {
+      "step": "auction 17a",
+      "transaction_hash": "6c1KYbcDcNvYqzLUMTyiPWWoouSLprQhViPrtoY4punJ",
+      "signer": "royltee-dev.testnet",
+      "receiver": "auction.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "CREATE_ACCOUNT",
+          "method": null
+        },
+        {
+          "action": "TRANSFER",
+          "method": null
+        },
+        {
+          "action": "ADD_KEY",
+          "method": null
+        }
+      ],
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "7114989537500000000000",
+      "fee_near": "0.0071149895375",
+      "attached_deposit_yocto": "6000000000000000000000000",
+      "block_height": 277639017,
+      "block_timestamp_utc": "2026-11-14T09:33:49.715Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "auction account auction.royltee-dev.testnet created by the root account with 6 NEAR and one full-access key (public key ed25519:3jmMtwTbYKBZJjEE7F9zRLZZsNx612unoMzEk9m9QsUF); the auction contract is on branch feat/tee-auction"
+    },
+    {
+      "step": "auction 17b",
+      "transaction_hash": "4c4xPqRuuhfcmj949aMzDB8VuvxGYFNiWK6B5cxMBrG1",
+      "signer": "auction.royltee-dev.testnet",
+      "receiver": "outlayer.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "__fastdata_fastfs"
+        }
+      ],
+      "method": "__fastdata_fastfs",
+      "success": false,
+      "result": "failed with MethodNotFound on outlayer.testnet, expected (FastFS reads the transaction data)",
+      "fee_yocto": "1039611063210400000000",
+      "fee_near": "0.0010396110632104",
+      "attached_deposit_yocto": "0",
+      "block_height": 277639509,
+      "block_timestamp_utc": "2026-11-14T09:38:41.342Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "FastFS upload of the auction WASI module, signed by the auction account with a 1 Tgas call to outlayer.testnet __fastdata_fastfs. The call fails with MethodNotFound on the receiver by design of FastFS: the upload is read from the transaction data, not executed. FastFS serves the module with sha256 c4a29e55ca61da2e069bdcfebd4d4e6690820620582ed2635d1dd6bc17c2594e"
+    },
+    {
+      "step": "auction 17c",
+      "transaction_hash": "EWWMu3chsa56hBybTpZ5hgiM6bazXRBekESv7KzpWYEt",
+      "signer": "auction.royltee-dev.testnet",
+      "receiver": "auction.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "DEPLOY_CONTRACT",
+          "method": null
+        },
+        {
+          "action": "FUNCTION_CALL",
+          "method": "new"
+        }
+      ],
+      "method": "DEPLOY_CONTRACT",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "2671361383358600000000",
+      "fee_near": "0.0026713613833586",
+      "attached_deposit_yocto": "0",
+      "block_height": 277639814,
+      "block_timestamp_utc": "2026-11-14T09:41:36.715Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "auction contract deployed and initialised in one transaction signed by the auction account itself; code sha256 48d32c71de83d94a4225502a726b80bd678ac3dfb1471952c93c4c16595a8d09; pins registry, mock USDC, outlayer.testnet, the WASI module url and hash, secrets account royltee-admin.testnet and profile royltee-auction"
+    },
+    {
+      "step": "auction 17d",
+      "transaction_hash": "2zysmt9BZCbFs3bcVQSdwQPouPNgtt4W1DH7RHMw4eeG",
+      "signer": "registrar.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "grant_credential"
+        }
+      ],
+      "method": "grant_credential",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "763594620704500000000",
+      "fee_near": "0.0007635946207045",
+      "attached_deposit_yocto": "20000000000000000000000",
+      "block_height": 277640210,
+      "block_timestamp_utc": "2026-11-14T09:45:29.023Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "registrar granted a member credential to auction.royltee-dev.testnet (0.02 NEAR attached, doc hash is a placeholder test value, Simulated)"
+    },
+    {
+      "step": "auction 17f",
+      "transaction_hash": "7TLqoWrnBbTupg3PLccuc2eXgbquXACtYZqGDNgV58fq",
+      "signer": "royltee-dev.testnet",
+      "receiver": "auction.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "publish_key"
+        }
+      ],
+      "method": "publish_key",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "1134615318262200000000",
+      "fee_near": "0.0011346153182622",
+      "attached_deposit_yocto": "20000000000000000000000",
+      "block_height": 277642341,
+      "block_timestamp_utc": "2026-11-14T10:06:25.390Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "publish_key: the auction asked OutLayer for the TEE public key (OutLayer request 44227, key 6260be000b604a3998c530ab429092285dc806d2712d138b90b2a5ec723a692f, key_version 1); 0.02 NEAR attached, OutLayer charged 0.0011308003 NEAR and refunded the rest. Step 17e (owner set the OutLayer secret access rule in the dashboard) has no transaction id recorded by this project: Logic And[WasmHash c4a29e55..., Predecessor Whitelist [auction.royltee-dev.testnet]], read back from outlayer.testnet, storage deposit 0.00692 NEAR"
+    },
+    {
+      "step": "auction 17g part 1",
+      "transaction_hash": "EaHtbQ54aAyZUgakGc4EkrYNLPMafboWStyC4rfQ9BvM",
+      "signer": "outsider.royltee-dev.testnet",
+      "receiver": "outlayer.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "request_execution"
+        }
+      ],
+      "method": "request_execution",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "794905676230700000000",
+      "fee_near": "0.0007949056762307",
+      "attached_deposit_yocto": "20000000000000000000000",
+      "block_height": 277642548,
+      "block_timestamp_utc": "2026-11-14T10:08:27.184Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "refusal check: outsider.royltee-dev.testnet called outlayer.testnet request_execution directly, naming the auction as contract (OutLayer request 44242). Refused by the OutLayer keystore: Access denied by access condition, 0 instructions, return value null. OutLayer charged 0.001 NEAR and refunded 0.019 NEAR"
+    },
+    {
+      "step": "auction 17g part 2",
+      "transaction_hash": "57tzs8NbCKhhC9guscGE1NbgqZWxNLXsTF4mZgyFXtqP",
+      "signer": "outsider.royltee-dev.testnet",
+      "receiver": "outlayer.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "request_execution"
+        }
+      ],
+      "method": "request_execution",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "800687398583100000000",
+      "fee_near": "0.0008006873985831",
+      "attached_deposit_yocto": "20000000000000000000000",
+      "block_height": 277643025,
+      "block_timestamp_utc": "2026-11-14T10:13:15.084Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "refusal check: the same outsider named itself as contract (OutLayer request 44261). Same refusal, return value null. OutLayer charged 0.001 NEAR and refunded 0.019 NEAR"
+    },
+    {
+      "step": "auction 17h",
+      "transaction_hash": "9kwufV5FfUjXbZVwN662kawt2Q9RDRz9Hb6WiYt4vZY",
+      "signer": "payer.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "mint"
+        }
+      ],
+      "method": "mint",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "193129963314600000000",
+      "fee_near": "0.0001931299633146",
+      "attached_deposit_yocto": "0",
+      "block_height": 277643285,
+      "block_timestamp_utc": "2026-11-14T10:15:50.611Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "payer minted 200 mock USDC to writer-b (Simulated money)"
+    },
+    {
+      "step": "auction 17h",
+      "transaction_hash": "6KZx5zga2jSAtWV1PPfucAra6RfECaSmWzx1v2wBnTmj",
+      "signer": "payer.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "mint"
+        }
+      ],
+      "method": "mint",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "192734410302600000000",
+      "fee_near": "0.0001927344103026",
+      "attached_deposit_yocto": "0",
+      "block_height": 277643349,
+      "block_timestamp_utc": "2026-11-14T10:16:26.866Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "payer minted 200 mock USDC to buyer-pub (Simulated money)"
+    },
+    {
+      "step": "auction 17i",
+      "transaction_hash": "Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR",
+      "signer": "writer-a.royltee-dev.testnet",
+      "receiver": "reg.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "nft_transfer_call"
+        }
+      ],
+      "method": "nft_transfer_call",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "1025169441260600000000",
+      "fee_near": "0.0010251694412606",
+      "attached_deposit_yocto": "1",
+      "block_height": 277643609,
+      "block_timestamp_utc": "2026-11-14T10:18:51.696Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "writer-a listed share s10 (work 4, vault held 0 money, no dispute) with nft_transfer_call to the auction: reserve 20000000, max_deposit 100000000, ends_at 1794652730000000000 (2026-11-14T10:38:50Z). The end time was set 20 minutes after sending instead of the 10 minutes in the plan, so both bids fit. Auction id 0"
+    },
+    {
+      "step": "auction 17j",
+      "transaction_hash": "GHCfH4PhhcNCG4mmDCZXKmy9WvDucEnhCmerYVSjNm1v",
+      "signer": "writer-b.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "ft_transfer_call"
+        }
+      ],
+      "method": "ft_transfer_call",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "1073986259038900000000",
+      "fee_near": "0.0010739862590389",
+      "attached_deposit_yocto": "1",
+      "block_height": 277644542,
+      "block_timestamp_utc": "2026-11-14T10:27:57.489Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "writer-b sealed bid 1 (sealed amount 70 mock USDC, deposit 100 mock USDC, Simulated money); only the ciphertext is on chain"
+    },
+    {
+      "step": "auction 17j",
+      "transaction_hash": "AK88NkPkXsik1xPbTNDNZB6VCCRi2rKhxeVbap9bHkSc",
+      "signer": "buyer-pub.royltee-dev.testnet",
+      "receiver": "usdc.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "ft_transfer_call"
+        }
+      ],
+      "method": "ft_transfer_call",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "1078443658515500000000",
+      "fee_near": "0.0010784436585155",
+      "attached_deposit_yocto": "1",
+      "block_height": 277644667,
+      "block_timestamp_utc": "2026-11-14T10:29:06.612Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "buyer-pub sealed bid 2 (sealed amount 90 mock USDC, deposit 100 mock USDC, Simulated money); only the ciphertext is on chain"
+    },
+    {
+      "step": "auction 17k",
+      "transaction_hash": "CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW",
+      "signer": "royltee-dev.testnet",
+      "receiver": "auction.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "settle"
+        }
+      ],
+      "method": "settle",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "2088578007998700000000",
+      "fee_near": "0.0020885780079987",
+      "attached_deposit_yocto": "20000000000000000000000",
+      "block_height": 277645673,
+      "block_timestamp_utc": "2026-11-14T10:39:05.132Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "settle by the root account, 300 Tgas, 0.02 NEAR attached, through the real OutLayer TEE (OutLayer request 44422, task 106286, 18959851 instructions). OutLayer charged 0.0010383018 NEAR and refunded 0.0189616982 NEAR. Result: status sold, winner buyer-pub, price 70000000 (second price); share s10 moved to buyer-pub.royltee-dev.testnet. Events winner_chosen, nft_transfer, share_transfer, auction_sold. outlayer-verify (git 90c27d9) passed all 5 checks on this transaction"
+    },
+    {
+      "step": "auction 17m",
+      "transaction_hash": "2PMK4vf1dKsPNhZwtNkWL2xninc7ZNRN515HiwndQdVY",
+      "signer": "royltee-dev.testnet",
+      "receiver": "auction.royltee-dev.testnet",
+      "actions": [
+        {
+          "action": "FUNCTION_CALL",
+          "method": "withdraw"
+        }
+      ],
+      "method": "withdraw",
+      "success": true,
+      "result": "succeeded",
+      "fee_yocto": "1660689299547700000000",
+      "fee_near": "0.0016606892995477",
+      "attached_deposit_yocto": "0",
+      "block_height": 277646389,
+      "block_timestamp_utc": "2026-11-14T10:46:17.548Z",
+      "confirmed_by": "RPC EXPERIMENTAL_tx_status, wait_until FINAL; fee is the sum of tokens_burnt over the transaction and every receipt",
+      "note": "withdraw by the root account for writer-a, writer-b and buyer-pub. After it get_accounting reads owed_total 0, pending_total 0, escrow_total 0; mock USDC balances writer-a 70.5 (had 0.5), writer-b 200 (full refund), buyer-pub 131 (30 change), all Simulated"
+    }
+  ],
+  "auction_0": {
+    "listed_in": "Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR",
+    "seller": "writer-a.royltee-dev.testnet",
+    "token_id": "s10",
+    "reserve": "20000000",
+    "max_deposit": "100000000",
+    "created_at": "1794651532928581148",
+    "ends_at": "1794652730000000000",
+    "ends_at_utc": "2026-11-14T10:38:50Z",
+    "bids": [
+      {
+        "bidder": "writer-b.royltee-dev.testnet",
+        "tx": "GHCfH4PhhcNCG4mmDCZXKmy9WvDucEnhCmerYVSjNm1v",
+        "sealed_amount": "70000000",
+        "deposit": "100000000",
+        "note": "the sealed amount is known to this project from the bid script; on chain only the ciphertext was stored and it is cleared after the sale"
+      },
+      {
+        "bidder": "buyer-pub.royltee-dev.testnet",
+        "tx": "AK88NkPkXsik1xPbTNDNZB6VCCRi2rKhxeVbap9bHkSc",
+        "sealed_amount": "90000000",
+        "deposit": "100000000"
+      }
+    ],
+    "settled_in": "CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW",
+    "status": "sold",
+    "winner": "buyer-pub.royltee-dev.testnet",
+    "price": "70000000",
+    "last_error": null,
+    "attempt": 1,
+    "failures": 0,
+    "delivery_op": 1,
+    "events": [
+      "winner_chosen",
+      "nft_transfer",
+      "share_transfer",
+      "auction_sold"
+    ],
+    "token_owner_after": "buyer-pub.royltee-dev.testnet",
+    "withdrawn_in": "2PMK4vf1dKsPNhZwtNkWL2xninc7ZNRN515HiwndQdVY"
+  },
+  "accounting_after_17m": {
+    "owed_total": "0",
+    "pending_total": "0",
+    "escrow_total": "0",
+    "open_auctions": 0,
+    "reserve_per_auction": "80000000000000000000000",
+    "source": "get_accounting on auction.royltee-dev.testnet, read only, 2026-11-14 about 11:05 UTC"
+  },
+  "musdc_balances_after_17m": {
+    "note": "Simulated mock USDC, base units, 6 decimals",
+    "writer-a.royltee-dev.testnet": "70500000",
+    "writer-b.royltee-dev.testnet": "200000000",
+    "buyer-pub.royltee-dev.testnet": "131000000",
+    "auction.royltee-dev.testnet": "0"
+  },
+  "not_run": {
+    "17e": "no transaction id recorded (owner set the rule in the OutLayer dashboard)",
+    "17l": "recovery calls, not needed",
+    "17n": "delete the auction full-access key, NOT run by decision"
+  }
+}

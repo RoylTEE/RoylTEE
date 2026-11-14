@@ -8,3 +8,9 @@ dist/
 .near-credentials/
 neardev/
 contracts/res/
+
+# Evidence log for the OutLayer call-path spike (root ignores *.log).
+!spike/outlayer/verify.log
+
+# The auction WASI module has its own workspace; its build output is ignored.
+tee/auction-wasi/target/

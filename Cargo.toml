@@ -4,7 +4,9 @@ members = [
     "contracts/vault",
     "contracts/mock-usdc",
     "contracts/registry",
+    "contracts/auction",
     "contracts/test-receiver",
+    "contracts/mock-outlayer",
     "contracts/tests",
 ]
 

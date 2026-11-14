@@ -27,7 +27,7 @@
       "An extra 0.5 NEAR transfer from royltee-dev.testnet to outsider.royltee-dev.testnet ran during step 11, before the refused outsider claim. It is recorded under step 11.",
       "Resynced to the chain on 2026-11-14T02:50:33Z with read-only RPC (view_account, view_access_key_list, nft_tokens, get_accounting, get_work, get_share_approval, get_vault_code_hash, ft_balance_of, and EXPERIMENTAL_tx_status for the new transactions). The root account balance fell by 2.5092643705036522 NEAR since the first record. All of it is the OutLayer probe spike on branch spike/outlayer: 2.5 NEAR to create probe.royltee-dev.testnet, two transaction fees (0.0071149895375 and 0.0010867809661522) and the 0.0010626 OutLayer charge. That spike is not part of the registry and is recorded on that branch. Both registry redeploys were paid by reg.royltee-dev.testnet.",
       "Updated on 2026-11-14T09:30:00Z after the final contract fixes redeploy (transaction 52jp95BVJCk6a9bUGyYtYEQq99R56Xiz5zxJ1vCHBJrD, 2026-11-14T09:09:40Z): wasm.registry, accounts.reg and the transaction list now describe code hash 5YNk7mvmiq4SuSckR1gULXVvgcRdUjaioxmDE8niguAG (sha256 4378568f0459560130cdb56fa05152f9946116d3332d6c3f7f53e939005dc271, 748115 bytes). The registry storage went from 731332 to 766489 bytes. The full-access keys of the registry and mock USDC are still present (step 6 parked). The registry has had three redeploys (step 15, the audit F1 redeploy, this one); all used its full-access key. Not re-read in this update: other accounts' balances, token owners and accounting_current.",
-      "Updated on 2026-11-14T11:05:00Z with step 16 (split sheet demo, work 6, shares s14 and s15, five transactions), the auction demo (steps 17a to 17m, 14 transactions, contract on branch feat/tee-auction) and the final contract fixes redeploy already recorded above. 17e had no transaction id recorded by this project. Share s10 is now owned by buyer-pub.royltee-dev.testnet (auction sale). Vaults s14 and s15 have 0 access keys (view_access_key_list) and the same vault code hash as s8 to s13. Balances were re-read for every account in this file. The record now holds 88 entries: 87 on-chain transactions, one refused client-side with no transaction (the agent claim on s4)."
+      "Updated on 2026-11-14T11:05:00Z with step 16 (split sheet demo, work 6, shares s14 and s15, five transactions), the auction demo (steps 17a to 17m, 14 transactions, contract in contracts/auction, its own record in deployments/auction-testnet.json) and the final contract fixes redeploy already recorded above. 17e had no transaction id recorded by this project. Share s10 is now owned by buyer-pub.royltee-dev.testnet (auction sale). Vaults s14 and s15 have 0 access keys (view_access_key_list) and the same vault code hash as s8 to s13. Balances were re-read for every account in this file. The record now holds 88 entries: 87 on-chain transactions, one refused client-side with no transaction (the agent claim on s4)."
     ],
     "updated_at_utc": "2026-11-14T11:05:00Z"
   },
@@ -437,6 +437,23 @@
         }
       ],
       "key_count": 1
+    },
+    "probe.royltee-dev.testnet": {
+      "variable": "PROBE",
+      "account_id": "probe.royltee-dev.testnet",
+      "role": "throwaway OutLayer probe, not part of the registry",
+      "balance_yocto": "2498340335000271700000000",
+      "balance_near": "2.4983403350002717",
+      "storage_usage_bytes": 185021,
+      "code_hash_base58": "HCaVhK4CVa7eF6VufsexRckEtsLAyfRcEwtL8HPEUs1o",
+      "keys": [
+        {
+          "public_key": "ed25519:3vSHK273p4gXTuKBQj5v3iUEm4vHxBdmYkP4MPX3EroF",
+          "permission": "full_access"
+        }
+      ],
+      "key_count": 1,
+      "note": "Balances and storage from view_account (finality final) at block 277614955 on 2026-11-14 (05:35 UTC). Other accounts in this object were recorded at 02:50 UTC the same day. Not part of the registry and not checked by scripts/verify-testnet.mjs."
     },
     "s1.reg.royltee-dev.testnet": {
       "variable": "S1",

@@ -290,6 +290,148 @@ Terms used below (full detail in DESIGN.md):
 - Control: a share registered by anyone other than the work's registrant is `pending` approval. While pending it is minted (vault and NFT exist, its bps count toward the 100 percent check) but it is not paid: its part of every group payment and every direct payment is held in the registry's escrow (`escrowed` event, `reason: awaiting_approval`). It cannot be claimed, synced, transferred, confirmed, attested, released to or named in `contests`. The work registrant signs the split sheet with `approve_share` (1 yoctoNEAR): the held money goes to the share's vault and the share is paid normally from then on. `reject_share` voids the share, frees its bps and moves its held money to the group's unallocated escrow, where the registrar releases it to the real owner's share once registered (T25). The registrar is the backup signer for both, with a document hash. A plain deposit sent straight into a rejected share's vault can be sent back by the registrar with `recover_rejected_vault`. Events: `share_approved`, `share_rejected`, `rejected_vault_recovered`; `share_registered` carries `approval` and `registered_by`; `get_share_approval` and the token's `extra` show the state. Shares registered by the work registrant, dispute claimants (approved by the registrar's resolve) and every share that existed before this rule are approved. Approval is kept in its own storage slot (`apv:<token>`), so existing records are unchanged and the deployed registry can be upgraded in place.
 - Test: unit tests `m2_share_by_non_registrant_is_held_until_approved`, `m2_reject_voids_share_and_keeps_money_in_the_group`, `m2_registrant_shares_and_old_shares_are_approved`, `m2_registrar_recovers_plain_deposits_of_a_rejected_vault`, `m2_void_work_moves_held_money_to_unallocated`; sandbox `r02_m2_split_sheet_approval_and_rejection`.
 
+## Sealed-bid share auction rows (T-A1 to T-A27)
+
+These rows cover `contracts/auction` and `tee/auction-wasi`. Money in these tests is mock USDC (Simulated). The sandbox tests use a mock OutLayer (Simulated, `contracts/mock-outlayer`) for the failure paths and the real WASI module, run under Node, for the answers. No registry code changes: the auction is a normal credentialed member at `auction.royltee-dev.testnet`.
+
+### T-A1. Operator trust: the TEE or OutLayer operator reads or leaks bids
+- Attack: whoever controls OutLayer's keys (single operator today per OutLayer's own docs, UNVERIFIED for testnet) or breaks the TEE can read every bid, or can run other code against the secret.
+- Impact: bids are no longer sealed. Money is only partly protected: the contract bounds any answer (T-A4), but whoever controls the answer can still pick any bidder as winner at any price between the reserve and `max_deposit`, which the contract cannot detect (T-A4, finding M3). There is no on-chain fix.
+- Mitigation: the secret is bound to the exact WASI hash, so another module cannot read it; the master key is generated inside the TEE. The README states the trust plainly: secrecy rests on the TEE and OutLayer governance. The contract cannot verify an attestation, so proof is off chain (`outlayer-verify`).
+- Test: none possible in the sandbox. Residual risk, accepted and stated.
+
+### T-A2. Deposit size leaks the bid
+- Attack: a bidder's deposit reveals their bid.
+- Mitigation: every bidder must lock exactly `max_deposit`; any other amount is refunded in full by the `ft_on_transfer` return value.
+- Test: `bad_bids_are_refunded_in_full`, sandbox `a04_bad_bids_are_refunded`.
+
+### T-A3. Ciphertext copied or replayed
+- Attack: copy a rival's ciphertext into your own bid, or reuse one in another auction.
+- Mitigation: the plaintext carries the auction id, the contract and the bidder; the module drops a bid whose binding does not match the bidder who sent it. AEAD fails on any edit, so a flipped byte drops the bid.
+- Test: WASI host tests `invalid_bids_are_dropped_silently` and `a_flipped_byte_breaks_the_tag`, and the Node test "copied ciphertext, wrong auction, wrong contract, bad amounts are dropped"; sandbox `a02`.
+
+### T-A4. TEE output tampering or a wrong answer
+- Attack: a bad or buggy answer names a non-bidder as winner, sets a price outside the rules, or answers for a different bid list.
+- Mitigation: the contract accepts only a winner who is a bidder, a price in [reserve, `max_deposit`], and a `bids_hash` equal to the hash of the bid list it sent. Anything else reopens settling and moves no money and no share.
+- Limit, stated plainly (finding M3): these checks bound the answer, they do not verify it. Whoever controls the OutLayer answer (the operator, or anyone who breaks the TEE) can name any bidder as winner at any price in [reserve, `max_deposit`]. A winner can be charged the full `max_deposit`, or the seller paid only the reserve, and the contract cannot tell. The loss is capped by `max_deposit` per bidder and by the seller's share, and a wrong sale is visible on chain afterwards, but it is not prevented. Off-chain `outlayer-verify` can check the run after the fact.
+- Test: `parse_settle_output` cases (`parse_output_cases`), `bids_hash_matches_the_module_golden_value`, `bad_answers_reopen_settling_and_never_move_money`, `answers_are_read_from_every_known_shape_and_only_when_successful`, sandbox `a07_bad_answers_never_move_money_or_the_share`.
+
+### T-A5. Non-member or junk bids (griefing, storage drain)
+- Attack: many accounts bid to fill the list, or bid to make settle fail.
+- Mitigation: a bid needs an active credential (async view on the registry, rechecked in the callback), one bid per account, at most 8 bids, ciphertext size cap, and a free-balance check. The seller cannot bid.
+- Test: `a_non_member_or_a_failed_check_is_refunded`, `a_second_bid_from_the_same_account_is_refused`, `an_auction_takes_at_most_eight_bids`, `the_callback_rechecks_the_rules`, sandbox `a04`, `a11_eight_bids_settle_within_300_tgas`.
+
+### T-A6. Share listed wrongly, or stranded by a bad listing
+- Mitigation: `nft_on_transfer` returns `true` (the registry gives the share back) for any bad message, an unpublished key, a second listing, or low balance; only the registry can call it.
+- Test: `listing_is_refused_with_true_for_every_bad_input`, `only_the_registry_can_list`, sandbox `a09_refused_listings_return_the_share`.
+
+### T-A7. Settle gets stuck, or OutLayer never answers
+- Mitigation: every settle has an attempt id (a late answer for an old attempt is ignored). A failed or empty answer reopens settling and counts as a failure. After 1 hour in Settling anyone can cancel; after `ends_at` plus 6 hours anyone can cancel once at least one settle run has failed; after `ends_at` plus 7 days anyone can cancel in any case. Cancelling credits every deposit back and returns the share. The seller can cancel at once while there are no bids. The settle callback has 120 Tgas and the settle call needs 230 (finding M1; measured in sandbox test a12).
+- Test: `a_late_answer_for_an_old_attempt_is_ignored`, `a_stuck_settle_request_can_be_cancelled_after_an_hour`, `anyone_cancels_after_a_failed_run_and_the_grace_period`, `a_third_party_cannot_void_a_sale_nobody_tried_to_settle`, `anyone_cancels_after_the_hard_limit_even_if_no_run_failed`, `seller_cancels_only_before_any_bid`, sandbox `a05`, `a07`, `a08`.
+
+### T-A8. Vault money during the auction
+- Attack or fault: the share carries unclaimed vault money. The seller listed without claiming, or money keeps arriving while it is listed.
+- Behaviour: vault money travels with the share (as for any registry transfer). The winner gets it; the seller gets it back if the auction is cancelled. The auction has no code path that calls `claim`.
+- Mitigation: documented rule, the demo claims before listing. The contract does not enforce it (it would need a second async call), stated as a known limit.
+- Test: sandbox `a03_vault_money_travels_with_the_share`.
+
+### T-A9. Winner suspended or refused at delivery
+- Mitigation: the registry re-checks the receiver at `nft_transfer`. A refusal cancels the auction, refunds everyone and returns the share; no money moves before the share does.
+- Test: `a_refused_delivery_cancels_refunds_all_and_returns_the_share`, sandbox `a06_suspended_winner_cancels_and_refunds_everyone`.
+
+### T-A10. Auction account suspended, or the share frozen by a dispute
+- Mitigation: refunds are a pull ledger and do not depend on the share. If the share cannot move, it stays in a pending state; `return_share` can be retried, `refresh_share` re-reads the registry, `reconcile` only reports, and the operator calls deal with a delivery or return whose callback was lost (T-A14), and the registrar can use the existing `registrar_transfer` for a suspended holder.
+- Test: `a_failed_share_return_can_be_retried`, `return_share_needs_a_cancelled_auction_that_still_holds_it`, sandbox `a10_suspended_auction_share_is_rescued_by_the_registrar`.
+
+### T-A11. Refund ledger failures
+- Mitigation: `withdraw` debits first and restores the credit if the token transfer fails; the list is bounded and the gas check counts 26 Tgas per account plus 10 (finding L2); the `get_accounting` view shows total escrow and total owed.
+- Test: `withdraw_takes_the_credit_first`, `a_failed_payout_puts_the_credit_back`, `withdraw_rejects_empty_and_oversized_lists_and_low_gas`, `withdraw_counts_promise_fees_per_account`, `a_withdrawal_leaves_a_pending_record_until_its_callback`, `a_failed_withdrawal_closes_its_record_and_restores_the_credit`, sandbox `a02_full_sale_with_the_real_module`.
+
+### T-A12. Fake token or direct calls
+- Mitigation: `ft_on_transfer` accepts only mock USDC; `nft_on_transfer` only the registry; callbacks are private. A wrong token or sender gets the whole amount back.
+- Test: `only_mock_usdc_can_deposit`, `only_the_registry_can_list`.
+
+### T-A13. The module used as a decryption oracle (finding C1)
+- Attack: every ciphertext is public. An attacker seals their own bid at `max_deposit`, then asks OutLayer directly (not through the auction) to run the pinned module with the same secret reference and a crafted settle input: the real auction id and contract, and the bid list [victim ciphertext, attacker ciphertext]. The answer would name the attacker as winner at the victim's exact bid, for about 0.004 NEAR, while the auction is still open. A colluding member could then bid just under it.
+- Mitigation, two layers, either of which stops this one:
+  1. The module reads `NEAR_PREDECESSOR_ID`, the account that called OutLayer (written by OutLayer's worker from the request receipt, stripped from secrets so a secret cannot fake it, empty over HTTPS), and fails every request unless it equals `EXPECTED_CONTRACT`, the auction account compiled into the module (so it is part of the pinned hash), and the request's `contract` field names the same account (review B-02). The account is not taken from the request alone: an attacker contract that names itself in the request is refused, because it is not the compiled in account. Only the auction contract is that account, and it builds requests only from its own state after `ends_at`.
+  2. The secret's access condition is `And[WasmHash(<this build>), Predecessor{Whitelist[auction]}]` (required; a signer whitelist alone is not equivalent, because it is judged against the signer, not the account that called OutLayer; the owner-only form in DEPLOY_PLAN 17e is for the rehearsal on a demo share only), so the keystore refuses to release the secret to any other caller. DEPLOY_PLAN 17e also says to check that no other row or profile exposes the same master.
+- Throwaway on-chain check before listing: DEPLOY_PLAN 17g makes the attack for real and must see no price. Run on testnet on 2026-11-14 UTC, twice (naming the auction, then naming the attacker); both were refused by the keystore with `Access denied by access condition`, 0 instructions, return null, no price (transactions `EaHtbQ54aAyZUgakGc4EkrYNLPMafboWStyC4rfQ9BvM` and `57tzs8NbCKhhC9guscGE1NbgqZWxNLXsTF4mZgyFXtqP`).
+- Verified: the module layer (tests below). Verified in source and by view call: the deployed `outlayer.testnet` accepts and stores that condition shape. Verified live on 2026-11-14 UTC: the dashboard built the condition (`get_secrets` read back), the keystore refused both outsider requests, and the worker set `NEAR_PREDECESSOR_ID` (the settle through the auction was accepted by the module). UNVERIFIED: the module's own caller check on the live worker, because the keystore refused the outsiders before the module ran (the module check is covered by the tests below).
+- Test: WASI host tests `a_direct_request_from_another_caller_is_refused` and `a_request_naming_another_contract_is_refused_even_from_that_contract`, Node tests "a direct request from another caller is refused (C1)" and "a request naming another contract is refused even from that contract (B-02)", sandbox `a13_a_direct_request_from_another_caller_is_refused` (also the attacker naming its own account), and `a02`; the old Node test line follows: "a direct request from another caller is refused (C1)", sandbox `a13_a_direct_request_from_another_caller_is_refused` (mock OutLayer, real module, real ciphertexts), and `a02` (the contract's own request is answered).
+
+### T-A14. A delivery or a share return whose callback never lands (findings H1, N-M1, N-M2, AR-1)
+- Fault: `on_delivered` cannot commit (for example the contract is short of NEAR for the storage of up to nine new credits), or `on_returned` is lost. The auction would stay Delivering forever, or `returning` would stay true and block a retry. The first recovery decided from the registry owner and from elapsed time. That was unsafe in four ways: a registrar can move the share to an unrelated account; a delivery that succeeded can be followed by the winner sending the share back to the seller; a delivery transfer that is only late can still land after a refund (the winner would hold the share and the deposit); a retried return can run later against a relisted auction.
+- Rule now: nothing automatic decides an outcome from current ownership or from elapsed time, and `reconcile` decides nothing at all. `delivering_since` and `returning_since` are recorded. After 15 minutes anyone calls `reconcile`. It reads the share's owner and emits `reconcile_pending` with that owner as a diagnostic. It never finishes, cancels, refunds or pays, not even when the winner holds the share: who holds the share now does not show what this attempt's transfer did, and the original transfer could still be executable (final review, AR-1). A delivery is settled only by its own `on_delivered(op)` callback or by `resolve_delivery(auction_id, op_id, delivered, evidence_hash)`; a return only by its own `on_returned(op)` or by `resolve_return(auction_id, op_id, returned, evidence_hash)`. Both operator calls accept only the auction account itself as caller (predecessor equals the current account, so the account's retained full-access key). The operator calls them after the final receipt outcome of that exact transfer is known; `evidence_hash` is the sha256 (64 hex digits) of that evidence and is written to the event. The contract checks only its shape, not its content, so a correct outcome depends on the operator. `delivered` true pays the sale; false cancels, credits every deposit back and sends the share back. `returned` true marks the share out; false allows `return_share` again. This is operator recovery, not autonomous recovery. Stated trust: it uses the retained key (T-A19). If the payout still cannot be written, add NEAR to the auction account and call again.
+- Test: `reconcile_never_settles_even_when_the_winner_holds_the_share`, `a_delayed_delivery_is_not_cancelled_by_an_early_reconcile`, `ar1_case1_an_unrelated_holder_does_not_make_a_sale`, `ar1_case2_a_share_sent_back_by_the_winner_is_still_a_sale`, `ar1_case4_a_pending_return_blocks_retry_and_relisting` (AR-1 case 3, the delayed transfer seen after 15 minutes, is the second named test), `reconcile_waits_fifteen_minutes_and_only_for_stuck_states`, `reconcile_waits_for_a_stuck_return_too`, `resolve_calls_need_the_auction_key_the_right_op_and_evidence`. Unit tests only: the sandbox cannot produce the fault any more, because the delivery callback now frees the bid ciphertexts and fits even with almost no spare NEAR (sandbox `a14_a_sale_completes_with_almost_no_spare_near`). The sandbox has no stuck delivery to resolve, so the operator calls have no sandbox test.
+
+### T-A15. Ciphertext length leaks the bid size (finding M2)
+- Fault: the amount was a variable length decimal, so the ciphertext length revealed how many digits the bid had.
+- Mitigation: the script zero pads every amount to 38 digits and the module drops any bid whose amount is not exactly 38 digits (reviews M2 and B-01). Account names and the auction id are public anyway. Listing terms are capped at 38 digits too (`MAX_TERM`, review B-09), so the contract, the script and the module work on one range; a listing with a larger `max_deposit` is refused.
+- Test: `listing_terms_are_capped_at_38_digits`, Node test "amounts are padded to 38 digits and the module rejects other widths" (equal ciphertext length for a 1 digit and an 18 digit bid), WASI host test `amounts_must_be_padded_to_the_fixed_width`.
+
+### T-A16. A share sent to the auction with a plain `nft_transfer` (findings L1 and B-10)
+- Fault: the registry lets a holder send a share to any active member. The auction is one, and a plain transfer carries no message, so the auction never learns of it: the share is stranded with no auction and no record.
+- Mitigation: none in code (a plain transfer cannot be intercepted). Documented: always list with `nft_transfer_call`. A stranded share can be rescued by the registrar (suspend the auction's credential, then `registrar_transfer`) or by the holder of the auction's key while it exists.
+- Test: none; behaviour follows from the registry rules.
+
+### T-A17. Junk bids fill the eight slots (finding L4)
+- Fault: a bid with a valid deposit but an unreadable ciphertext holds a slot until settle, then its deposit is refunded in full, so the junk costs nothing but time and gas.
+- Why this is accepted: each slot needs its own registrar-credentialed member (one bid per account, a bid from a non-member is refused), the deposit is locked until settle, and the seller can wait out the auction and list again. A fee or a stake would add a payout path and a way to lose money. The simplest sound answer is to document it.
+- Test: `an_auction_takes_at_most_eight_bids`, `a_second_bid_from_the_same_account_is_refused`.
+
+### T-A18. Voiding a sale by cancelling early (finding L7)
+- Fault: anyone could cancel an auction with valid bids 6 hours after `ends_at` if nobody had settled it, so a griefer could void a sale by winning the race.
+- Mitigation: that cancel now needs at least one failed settle run (a griefer cannot cause one while OutLayer works, because the settle input is built by the contract), or 7 days after `ends_at`. Cancelling a stalled Settling request after 1 hour stays, because only a callback that never returns leaves that state. Under owner-only access (DEPLOY_PLAN 17e fallback 2) a settle by anyone else fails at the keystore and counts as a failed run, so the owner has 6 hours to settle.
+- Test: `a_third_party_cannot_void_a_sale_nobody_tried_to_settle`, `anyone_cancels_after_a_failed_run_and_the_grace_period`, `anyone_cancels_after_the_hard_limit_even_if_no_run_failed`.
+
+### T-A19. The auction's full-access key (finding L9)
+- Fault: while the full-access key of the auction account exists, its holder can claim vault money of shares the auction holds and move the escrow. The contract has no admin method, so the key is the only way to fix a bug.
+- Mitigation: none while the key exists, and it is now also relied on: `resolve_delivery`, `resolve_return` and `resolve_withdrawal` accept only the auction account as caller, so they run with this key. That is a stated trust, not a removed one. The key must not be deleted while any auction is Delivering or returning or while `pending_total` is not zero; DEPLOY_PLAN 17n is optional and left to the owner's decision after everything is final. Until then the demo must not hold real value.
+
+### T-A20. The price shows the second highest bid (finding L3)
+- Fact: the sale price is the second highest valid bid, and it is public (events, `get_auction`, the payment). With two bidders the price is the loser's exact bid. Only the other losing bids and the winner's own top bid stay private.
+- Mitigation: none, it is the second price rule. The README says so.
+
+### T-A21. A result the contract cannot read, and the key is permanent (findings M4 and L6)
+- Fault: the answer shape, pricing, timeout and refund behaviour of the real OutLayer were assumed. The key answer used to accept a `{success, result}` wrapper without checking `success`. The published key is permanent: if the master secret is ever replaced, every sealed bid becomes unreadable and each auction ends in no sale.
+- Mitigation: one reader (`unwrap_answer`) for the key and the settle answer accepts the guest JSON, a successful wrapper, or the same inside a JSON string, and rejects an unsuccessful or malformed wrapper. DEPLOY_PLAN 17f and 17k run the real call once, as a rehearsal on a demo share, before any real share is listed. The master secret must never be rotated while an auction is open. Review B-08 adds: the key answer must carry `key_version` 1 and a usable key (not all zero, not any of the seven low order X25519 points, whatever the top bit), or it is refused; every settle request carries the published key and the version, and the module derives its own key and fails with an explicit `key mismatch` error if it differs (a changed master gives a failed run that the cancel rules recover, never a silent no sale). The bid script refuses a low order key too.
+- Test: `publish_key_rejects_bad_answers_and_low_deposit`, `answers_are_read_from_every_known_shape_and_only_when_successful`, `low_order_and_malformed_keys_are_never_usable`, `the_key_answer_needs_a_usable_key_and_the_known_version`, WASI host test `a_wrong_or_unversioned_key_fails_explicitly`, Node tests "a key that is not the published one fails explicitly (B-08)" and "low order public keys are refused by the bid script (B-08)".
+
+### T-A22. Accepted auctions must be able to finish, and records must not pile up (findings B-04 and B-06)
+- Fault (B-04): admission used one global floor of 0.25 NEAR, but every accepted auction later needs storage the contract pays for: up to eight bids, and nine credits at the end. Many accepted auctions could outrun the floor, and a payout callback that cannot write leaves the share moved and the auction stuck.
+- Fault (B-06): a credentialed seller could list and cancel with no bids over and over, each time leaving a permanent record the contract pays for.
+- Mitigation: every accepted auction holds a reserve of 8000 bytes (0.08 NEAR at the current byte price) until it is final; a new listing needs the floor plus the reserve of every open auction and of itself (`listing_floor`). Measured worst case (unit test, 64 character account names, eight 512 character ciphertexts, nine credits): 5023 bytes after the bids and 2076 bytes after the sale. At a final state the reserve is released and the bid ciphertexts are dropped. An auction that was cancelled with no bid has its record deleted when the share is back, so list and cancel costs nothing lasting. The delivery callback usually frees more storage (the ciphertexts) than it adds (the credits), but that is not a guarantee: with maximum size account names the credits can add more than the ciphertexts free, so the claim that storage faults can no longer occur was wrong and is withdrawn (AR-4). What holds is the reserve below, plus the free balance floor on `withdraw`.
+- Limits: a listing deposit cannot be charged, because the registry's `nft_transfer_call` carries no NEAR, so the reserve comes from the contract's own balance and the owner must keep it topped up. A seller and a colluding bidder can still leave one small record per cancelled auction (a bid must be placed, and cancelling after bids needs a failed run and 6 hours, or 7 days). Terminal records with bids stay (about 2 KB at most) so views and refunds stay auditable, and the contract pays for them: retained history grows with use and is not reclaimed. Pending withdrawal records are written after an auction has released its reserve, and each is about 16 bytes (the longest account name) larger than the credit it replaces, so they cannot be reserved inside the auction. Instead `withdraw` needs at least 0.25 NEAR of free balance and fails before it debits anything when the account is short (AR-4). The reserve is a measured byte count, not proven on a live node (UNVERIFIED). Every path that ends a no bid auction's hold on the share (the return callback, `refresh_share`, `resolve_return`) deletes the record, and a callback that finds its record gone returns false instead of failing (N-L1).
+- Test: `admission_counts_the_reserve_of_every_open_auction`, `a_finished_auction_releases_its_reserve_and_ciphertexts`, `a_cancelled_auction_with_no_bids_leaves_no_record`, `the_storage_reserve_covers_the_worst_case`, `withdraw_needs_the_free_balance_floor_and_debits_nothing_without_it`, `share_out_paths_reclaim_a_no_bid_record_and_late_callbacks_are_quiet`, sandbox `a14_a_sale_completes_with_almost_no_spare_near`, `a15_listing_counts_the_reserve_of_every_open_auction`, `a08_seller_cancels_before_bids`.
+
+### T-A23. First caller initialises the contract (finding B-07)
+- Fault: with deploy and init in two transactions, anyone could call `new` first with their own registry, token, module and secret settings.
+- Mitigation: `new` only works when the contract account itself calls it, and DEPLOY_PLAN 17c deploys and calls `new` in one transaction signed by that account. After deploy the plan reads back `get_config` and compares the deployed code hash with the built file before the account gets a credential or any asset.
+- Test: `init_only_works_from_the_contract_account`, `init_checks_its_arguments`.
+
+### T-A24. A withdrawal whose callback is lost (finding B-05)
+- Fault: `withdraw` debits first and restores the credit in a callback. If the token transfer fails and that callback is also lost, the credit disappears from the ledger.
+- Mitigation: every withdrawal first writes a pending record (id, account, amount, time) and a `withdraw_sent` event; the callback removes it and restores the credit on failure. A lost callback leaves the record and the `pending_total` visible (`get_pending_withdrawal`, `get_accounting`), so the claim is never erased. There is deliberately no automatic timeout refund: a delayed transfer could still land and pay twice. Resolving a stuck record needs an authenticated fact (the token's own transfer receipts): the operator calls `resolve_withdrawal(id, paid, evidence_hash)` from the auction account itself (retained full-access key, stated trust, T-A19), `paid` true drops the record, false drops it and restores the credit. `on_withdrawn` is idempotent: the account and the amount come from the removed record, never from the callback arguments, and a callback whose record is already gone changes no money (AR-3).
+- Test: `a_withdrawal_leaves_a_pending_record_until_its_callback`, `a_failed_withdrawal_closes_its_record_and_restores_the_credit`, `a_failed_payout_puts_the_credit_back`, `ar3_a_replayed_withdrawal_callback_changes_no_money`, `on_withdrawn_takes_account_and_amount_from_the_pending_record`, `resolve_withdrawal_needs_the_auction_key_and_closes_the_record`.
+
+### T-A25. Stale callbacks and the token index (finding AR-2)
+- Fault: two recoveries could read the same expired return; the first cleared `returning`, a retry started, and the stale second snapshot cleared the new attempt. Separately, `reconcile` could mark auction 0 out, the share could be listed again as auction 1, and a delayed `on_returned(0)` then deleted auction 1's token index entry.
+- Mitigation: every delivery, return and reconcile attempt takes a new number from one increasing counter (`delivery_op`, `return_op`), and its callback carries it. A callback whose number is not the auction's current one, or whose state no longer matches, is a no-op. `release_token` removes the token index entry only if it still points at that auction.
+- Test: `ar2_a_stale_snapshot_cannot_clear_a_newer_return`, `ar2_a_delayed_return_callback_keeps_a_newer_auctions_index`.
+
+### T-A26. Paging over holes (finding AR-5)
+- Fault: reclaimed no bid records leave holes in the id range, so a page could be empty with no hint where to continue, and a long hole run could cost unbounded reads.
+- Mitigation: `get_auctions(from_index, limit)` returns `{items, next}`. It looks at no more than 200 ids per call, skips holes, and `next` is the id to continue from (null at the end).
+- Test: `ar5_get_auctions_skips_holes_and_returns_a_cursor`.
+
+### T-A27. A module built for the wrong account, and hashes that do not reproduce (findings N-L2 and the reviewer's hash note)
+- Fault: the module had a default account when `ROYLTEE_AUCTION_ACCOUNT` was unset, so a plain build gave a module for an account nobody chose. A reviewer could not reproduce our hashes.
+- Mitigation: the WASI crate has no default, and a build without `ROYLTEE_AUCTION_ACCOUNT` fails with a compile error that says so. The build scripts, `npm run lint`, `npm run test:wasi` and CI set it. `Cargo.lock` for the workspace and for the module are committed and builds use `--locked`. The exact toolchain and command are in the README (Rust 1.99.1, `npm run build:wasm`). Reproducing the same bytes on another machine is UNVERIFIED.
+- Test: building the module without the variable (checked by hand, the compiler stops); `npm run test:wasi` with the variable set.
+
+Known limits, stated plainly: the auction has no admin method, so a bug can only be fixed while its full-access key exists; if OutLayer rejects a request up front, the settle deposit stays in the auction balance; whether OutLayer's dashboard can build the tightest access condition is UNVERIFIED.
+
 ## Test mapping summary
 
 | Test | Covers |
@@ -327,6 +469,7 @@ Terms used below (full detail in DESIGN.md):
 | 31 | T32 |
 | `npm run verify:testnet` | T1, T13, T20, T31 (live, read only) |
 | `assert_solvent` helper | T31 |
+| `contracts/auction/src/tests.rs`, `tee/auction-wasi` host tests, `scripts/auction/auction.test.mjs`, `contracts/tests/tests/auction.rs` | T-A1 to T-A27 (see the rows) |
 | `review_fixes.rs`, `review.rs` | T7, T11, T12, T15, T19, T21, T24, T27, T35, T38, T39 |
 | `final_fixes.rs`, sandbox `final.rs`, `upgrade.rs` (u02, u03) | T12, T19, T19b |
 

@@ -32,6 +32,8 @@ jobs:
         run: npm run lint
       - name: Rust tests
         run: cargo test --workspace --locked
+      - name: Auction WASI module and Node tests
+        run: npm run test:wasi && npm run test:auction
       - name: Site typecheck, tests and build
         working-directory: site
         run: npm ci && npm run typecheck && npm test && npm run build

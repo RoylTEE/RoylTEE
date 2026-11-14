@@ -25,8 +25,8 @@ mkdir -p contracts/res
 cargo build -p vault --target "$TARGET" --release --target-dir target/wasm
 cp "$OUT/vault.wasm" contracts/res/vault.wasm
 
-cargo build -p mock_usdc -p registry -p test_receiver --target "$TARGET" --release --target-dir target/wasm
-for c in mock_usdc registry test_receiver; do
+cargo build -p mock_usdc -p registry -p test_receiver -p auction -p mock_outlayer --target "$TARGET" --release --target-dir target/wasm
+for c in mock_usdc registry test_receiver auction mock_outlayer; do
   cp "$OUT/$c.wasm" "contracts/res/$c.wasm"
 done
 
@@ -34,6 +34,22 @@ done
 # reach it (feature short-stale-forward, never deployed).
 cargo build -p registry --features short-stale-forward --target "$TARGET" --release --target-dir target/wasm-short
 cp "target/wasm-short/$TARGET/release/registry.wasm" contracts/res/registry_short_stale.wasm
+
+# The auction's WASI module (run by OutLayer, not a NEAR contract) is its own
+# workspace with its own lock file. It imports the WASI Preview 1 functions
+# it needs itself, so the installed wasm32-unknown-unknown target is enough.
+ROYLTEE_AUCTION_ACCOUNT=auction.royltee-dev.testnet cargo build --manifest-path tee/auction-wasi/Cargo.toml \
+  --target "$TARGET" --release --locked --target-dir tee/auction-wasi/target
+cp "tee/auction-wasi/target/$TARGET/release/auction_wasi.wasm" contracts/res/auction_wasi.wasm
+
+# The module serves one auction account, fixed when it is built (so it is part
+# of the pinned hash). The file above serves the planned account
+# auction.royltee-dev.testnet. The sandbox tests deploy the auction as
+# auction.test.near, so they use a second build that differs only in that one
+# constant. It is never deployed.
+ROYLTEE_AUCTION_ACCOUNT=auction.test.near cargo build --manifest-path tee/auction-wasi/Cargo.toml \
+  --target "$TARGET" --release --locked --target-dir tee/auction-wasi/target/test-variant
+cp "tee/auction-wasi/target/test-variant/$TARGET/release/auction_wasi.wasm" contracts/res/auction_wasi_test.wasm
 
 # Fail if a machine path is still in any built wasm. A pattern that is empty
 # or just "/" (for example HOME=/ in a container) is skipped, since it would
