@@ -4,6 +4,10 @@
 
 A writer's share of a song can be sold, split or disputed, but the place royalties are sent should never break. Each share's payout account has no keys, so nobody can sign money out of it. Payers and AI agents can send money in, and only the holder of the share NFT can collect it.
 
+![The RoylTEE landing page: a microphone shining a light on a music note NFT above a vault, with the headline "RoylTEE turns each share of a song into an NFT with its own verified payout address".](docs/media/01-hero.webp)
+
+[Watch the 2 minute demo video](https://github.com/RoylTEE/RoylTEE/releases/download/v1.0/royltee-demo.mp4)
+
 ## Judges, start here
 
 Track: NFTs That Do Something (`nfts`). Testnet only, no real money. No wallet and no keys are needed for anything below.
@@ -79,6 +83,8 @@ Demo scripts: there are no separate `seed-demo`, `simulated-payer` or `scripted-
 ## Every claim, checked
 
 Each row gives the claim, the code that implements it (file and function), the exact test name, and the evidence on NEAR testnet. Transaction links come from [deployments/testnet.json](deployments/testnet.json). The same rows, with a live check per claim, are on the hosted `/verify` page. `npm run check:claims` and the site test `site/tests/claims.test.ts` fail if a test name, function or transaction in these tables does not exist.
+
+![The account page of share s2 on the live site: the share account shows the badge "0 access keys" and says nobody can sign for it and only the registry contract can move money out.](docs/media/03-zero-keys.webp)
 
 | Claim | Code | Test | On-chain evidence |
 |---|---|---|---|
@@ -196,6 +202,8 @@ payer --ft_transfer_call (work, period, statement hash)--> registry (reg.royltee
                              holder of share s1                                      holder of share s2
 ```
 
+![The Payments tab of the Activity page on the live site: one payment of 1.0 mUSDC for work 0 is split 0.5 and 0.5 into the vaults of shares s1 and s2.](docs/media/02-payment-split.webp)
+
 - **Work**: a song keyed by ISRC (recording) or ISWC (composition), with a provenance field. Titles are stored as hashes; personal data stays off chain.
 - **Share**: one NFT per rights share: right type (`master`, `publishing`, `performance`, `mechanical`), territory, basis points (1 bps = 0.01 percent), basis (`copyright`, `contract`, `none`), evidence tier. Shares of one work, right and territory may not sum above 10000 bps; a claim that would go above opens a dispute.
 - **Vault**: `s<N>.reg.royltee-dev.testnet`, created by the registry at mint in one batch with no `AddKey` action, storage-registered with Mock USDC (testnet). Its only change method is `withdraw`, callable only by the registry. New vaults also export an `ft_on_transfer` that keeps tokens and does nothing else.
@@ -210,6 +218,8 @@ Full method signatures, state layout and events: [DESIGN.md](DESIGN.md). Every d
 ## How control passes on transfer
 
 Nothing is handed over on transfer. There is no key to rotate and the seller keeps no holder power over the sold share. Each owner action reads `nft_token(token_id).owner_id` at call time. One exception: if the seller registered the work, it stays the work's split sheet signer after the sale (see [Known limits](#known-limits)).
+
+![The History tab of share s2 on the live site: a catalog sale moves the share to the buyer, the seller who sold it is refused when it tries to claim, and the buyer claims the payments.](docs/media/04-catalog-sale.webp)
 
 | Threat | What stops it | Proof |
 |---|---|---|
@@ -450,7 +460,7 @@ The site is an Astro app in `site/`, hosted at https://royltee.app (checked 2026
 - Support tickets: wallet sign-in with a NEP-413 signed message checked on the server against a full-access key of the testnet account. Live wallet sign-in on the hosted site is UNVERIFIED.
 - Details, limits, environment variable names and security headers: [site/README.md](site/README.md). No secrets are in the repo; values live in the host's settings.
 
-Screenshots: none yet. **Pre-submission item:** add the landing page, the help chat with the TEE label and the explorer view of the catalog sale, or remove this line.
+Screenshots: the images in this README are captured from the live site, and the [demo video](https://github.com/RoylTEE/RoylTEE/releases/download/v1.0/royltee-demo.mp4) is attached to release v1.0.
 
 ## Simulated vs real
 
@@ -491,6 +501,8 @@ How to rebuild, re-test and re-verify the probe and the echo module, including t
 Status: deployed on NEAR testnet at `auction.royltee-dev.testnet` on 2026-11-14 (UTC) and run once end to end with Simulated mock USDC (steps 17a to 17m of [DEPLOY_PLAN.md](DEPLOY_PLAN.md) step 17; the record is `deployments/auction-testnet.json`). It is also built and tested locally (unit, sandbox and Node tests). The auction has been reviewed by two external reviewers; every finding is mapped to a fix and a test in [THREAT_MODEL.md](THREAT_MODEL.md) (rows T-A1 to T-A27).
 
 **This is a prototype with explicit operator and executor trust.** Four things are stated plainly and are not hidden by the tests: (1) B-02: the live OutLayer keystore refused both outsider requests on chain before any listing (DEPLOY_PLAN 17g, two transactions, see the table below), so the access rule is enforced for those two attacks; that does not prove the module's own caller check on the live worker, because the keystore refused first (the module check is covered by the sandbox and Node tests). (2) B-03: fairness and bid authorization rest on the OutLayer executor. The contract bounds the answer and conserves escrow; it does not prove that bids were decrypted honestly or that the second price was computed correctly, and nothing here is verified fair TEE execution. (3) B-05: recovery is not autonomous. A delivery or return whose callback is lost stays pending until the operator, using the auction account's retained full-access key, settles it from the final receipt outcome. Nothing is decided from the current owner of the share or from elapsed time. (4) B-10: a share sent with a plain `nft_transfer` is not tracked by the auction; only a privileged rescue (registrar or key holder) can move it, per token, by hand. Do not put real value in it.
+
+![The Attestation proof card for the auction on the live site: the five outlayer-verify checks (authenticity, identity, binding, input, output) all show PASS.](docs/media/05-tee-auction-proof.webp)
 
 **Live run on testnet, 2026-11-14 UTC (all mock USDC is Simulated).** Full record: `deployments/auction-testnet.json`; plan and results: DEPLOY_PLAN 17a to 17m.
 

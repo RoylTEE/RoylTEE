@@ -1,5 +1,7 @@
 # Review 03a status
 
+Snapshot from 13 November 2026 (UTC). Branches named here are now merged into `main`. For the current state, see Known limits and Live testnet deployment in the [README](../../README.md).
+
 Review 03a covered the contracts diff `ace5138..e0c2819` (branch `fix/contract-review`) and the judge-facing README, from a pack file only. This file maps each finding to its state on branch `fix/review-03a` (off `fix/contract-review`). Nothing here is deployed. Review 03b later withdrew L8(b) and narrowed M4.
 
 States: **fixed** (changed in code, script or record, with a test or a run), **documented** (stated as residual risk or reworded, no code change), **deferred** (needs the owner's yes or a later step), **false** (the code already does what the finding asks).
