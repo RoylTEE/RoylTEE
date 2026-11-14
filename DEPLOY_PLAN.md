@@ -373,7 +373,7 @@ near account create-account fund-myself $AUCTION '6 NEAR' \
   autogenerate-new-keypair save-to-legacy-keychain sign-as $ROOT $NET $SIGN
 ```
 
-17b. Publish the WASI module with FastFS. The module serves one account, fixed when it is built (default `auction.royltee-dev.testnet`; for any other auction account rebuild with `ROYLTEE_AUCTION_ACCOUNT=<account>` first, and use the new hash everywhere below; findings C1 and B-02). Publish it (1 tx, fails out of gas by design, same as the spike). Build the payload with `spike/outlayer/scripts/fastfs_payload.py`, then check the URL serves the same hash:
+17b. Publish the WASI module with FastFS. The module serves one account, fixed when it is built. `npm run build:wasm` builds it for `auction.royltee-dev.testnet` (Rust 1.99.1, committed lock files, `--locked`; the exact command is in the README). The crate has no default account: a direct build without `ROYLTEE_AUCTION_ACCOUNT` fails to compile. For any other auction account rebuild with `ROYLTEE_AUCTION_ACCOUNT=<account>` set and use the new hash everywhere below (findings C1, B-02 and N-L2). Publish it (1 tx, fails out of gas by design, same as the spike). Build the payload with `spike/outlayer/scripts/fastfs_payload.py`, then check the URL serves the same hash:
 
 ```bash
 python3 spike/outlayer/scripts/fastfs_payload.py $WASI /tmp/auction_fastfs.bin
@@ -501,16 +501,27 @@ near contract call-function as-transaction $AUCTION settle json-args '{"auction_
 near contract call-function as-read-only $AUCTION get_auction json-args '{"auction_id":"0"}' $NET now
 ```
 
-If OutLayer returns nothing or a bad answer, the auction returns to open and `settle` can be called again. Anyone can cancel (refund every bid, share back) 6 hours after `ENDS_AT` once one settle run has failed, and 7 days after `ENDS_AT` in any case. If the sale paid out but the contract stayed in `delivering` (the callback could not be written), wait 15 minutes, add NEAR to the auction account if it is short, and call `reconcile` (17l).
+If OutLayer returns nothing or a bad answer, the auction returns to open and `settle` can be called again. Anyone can cancel (refund every bid, share back) 6 hours after `ENDS_AT` once one settle run has failed, and 7 days after `ENDS_AT` in any case. If a delivery or a share return never reports back and the contract stays in `delivering` or keeps `returning` set, wait 15 minutes, add NEAR to the auction account if it is short, and call `reconcile` (17l). `reconcile` pays the sale only when the winner holds the share; in every other case it only emits `reconcile_pending`, and the operator settles the auction from the receipt outcome with `resolve_delivery` or `resolve_return` (17l).
 
-17l. Recovery calls, only if needed (1 tx each, anyone):
+17l. Recovery calls, only if needed. `reconcile`, `return_share` and `refresh_share` are 1 tx each, anyone. The three `resolve_*` calls are signed by the auction account itself (`sign-as $AUCTION`, its retained full-access key) and only after the final receipt outcome of the exact transfer is known (read it with `near tx-status` or the explorer, then take the sha256 of the receipt JSON as `evidence_hash`; `op_id` is `delivery_op` or `return_op` from `get_auction`). Nothing decides these outcomes from current ownership or from elapsed time:
 
 ```bash
 near contract call-function as-transaction $AUCTION reconcile json-args '{"auction_id":"0"}' \
   prepaid-gas '300 Tgas' attached-deposit '0 NEAR' sign-as $ROOT $NET $SIGN     # a delivery or return that never reported back, after 15 minutes
 near contract call-function as-transaction $AUCTION return_share json-args '{"auction_id":"0"}' \
   prepaid-gas '100 Tgas' attached-deposit '0 NEAR' sign-as $ROOT $NET $SIGN     # retry sending a cancelled auction's share back
+near contract call-function as-transaction $AUCTION resolve_delivery \
+  json-args '{"auction_id":"0","op_id":"1","delivered":true,"evidence_hash":"<64 hex sha256>"}' \
+  prepaid-gas '300 Tgas' attached-deposit '0 NEAR' sign-as $AUCTION $NET $SIGN  # delivered true pays the sale, false cancels and refunds
+near contract call-function as-transaction $AUCTION resolve_return \
+  json-args '{"auction_id":"0","op_id":"2","returned":false,"evidence_hash":"<64 hex sha256>"}' \
+  prepaid-gas '30 Tgas' attached-deposit '0 NEAR' sign-as $AUCTION $NET $SIGN   # returned true marks the share out, false allows return_share again
+near contract call-function as-transaction $AUCTION resolve_withdrawal \
+  json-args '{"id":"0","paid":true,"evidence_hash":"<64 hex sha256>"}' \
+  prepaid-gas '30 Tgas' attached-deposit '0 NEAR' sign-as $AUCTION $NET $SIGN   # paid false drops the record and restores the credit
+near contract call-function as-read-only $AUCTION get_auctions json-args '{"from_index":"0","limit":10}' $NET now  # returns {items, next}; call again with from_index = next until next is null
 ```
+These are chain writes and need the owner's yes each time.
 
 17m. Pay out and prove (1 tx, anyone; seller price, winner change, loser refunds sit in the ledger until pulled). `withdraw` needs 26 Tgas per account plus 10; 300 Tgas covers nine accounts:
 
@@ -523,7 +534,7 @@ near contract call-function as-read-only $AUCTION get_accounting json-args '{}' 
 
 Off chain proof: verify the settle transaction with `outlayer-verify tx <hash> --network testnet --api https://testnet-api.outlayer.ai` (see `spike/outlayer/README.md`). UNVERIFIED for this module until run.
 
-17n. Optional and NOT recommended yet: delete the auction's full-access key, then prove zero keys. Review B says do not delete it on the present evidence, because the key is also the only way to fix a bug or to rescue a stranded share (T-A16, T-A19). Do it only when the owner decides that no further fix is wanted after the rehearsal and the demo. The contract has no owner or admin method, so a bug can only be fixed while the key exists, and while the key exists its holder can claim vault money of listed shares and move all escrow (T-A19).
+17n. Optional and NOT recommended yet: delete the auction's full-access key, then prove zero keys. Review B says do not delete it on the present evidence, because the key is also the only way to fix a bug or to rescue a stranded share (T-A16, T-A19). Do it only when the owner decides that no further fix is wanted after the rehearsal and the demo, and never while an auction is Delivering or returning or `pending_total` in `get_accounting` is not zero: the `resolve_*` calls in 17l need this key and nothing else can finish those states. The contract has no owner or admin method, so a bug can only be fixed while the key exists, and while the key exists its holder can claim vault money of listed shares and move all escrow (T-A19).
 
 ```bash
 near account delete-keys $AUCTION public-keys <the one key printed in 17a> network-config testnet sign-with-legacy-keychain send
