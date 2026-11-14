@@ -12,6 +12,12 @@ crate-type = ["cdylib", "rlib"]
 near-sdk.workspace = true
 near-contract-standards.workspace = true
 
+[features]
+# Test build only: a 1500 block forward release window instead of about a day,
+# so the sandbox can reach it. Never deployed. scripts/build-wasm.sh builds it
+# to contracts/res/registry_short_stale.wasm.
+short-stale-forward = []
+
 [dev-dependencies]
 near-sdk = { workspace = true, features = ["unit-testing"] }
 

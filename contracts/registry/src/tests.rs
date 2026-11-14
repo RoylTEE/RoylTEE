@@ -128,7 +128,7 @@ fn pay_share(c: &mut Registry, token_id: &TokenId, amount: u128) {
     let r = c.ft_on_transfer(acc("payer.near"), U128(amount), msg.to_string());
     assert!(matches!(r, PromiseOrValue::Value(U128(0))));
     callback(ok(b""));
-    assert!(c.on_forward(token_id.clone(), U128(amount), None));
+    assert!(c.on_forward(token_id.clone(), U128(amount), Some(U64(0))));
 }
 
 fn ledger(c: &Registry, t: &TokenId) -> LedgerView {
@@ -588,7 +588,7 @@ fn under_allocated_group_pays_exact_bps_and_escrows_the_rest() {
     assert_eq!(c.get_accounting().forwards_in_flight_total.0, 750_001);
     for (t, amt) in [(&a, 500_001u128), (&b, 250_000)] {
         callback(ok(b""));
-        c.on_forward(t.clone(), U128(amt), None);
+        c.on_forward(t.clone(), U128(amt), Some(U64(0)));
     }
     assert_eq!(ledger(&c, &a).known_balance.0, 500_001);
     assert_eq!(ledger(&c, &b).known_balance.0, 250_000);
@@ -624,7 +624,7 @@ fn under_allocated_group_pays_exact_bps_and_escrows_the_rest() {
     );
     assert_eq!(c.get_accounting().unallocated_total.0, 0);
     callback(ok(b""));
-    c.on_forward(d.clone(), U128(250_002), None);
+    c.on_forward(d.clone(), U128(250_002), Some(U64(0)));
     assert_eq!(ledger(&c, &d).known_balance.0, 250_002);
 
     // Now full: the next payment leaves nothing unallocated.
@@ -681,7 +681,7 @@ fn failed_forward_goes_to_undelivered() {
         json!({ "pay_share": { "token_id": t, "period": "2026-Q3", "statement_hash": h('f') } });
     let _ = c.ft_on_transfer(acc("payer.near"), U128(50_000), msg.to_string());
     callback(PromiseResult::Failed);
-    assert!(!c.on_forward(t.clone(), U128(50_000), None));
+    assert!(!c.on_forward(t.clone(), U128(50_000), Some(U64(0))));
     let l = ledger(&c, &t);
     assert_eq!(
         (l.known_balance.0, l.undelivered.0, l.inbound_pending),
@@ -1039,9 +1039,9 @@ fn agent_pays_registered_shares_only_and_once_per_line() {
     assert!(logs.contains("\"source\":\"allowance\""));
     assert!(logs.contains("allowance_spent"));
     callback(ok(b""));
-    c.on_forward(t1.clone(), U128(60_000), None);
+    c.on_forward(t1.clone(), U128(60_000), Some(U64(0)));
     callback(ok(b""));
-    c.on_forward(t2.clone(), U128(40_000), None);
+    c.on_forward(t2.clone(), U128(40_000), Some(U64(0)));
     assert_eq!(ledger(&c, &t1).known_balance.0, 60_000);
     assert_eq!(ledger(&c, &t2).known_balance.0, 40_000);
     let r = c.get_role(agent()).unwrap();
@@ -1298,14 +1298,14 @@ fn retry_forward_resends_undelivered() {
         json!({ "pay_share": { "token_id": t, "period": "2026-Q3", "statement_hash": h('f') } });
     let _ = c.ft_on_transfer(acc("payer.near"), U128(80_000), msg.to_string());
     callback(PromiseResult::Failed);
-    assert!(!c.on_forward(t.clone(), U128(80_000), None));
+    assert!(!c.on_forward(t.clone(), U128(80_000), Some(U64(0))));
     assert_eq!(c.get_accounting().undelivered_total.0, 80_000);
     call(&acc("anyone.near"), NearToken::from_yoctonear(0));
     c.retry_forward(t.clone());
     assert_eq!(c.get_accounting().undelivered_total.0, 0);
     assert_eq!(c.get_accounting().forwards_in_flight_total.0, 80_000);
     callback(ok(b""));
-    assert!(c.on_forward(t.clone(), U128(80_000), None));
+    assert!(c.on_forward(t.clone(), U128(80_000), Some(U64(0))));
     assert_eq!(ledger(&c, &t).known_balance.0, 80_000);
     call(&acc("anyone.near"), NearToken::from_yoctonear(0));
     assert!(panics(|| c.retry_forward(t)), "nothing left to retry");
@@ -1437,7 +1437,7 @@ fn pay_work_msg(c: &mut Registry, w: WorkId, amount: u128) -> PromiseOrValue<U12
 
 fn settle(c: &mut Registry, t: &TokenId, amount: u128) {
     callback(ok(b""));
-    assert!(c.on_forward(t.clone(), U128(amount), None));
+    assert!(c.on_forward(t.clone(), U128(amount), Some(U64(0))));
 }
 
 fn resolve(c: &mut Registry, id: DisputeId, outcome: Outcome) {

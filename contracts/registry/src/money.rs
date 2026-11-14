@@ -119,6 +119,10 @@ impl Registry {
             "share has no vault"
         );
         require!(Self::has_gas_for_forwards(1), "not enough gas to forward");
+        require!(
+            !forwards::watch_older_than(&token_id, STALE_FORWARD_BLOCKS),
+            "a stale forward is stuck on this share: release it first"
+        );
         let l = self.ledger_mut(&token_id);
         let amount = l.undelivered;
         require!(amount > 0, "nothing undelivered");
@@ -132,13 +136,26 @@ impl Registry {
     }
 
     /// Clears a lock older than `STALE_LOCK_BLOCKS` (T19). Anyone may call
-    /// it. A transfer lock is cleared at once and the current owner keeps
-    /// the token. A payout lock is cleared by `on_release_payout` after the
-    /// vault's real balance is read (T19, audit F3): the debit is undone
-    /// only if the balance shows the withdraw never happened, and is kept
-    /// otherwise. If a payment forward is also stuck on the share, the
-    /// payout lock is cleared at once without a read, as before F3 was
-    /// addressed, and `anomaly` marks the share.
+    /// it.
+    ///
+    /// A transfer lock is cleared at once and the current owner keeps the
+    /// token.
+    ///
+    /// A payout lock is never cleared blindly (audit F3, A-02, A-03). When
+    /// the share has no pending forward and no quarantined amount, the
+    /// vault's balance is read and `on_release_payout` clears the lock only
+    /// for an exact match: balance equal to the ledger's known balance means
+    /// the withdraw happened (the debit stays); balance equal to known balance
+    /// plus the locked amount means it did not (the debit is undone). Any
+    /// other balance cannot be attributed, because a balance does not show
+    /// where its units came from, so the lock stays. The same holds while a
+    /// forward is pending or quarantined on the share. A lock that stays is
+    /// cleared by the real `on_claim` callback if it still arrives, or by
+    /// the registrar with `resolve_stale_payout`.
+    ///
+    /// If only a payout lock is stale and it cannot be read, the call is
+    /// refused. If a stale transfer lock is released in the same call, the
+    /// payout lock is simply left as it is.
     pub fn release_stale_lock(&mut self, token_id: TokenId) -> PromiseOrValue<()> {
         let now = env::block_height();
         let stale = |k: &Option<Lock>| {
@@ -147,49 +164,34 @@ impl Registry {
         };
         let vault = self.share(&token_id).vault.clone();
         let usdc = self.usdc.clone();
-        let forward_stale = forwards::read_watch(&token_id)
-            .is_some_and(|w| w.count > 0 && now >= w.since.saturating_add(STALE_LOCK_BLOCKS));
+        let quarantined = forwards::written_off(&token_id) > 0;
         let l = self.ledger_mut(&token_id);
         let payout_stale = stale(&l.payout_in_flight);
         let transfer_stale = stale(&l.transfer_pending);
         require!(payout_stale || transfer_stale, "no stale lock");
-        let read_balance = payout_stale && l.inbound_pending == 0;
+        let read_balance = payout_stale && l.inbound_pending == 0 && !quarantined;
         require!(
-            !payout_stale || read_balance || forward_stale,
-            "payment forward in flight: release the payout lock after it settles"
+            !payout_stale || read_balance || transfer_stale,
+            "payout lock cannot be read while a forward is pending or quarantined: the registrar resolves it"
         );
         if read_balance {
             require!(
                 env::prepaid_gas().as_gas()
                     >= GAS_FT_BALANCE.as_gas()
-                        + GAS_RELEASE_FORWARD_CB.as_gas()
+                        + GAS_RELEASE_PAYOUT_CB.as_gas()
                         + Gas::from_tgas(5).as_gas(),
                 "not enough gas attached"
             );
         }
-        let mut released = Vec::new();
-        if transfer_stale {
-            released.push(("transfer_pending", l.transfer_pending.take()));
-        }
-        if payout_stale && !read_balance {
-            released.push(("payout_in_flight", l.payout_in_flight.take()));
-        }
-        if !released.is_empty() {
-            l.epoch += 1;
-        }
+        let released = transfer_stale.then(|| l.transfer_pending.take());
+        l.epoch += 1;
         let epoch = l.epoch;
         let lock = l.payout_in_flight.clone();
-        for (kind, lock) in released {
+        if let Some(lock) = released {
             emit(
                 "lock_released_stale",
-                json!({ "token_id": token_id, "lock": kind, "detail": lock }),
+                json!({ "token_id": token_id, "lock": "transfer_pending", "detail": lock }),
             );
-            if kind == "payout_in_flight" {
-                emit(
-                    "anomaly",
-                    json!({ "token_id": token_id, "kind": "payout_lock_released_stale", "detail": "sync to reconcile the vault balance" }),
-                );
-            }
         }
         match lock.filter(|_| read_balance) {
             Some(lock) => PromiseOrValue::Promise(
@@ -202,7 +204,7 @@ impl Registry {
                     )
                     .then(
                         Self::ext(env::current_account_id())
-                            .with_static_gas(GAS_RELEASE_FORWARD_CB)
+                            .with_static_gas(GAS_RELEASE_PAYOUT_CB)
                             .on_release_payout(token_id, U64(epoch), lock.since_block, lock.amount),
                     ),
             ),
@@ -210,17 +212,19 @@ impl Registry {
         }
     }
 
-    /// Settles the payout part of `release_stale_lock` (audit F3). With the
-    /// lock still the same and the ledger unchanged since the read began:
+    /// Settles the payout part of `release_stale_lock`. With the lock still
+    /// the same, the ledger unchanged since the read began and no forward
+    /// pending or quarantined:
     /// - vault balance equals the ledger's known balance: the withdraw
     ///   happened, the debit is right, the lock is cleared;
     /// - vault balance is exactly known balance plus the locked amount: the
     ///   withdraw did not happen, so the debit is undone (known balance back,
     ///   paid out back), which keeps `earned` and `total_paid_out` true;
-    /// - anything else cannot be told apart from a plain deposit: the lock is
-    ///   cleared without undoing the debit and `anomaly` marks the share, as
-    ///   before. A failed read leaves the lock as it is, to try again.
-    /// Never panics. Returns true if the lock was cleared.
+    /// - anything else: the lock stays and `payout_uncertain` is emitted. No
+    ///   history is published from an ambiguous balance.
+    /// A failed read or a changed ledger leaves the lock too
+    /// (`release_discarded`). Never panics. Returns true if the lock was
+    /// cleared.
     #[private]
     pub fn on_release_payout(
         &mut self,
@@ -230,6 +234,7 @@ impl Registry {
         amount: U128,
     ) -> bool {
         let observed = callback_result(64).and_then(|v| serde_json::from_slice::<U128>(&v).ok());
+        let quarantined = forwards::written_off(&token_id) > 0;
         let Some(l) = self.ledgers.get_mut(&token_id) else {
             return false;
         };
@@ -243,6 +248,7 @@ impl Registry {
             || l.epoch != epoch.0
             || l.transfer_pending.is_some()
             || l.inbound_pending > 0
+            || quarantined
         {
             Some("ledger changed during the read")
         } else {
@@ -250,34 +256,71 @@ impl Registry {
         };
         if let Some(reason) = discard_reason {
             emit(
-                "sync_discarded",
+                "release_discarded",
                 json!({ "token_id": token_id, "reason": reason }),
             );
             return false;
         }
         let observed = observed.map_or(0, |o| o.0);
-        let lock = l.payout_in_flight.take();
-        l.epoch += 1;
         let outcome = if observed == l.known_balance {
             "withdraw_happened"
         } else if amount.0 > 0 && observed == l.known_balance.saturating_add(amount.0) {
-            l.known_balance += amount.0;
-            l.total_paid_out = l.total_paid_out.saturating_sub(amount.0);
             "withdraw_failed_debit_undone"
         } else {
-            "unclear"
+            emit(
+                "payout_uncertain",
+                json!({ "token_id": token_id, "amount": amount, "observed": U128(observed), "known_balance": U128(l.known_balance), "detail": "balance matches neither outcome; the real callback or the registrar settles it" }),
+            );
+            return false;
         };
+        let lock = l.payout_in_flight.take();
+        l.epoch += 1;
+        if outcome == "withdraw_failed_debit_undone" {
+            l.known_balance += amount.0;
+            l.total_paid_out = l.total_paid_out.saturating_sub(amount.0);
+        }
         emit(
             "lock_released_stale",
             json!({ "token_id": token_id, "lock": "payout_in_flight", "detail": lock, "outcome": outcome }),
         );
-        if outcome == "unclear" {
-            emit(
-                "anomaly",
-                json!({ "token_id": token_id, "kind": "payout_lock_released_stale", "detail": "sync to reconcile the vault balance" }),
-            );
-        }
         true
+    }
+
+    /// Registrar only. Settles a stale payout lock that no callback and no
+    /// exact balance could settle. `paid` is whether the vault withdraw
+    /// reached the holder, read from the public receipt outcome off chain.
+    /// `true`: the debit stays and the lock is cleared. `false`: the debit is
+    /// undone (known balance and paid out go back). Only for a lock older than
+    /// `STALE_LOCK_BLOCKS`. A wrong answer is a registrar error, see
+    /// THREAT_MODEL T12 and T19. A later `sync` then reads the vault balance.
+    #[payable]
+    pub fn resolve_stale_payout(&mut self, token_id: TokenId, paid: bool, doc_hash: Hash32) {
+        assert_one_yocto();
+        self.assert_registrar();
+        require!(
+            logic::is_hash32(&doc_hash),
+            "doc_hash must be 64 lowercase hex characters"
+        );
+        let now = env::block_height();
+        let l = self.ledger_mut(&token_id);
+        let lock = l
+            .payout_in_flight
+            .as_ref()
+            .filter(|k| now >= k.since_block.0.saturating_add(STALE_LOCK_BLOCKS))
+            .cloned();
+        let Some(lock) = lock else {
+            env::panic_str("no stale payout lock");
+        };
+        l.payout_in_flight = None;
+        l.epoch += 1;
+        if !paid {
+            l.known_balance += lock.amount.0;
+            l.total_paid_out = l.total_paid_out.saturating_sub(lock.amount.0);
+        }
+        emit(
+            "payout_resolved",
+            json!({ "token_id": token_id, "paid": paid, "amount": lock.amount, "doc_hash": doc_hash }),
+        );
     }
 
     /// Reads the vault's real token balance and records it, so plain
@@ -314,6 +357,10 @@ impl Registry {
         require!(ledger.transfer_pending.is_none(), "transfer pending");
         require!(ledger.inbound_pending == 0, "payment forward in flight");
         let epoch = ledger.epoch;
+        require!(
+            forwards::written_off(&token_id) == 0,
+            "a quarantined forward is unresolved: wait for its callback or the registrar"
+        );
         Promise::new(self.usdc.clone())
             .function_call(
                 "ft_balance_of".to_string(),
@@ -338,7 +385,8 @@ impl Registry {
             .shares
             .get(&token_id)
             .is_none_or(|s| s.dispute.is_some())
-            || !self.is_approved(&token_id);
+            || !self.is_approved(&token_id)
+            || forwards::written_off(&token_id) > 0;
         let ledger = self.ledgers.get_mut(&token_id)?;
         let Some(observed) = observed else {
             emit(
@@ -549,9 +597,9 @@ impl Registry {
     /// Settles one forward. On failure the amount stays in the registry as
     /// `undelivered` (T26). `since` is the block the forward started in;
     /// callbacks that were already in flight before the T19b upgrade carry
-    /// none. A forward written off by `release_stale_forward` changes
-    /// nothing here: the release already set the ledger from the vault
-    /// balance. Never panics.
+    /// none. A forward quarantined by `release_stale_forward` is settled by
+    /// `settle_late_forward`: credited if the transfer succeeded, moved to
+    /// `undelivered` if not. Panics only on a damaged watch entry (T19b).
     #[private]
     pub fn on_forward(&mut self, token_id: TokenId, amount: U128, since: Option<U64>) -> bool {
         let ok = callback_result(64).is_some();
@@ -559,13 +607,7 @@ impl Registry {
             forwards::watch_settle(&token_id, amount.0, since.map(|s| s.0)),
             forwards::Settle::Late
         ) {
-            if let Some(l) = self.ledgers.get_mut(&token_id) {
-                l.epoch += 1;
-            }
-            emit(
-                "anomaly",
-                json!({ "token_id": token_id, "kind": "late_forward_callback", "ok": ok, "amount": amount, "detail": "already released by release_stale_forward" }),
-            );
+            self.settle_late_forward(&token_id, amount.0, ok);
             return ok;
         }
         self.forwards_in_flight_total = self.forwards_in_flight_total.saturating_sub(amount.0);
@@ -771,9 +813,21 @@ impl Registry {
         if amount == 0 {
             return;
         }
+        // A stuck forward older than STALE_FORWARD_BLOCKS stops all new sends
+        // to this share; the money waits in `undelivered` (M1).
+        let Some(since) = forwards::watch_begin(token_id, amount) else {
+            self.undelivered_total += amount;
+            let l = self.ledger_mut(token_id);
+            l.undelivered += amount;
+            l.epoch += 1;
+            emit(
+                "forward_held",
+                json!({ "token_id": token_id, "amount": U128(amount), "reason": "stale_forward" }),
+            );
+            return;
+        };
         let vault = self.share(token_id).vault.clone();
         self.forwards_in_flight_total += amount;
-        let since = forwards::watch_start(token_id, amount);
         let l = self.ledger_mut(token_id);
         l.inbound_pending += 1;
         l.epoch += 1;

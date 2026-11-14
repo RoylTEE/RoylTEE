@@ -65,8 +65,18 @@ pub const MIN_GROUP_PAYMENT: u128 = 10_000;
 pub const MAX_EFFECTIVE_FUTURE_NS: u64 = 30 * 24 * 3600 * 1_000_000_000;
 
 /// A lock older than this many blocks may be cleared by anyone (T19).
-/// About 20 minutes at one block per second. Long enough under congestion: UNVERIFIED.
+/// About 12 minutes at the 0.59 s block time measured on testnet on
+/// 2026-11-14 (AUDIT.md). Long enough under congestion: UNVERIFIED.
 pub const STALE_LOCK_BLOCKS: u64 = 1_200;
+/// A payment forward whose callback has not run for this many blocks may be
+/// released by anyone (T19b). About 24.5 hours at 0.59 s. Much longer than
+/// the lock window, because a release cannot tell a lost callback from a late
+/// transfer; it quarantines what it cannot find and never resends it.
+#[cfg(not(feature = "short-stale-forward"))]
+pub const STALE_FORWARD_BLOCKS: u64 = 150_000;
+/// Sandbox test build only (feature `short-stale-forward`), never deployed.
+#[cfg(feature = "short-stale-forward")]
+pub const STALE_FORWARD_BLOCKS: u64 = 1_500;
 /// A share Pending this long (its mint callbacks never committed) may be
 /// failed by anyone (review M1). Same 20 minutes as STALE_LOCK_BLOCKS.
 pub const STALE_MINT_NS: u64 = 20 * 60 * 1_000_000_000;
@@ -108,8 +118,8 @@ const _: () = assert!(
 );
 pub const GAS_FT_BALANCE: Gas = Gas::from_tgas(5);
 pub const GAS_SYNC_CB: Gas = Gas::from_tgas(5);
-/// Callback of `release_stale_forward` and of the stale payout read.
-pub const GAS_RELEASE_FORWARD_CB: Gas = Gas::from_tgas(10);
+/// Callback of the stale payout read.
+pub const GAS_RELEASE_PAYOUT_CB: Gas = Gas::from_tgas(10);
 pub const GAS_NFT_ON_TRANSFER_MIN: Gas = Gas::from_tgas(25);
 pub const GAS_RESOLVE_TRANSFER: Gas = Gas::from_tgas(10);
 

@@ -298,9 +298,11 @@ pub struct Dispute {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ForwardWatchView {
     pub since_block: U64,
+    pub latest_block: U64,
     pub amount: U128,
     pub count: u32,
     pub released_through: U64,
+    pub written_off: U128,
 }
 
 #[near(serializers = [json])]
