@@ -1,0 +1,622 @@
+{
+  "writtenFrom": "deployments/testnet.json",
+  "recordWrittenAtUtc": "2026-11-14T02:50:33Z",
+  "txs": {
+    "Dc9UC9uoBvbnUCHBhhYH61spAHNQwdGRaexvGJj5Jjv2": {
+      "step": "1",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:22:31.509Z"
+    },
+    "GBArKSzp5EZvuAsmazaApecEgsnDq8ZzRQZn7aCDq9WH": {
+      "step": "1",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:22:33.892Z"
+    },
+    "CqgWcrji8eNHpbqQjgTXBaedeB2VjQ4aHbJ7jvy76LbR": {
+      "step": "1",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:22:36.293Z"
+    },
+    "3p5XicR5K6VZZ3fyXd3ajme18jK9GVCvF1MptUjQCzhV": {
+      "step": "2",
+      "method": "TRANSFER",
+      "success": true,
+      "at": "2026-11-13T05:24:15.588Z"
+    },
+    "DuHBA6BhJL6xBtJnmgFiTQSp8SPBQma6oNiK1t4fCG5q": {
+      "step": "2",
+      "method": "TRANSFER",
+      "success": true,
+      "at": "2026-11-13T05:24:19.950Z"
+    },
+    "2w6e8cpFR3Te6SN37boNG2yjQBaF1nSYoEgtaJQh7oLL": {
+      "step": "3",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:25:08.981Z"
+    },
+    "4SdSyjyavgTHmguaH6wwhaL44A9kD6i9qJ7mkFqFJ4HW": {
+      "step": "3",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:25:13.762Z"
+    },
+    "J3Nsa96BCjRdTcoKPH2aRMTpcmjaJkhbK76DZp6prtY4": {
+      "step": "3",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:25:18.598Z"
+    },
+    "3zMViPrv5wSvaEQjwzmK6Ed4yHawgf5WHirG3vHhMeUP": {
+      "step": "3",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:25:22.846Z"
+    },
+    "BUHnhUj8L4SzsFw4nj17UwmvawKu7uZiThVrnQorvR4N": {
+      "step": "3",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:25:27.697Z"
+    },
+    "55zQtvog1Jm8Wag82p6tr9SyqVdQB8EX6xadmRM2Kfkb": {
+      "step": "3",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:25:31.975Z"
+    },
+    "Cro9NxTB5hdV6sdeQhZFm8eRhWJTYiJMeKRtjkeUFPde": {
+      "step": "3",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:25:36.882Z"
+    },
+    "DJovCyZmzC5x4Qnzg6eAzc2VvgPfkAC3hqcMP7PRdyNB": {
+      "step": "3",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T05:25:41.081Z"
+    },
+    "APzCzPmVMWStFkwXkJXYX4JQPQqYYghjkWKYR3c6vcmK": {
+      "step": "4",
+      "method": "deploy+new",
+      "success": true,
+      "at": "2026-11-13T05:26:32.061Z"
+    },
+    "Ckk8dvY7sR2fKpDBEQ1akEVx8QSviSNmJCKkyBRjpXeN": {
+      "step": "5",
+      "method": "deploy+new",
+      "success": true,
+      "at": "2026-11-13T05:34:28.408Z"
+    },
+    "C1GNRhzLHUR7Tj4dvro66rzd2m7W9B2kgNtKm5CVP7y7": {
+      "step": "7",
+      "method": "storage_deposit",
+      "success": true,
+      "at": "2026-11-13T05:40:47.659Z"
+    },
+    "2JuQenXQYe8DiWZBfAN6AhdvDAeZbbRLM1PwwdXuU1Ty": {
+      "step": "7",
+      "method": "storage_deposit",
+      "success": true,
+      "at": "2026-11-13T05:40:52.536Z"
+    },
+    "D1kHgerP4xVj7jmCp8JoGUSvHZE8grp19U7XcBHCh8Hs": {
+      "step": "7",
+      "method": "mint",
+      "success": true,
+      "at": "2026-11-13T05:40:58.036Z"
+    },
+    "Bv7cDUgGrGxgqaXr5FJnGpauqw1DcLpJmUuTMnrydFa6": {
+      "step": "8",
+      "method": "grant_credential",
+      "success": true,
+      "at": "2026-11-13T05:48:03.791Z"
+    },
+    "8QffMekUyzGzF6UvPX256tUBBBcXsjhy5M6GTHibUjkB": {
+      "step": "8",
+      "method": "grant_credential",
+      "success": true,
+      "at": "2026-11-13T05:48:09.234Z"
+    },
+    "3dqBCz6QkbdbDqkZFSqvmfzHjuZHRkVt45A5kbAvg6Vq": {
+      "step": "8",
+      "method": "grant_credential",
+      "success": true,
+      "at": "2026-11-13T05:48:37.063Z"
+    },
+    "BPPDyNSdA8T3uUR1DFmWGj48Wx7mjQtnh9h931g2myL6": {
+      "step": "9",
+      "method": "register_work",
+      "success": true,
+      "at": "2026-11-13T05:49:35.160Z"
+    },
+    "DNYpArZtk7YFkwVSemz9tqqJ412Z9d9bAzeZfqLVUC8g": {
+      "step": "9",
+      "method": "register_work",
+      "success": true,
+      "at": "2026-11-13T05:49:40.079Z"
+    },
+    "FUXXssztjGSmyiuTFbdM2cajmUU1U83VjG5ghNcTKKMK": {
+      "step": "9",
+      "method": "register_work",
+      "success": true,
+      "at": "2026-11-13T05:49:44.917Z"
+    },
+    "7wxZ7Bmstzu9qTUayrvzbGP97tcD6GRLMaZo7pTVAqzh": {
+      "step": "9",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T05:49:49.811Z"
+    },
+    "5w2dvQS54div1eWYPrfFBteYK541cQiCxfvfKhEYw51c": {
+      "step": "9",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T05:49:56.435Z"
+    },
+    "6TM8ZRPrH88GXN9AcgBCF7WGkyLLnn64PnkRnqNEg3Fz": {
+      "step": "9",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T05:50:03.787Z"
+    },
+    "DPSu7aR4HCsTp4mvvAKgbTbwcAzDnvADYBmvsoSpANuH": {
+      "step": "9",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T05:50:10.338Z"
+    },
+    "79TqB2ZMs8DcTGpsvYidKvffe4ytf7gWngWDveJnVhDf": {
+      "step": "9",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T05:50:17.072Z"
+    },
+    "4VFK3fPFo5Amk9B6r2KzBqpkVEmYNtN53vpcHyLC9q5J": {
+      "step": "9",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T05:50:23.745Z"
+    },
+    "HBzKi5ptr5sGvPSgwWQSUNMKBRJksNCp3tAeT4xByo8u": {
+      "step": "10",
+      "method": "ft_transfer_call",
+      "success": true,
+      "at": "2026-11-13T05:57:09.493Z"
+    },
+    "5wiQVMdfYtuFvUsYcaTeM31sZPizytAaT8etsDx9dQZo": {
+      "step": "10",
+      "method": "ft_transfer",
+      "success": true,
+      "at": "2026-11-13T05:57:15.538Z"
+    },
+    "2Jsht1EatGqZfeVrZePKyVMQPyqyeqTCpEcoaHWK44LY": {
+      "step": "10",
+      "method": "sync",
+      "success": true,
+      "at": "2026-11-13T05:57:19.014Z"
+    },
+    "FLzUW7hfLkY1waMuwRDoLCdhAxKsXyxv2FmJ4UoRnsNH": {
+      "step": "11",
+      "method": "claim",
+      "success": true,
+      "at": "2026-11-13T05:59:16.712Z"
+    },
+    "HZ9pD2kLbqbjmKqC68ao6KBTUpQmQstyd2Tro8hWwYPy": {
+      "step": "11",
+      "method": "nft_transfer",
+      "success": true,
+      "at": "2026-11-13T05:59:22.382Z"
+    },
+    "M4pWDbEgnUfz4TiJA8ZZdNVCnwV9vzsBnnEqRgALDrp": {
+      "step": "11",
+      "method": "claim",
+      "success": true,
+      "at": "2026-11-13T05:59:25.899Z"
+    },
+    "Agtkfe5qEGaXzYQJsHdUxXL7ELx4D432sM4bHPRSiM8R": {
+      "step": "11",
+      "method": "TRANSFER",
+      "success": true,
+      "at": "2026-11-13T06:01:20.022Z"
+    },
+    "GvcHLtG7vLQXihNgbH6cmGSnG8QWhsNgzYGFQ2URwAVB": {
+      "step": "11",
+      "method": "claim",
+      "success": false,
+      "error": "only the current holder can claim",
+      "at": "2026-11-13T06:01:26.185Z"
+    },
+    "9ysr9ZjYxTi2noGfDLRe7msVAqAqbpG4FvePejnHXdf8": {
+      "step": "12",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-13T06:38:18.382Z"
+    },
+    "CnXEfU7QdnoBPEqvkf1fU1rPd3idUDWABhz6eYzS7Xuf": {
+      "step": "12",
+      "method": "ADD_KEY",
+      "success": true,
+      "at": "2026-11-13T06:38:35.328Z"
+    },
+    "5W1zDz8JVPt8p39PXxZhY7c5vZ5gyUdiTC3vKRSR9rAo": {
+      "step": "12",
+      "method": "grant_role",
+      "success": true,
+      "at": "2026-11-13T06:38:50.471Z"
+    },
+    "3HjExU75Ge7kzRu9boJbmKuEv3nirxfhYGHdxseYfi4k": {
+      "step": "12",
+      "method": "ft_transfer",
+      "success": true,
+      "at": "2026-11-13T06:38:55.403Z"
+    },
+    "28CT65SBxByM6HA9KDRoJQSFpqymz6KxafdFJEMXhBaQ": {
+      "step": "12",
+      "method": "ft_transfer_call",
+      "success": true,
+      "at": "2026-11-13T06:38:59.668Z"
+    },
+    "7DJThzgCgnZYf9uNhPgH5ZsuJKx8mJqHkiLcqszdRSTu": {
+      "step": "12",
+      "method": "pay_from_allowance",
+      "success": true,
+      "at": "2026-11-13T06:39:11.102Z"
+    },
+    "CmRvd9ZNcfsR5EnMsc3VJ6YYncE3mQgLWqF21YhS1w5G": {
+      "step": "12",
+      "method": "report",
+      "success": true,
+      "at": "2026-11-13T06:45:05.826Z"
+    },
+    "7Bwi9rmQk4R4iApdVTXMWLkGjMgDnh2qZiVEfGPY5NAH": {
+      "step": "12",
+      "method": "DELETE_KEY",
+      "success": true,
+      "at": "2026-11-13T06:45:15.045Z"
+    },
+    "2547uRUDcHokGMabzgLXdHZVfuG1VzDyxBc2X1rxmFb3": {
+      "step": "12",
+      "method": "pay_from_allowance",
+      "success": false,
+      "error": "statement line already paid",
+      "at": "2026-11-13T06:45:37.520Z"
+    },
+    "3uKby5aP5pN6sMEp1EJSWn7xDEzyH2nASNzS7ccstJba": {
+      "step": "13",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T07:42:25.256Z"
+    },
+    "C8H28Nx1MZ5Pjb13uzkvheAh7S6Jf5mdqqHqmM1n7Mu": {
+      "step": "13",
+      "method": "ft_transfer_call",
+      "success": true,
+      "at": "2026-11-13T07:42:40.068Z"
+    },
+    "7wvLcnuB5L6w3rh3tBL2Jgg7yTMErD9QduC1XLSAYUVi": {
+      "step": "13",
+      "method": "resolve",
+      "success": true,
+      "at": "2026-11-13T07:42:54.535Z"
+    },
+    "9oR5awwxiJPouDhpYdTxTquskc8YpoFHdmAJy4SrrAMp": {
+      "step": "15",
+      "method": "DEPLOY_CONTRACT",
+      "success": true,
+      "at": "2026-11-13T18:54:40.170Z"
+    },
+    "2aAgWtcaEC1RinbQvVS1AoLpZn7zQeEmzAGW3FshXHQA": {
+      "step": "demo W1",
+      "method": "ft_transfer_call",
+      "success": true,
+      "at": "2026-11-13T21:22:29.265Z"
+    },
+    "EYDV3Tsv7Q1ZFPnJzmVdk6D4Rtosqpn8fYNY71ofVWJU": {
+      "step": "demo W2",
+      "method": "claim",
+      "success": false,
+      "error": "only the current holder can claim",
+      "at": "2026-11-13T21:23:41.992Z"
+    },
+    "ASynFkHYZ5CxZdSi6paosMVuZiQf66mvEusNn4mnxhiw": {
+      "step": "demo W3",
+      "method": "claim",
+      "success": true,
+      "at": "2026-11-13T21:25:04.215Z"
+    },
+    "3er9FiUfRj1msBQkDbM2WhxazMou8hdRw95xPPs1eyKA": {
+      "step": "demo W4",
+      "method": "register_work",
+      "success": true,
+      "at": "2026-11-13T21:25:55.241Z"
+    },
+    "FGrwBa58Empz2zW1Yj2BTHPvaSw9ZjsrVrDT6PrbN4gf": {
+      "step": "demo W5",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T21:26:44.602Z"
+    },
+    "BDE7EtebNBcfNX5PXCi2aniUCaLwQivKzQwpvSxq7Cft": {
+      "step": "demo W6",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T21:27:29.598Z"
+    },
+    "BRt579jXQx8bhwbMHhtaykeik7D86TWLBVgEX3VNEp1K": {
+      "step": "demo W7",
+      "method": "register_work",
+      "success": true,
+      "at": "2026-11-13T21:28:38.464Z"
+    },
+    "46nERgHy9ydk3x58zwqMCmrrVSnvMJQNMKd26BhpPebe": {
+      "step": "demo W8",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T21:29:08.215Z"
+    },
+    "vhe6Vgoc9btbQia4ArgcsbygYiECAmbSm58hqTy1qph": {
+      "step": "demo W9",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T21:30:18.713Z"
+    },
+    "2XjtVThM4g7tRkt79XCj1inLj1bBk3vNZiKAbUmQsBaW": {
+      "step": "demo W10",
+      "method": "pay_from_allowance",
+      "success": true,
+      "at": "2026-11-13T21:31:47.944Z"
+    },
+    "7Vu5wRDqx7dj487LAk3e69wFt6FmH8bMNfzpL8E2LuaW": {
+      "step": "demo W11",
+      "method": "pay_from_allowance",
+      "success": false,
+      "error": "over per-transaction limit",
+      "at": "2026-11-13T21:33:42.841Z"
+    },
+    "ryAcUUtRGdxyzsraWZjJE3SnytCbZzpsmZNNCmNFq3y": {
+      "step": "demo W12",
+      "method": "register_work",
+      "success": true,
+      "at": "2026-11-13T21:35:07.079Z"
+    },
+    "GJopxb2zVGHNEgSUq9RKFHA3wmBYjcyM4wVmhZH5NcKd": {
+      "step": "demo W13",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T21:35:29.474Z"
+    },
+    "FR5SZZWyr9dfQdpkxDTQamQXXoRKG6SPTPwK7NU21W1P": {
+      "step": "demo W14",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-13T21:36:11.171Z"
+    },
+    "CUW8qssJVCJZuUgzzWHf9bdEyNCkFXpQjUKrJeWXeVPS": {
+      "step": "demo W15",
+      "method": "pay_from_allowance",
+      "success": true,
+      "at": "2026-11-13T21:37:47.217Z"
+    },
+    "BGBUJDTnnjpevSUZkdmfeVASxbKHn1FQDAZqj75kH5rU": {
+      "step": "audit F1 redeploy",
+      "method": "DEPLOY_CONTRACT",
+      "success": true,
+      "at": "2026-11-14T02:43:52.041Z"
+    },
+    "52jp95BVJCk6a9bUGyYtYEQq99R56Xiz5zxJ1vCHBJrD": {
+      "step": "final contract fixes redeploy (atomic deploy and assert_quiescent)",
+      "method": "DEPLOY_CONTRACT",
+      "success": true,
+      "at": "2026-11-14T09:09:40.509Z"
+    },
+    "6c1KYbcDcNvYqzLUMTyiPWWoouSLprQhViPrtoY4punJ": {
+      "step": "auction 17a",
+      "method": "CREATE_ACCOUNT",
+      "success": true,
+      "at": "2026-11-14T09:33:49.715Z"
+    },
+    "4c4xPqRuuhfcmj949aMzDB8VuvxGYFNiWK6B5cxMBrG1": {
+      "step": "auction 17b",
+      "method": "__fastdata_fastfs",
+      "success": false,
+      "error": null,
+      "at": "2026-11-14T09:38:41.342Z"
+    },
+    "EWWMu3chsa56hBybTpZ5hgiM6bazXRBekESv7KzpWYEt": {
+      "step": "auction 17c",
+      "method": "DEPLOY_CONTRACT",
+      "success": true,
+      "at": "2026-11-14T09:41:36.715Z"
+    },
+    "2zysmt9BZCbFs3bcVQSdwQPouPNgtt4W1DH7RHMw4eeG": {
+      "step": "auction 17d",
+      "method": "grant_credential",
+      "success": true,
+      "at": "2026-11-14T09:45:29.023Z"
+    },
+    "7TLqoWrnBbTupg3PLccuc2eXgbquXACtYZqGDNgV58fq": {
+      "step": "auction 17f",
+      "method": "publish_key",
+      "success": true,
+      "at": "2026-11-14T10:06:25.390Z"
+    },
+    "EaHtbQ54aAyZUgakGc4EkrYNLPMafboWStyC4rfQ9BvM": {
+      "step": "auction 17g part 1",
+      "method": "request_execution",
+      "success": true,
+      "at": "2026-11-14T10:08:27.184Z"
+    },
+    "57tzs8NbCKhhC9guscGE1NbgqZWxNLXsTF4mZgyFXtqP": {
+      "step": "auction 17g part 2",
+      "method": "request_execution",
+      "success": true,
+      "at": "2026-11-14T10:13:15.084Z"
+    },
+    "9kwufV5FfUjXbZVwN662kawt2Q9RDRz9Hb6WiYt4vZY": {
+      "step": "auction 17h",
+      "method": "mint",
+      "success": true,
+      "at": "2026-11-14T10:15:50.611Z"
+    },
+    "6KZx5zga2jSAtWV1PPfucAra6RfECaSmWzx1v2wBnTmj": {
+      "step": "auction 17h",
+      "method": "mint",
+      "success": true,
+      "at": "2026-11-14T10:16:26.866Z"
+    },
+    "Ae6ZccUJNUoRZRSPesWyJGCnpSPZ8hs11Ch5WjFANHiR": {
+      "step": "auction 17i",
+      "method": "nft_transfer_call",
+      "success": true,
+      "at": "2026-11-14T10:18:51.696Z"
+    },
+    "GHCfH4PhhcNCG4mmDCZXKmy9WvDucEnhCmerYVSjNm1v": {
+      "step": "auction 17j",
+      "method": "ft_transfer_call",
+      "success": true,
+      "at": "2026-11-14T10:27:57.489Z"
+    },
+    "AK88NkPkXsik1xPbTNDNZB6VCCRi2rKhxeVbap9bHkSc": {
+      "step": "auction 17j",
+      "method": "ft_transfer_call",
+      "success": true,
+      "at": "2026-11-14T10:29:06.612Z"
+    },
+    "CATqXVEauHtQ1mpFHQo7VxQdj9fCwnEQQUFGh9NK5esW": {
+      "step": "auction 17k",
+      "method": "settle",
+      "success": true,
+      "at": "2026-11-14T10:39:05.132Z"
+    },
+    "2PMK4vf1dKsPNhZwtNkWL2xninc7ZNRN515HiwndQdVY": {
+      "step": "auction 17m",
+      "method": "withdraw",
+      "success": true,
+      "at": "2026-11-14T10:46:17.548Z"
+    },
+    "EMdw5gBJg8LAeuZ96n767iYiV6zyYhAgqmQ1Gf89W2sy": {
+      "step": "step 16.1",
+      "method": "register_work",
+      "success": true,
+      "at": "2026-11-14T10:54:52.548Z"
+    },
+    "9aUzpdgBPrdJ3XaSn3YdKu19yjaBjKZj1S9wzowL9Nwt": {
+      "step": "step 16.2",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-14T10:55:21.711Z"
+    },
+    "5xYY2sWQQrZL7XCiQ8CVKhw27pUWDRhnN5k3doqjsgjB": {
+      "step": "step 16.3",
+      "method": "register_share",
+      "success": true,
+      "at": "2026-11-14T10:56:13.828Z"
+    },
+    "8y7g9RfonZSfhBHKvRVAiYytyK1zEeo2zp5kgJV4cokL": {
+      "step": "step 16.4",
+      "method": "ft_transfer_call",
+      "success": true,
+      "at": "2026-11-14T10:56:46.545Z"
+    },
+    "5dgncSm1CyDuiEKRzeUpZJTWrBnHzNuuEP6k51RNseGa": {
+      "step": "step 16.5",
+      "method": "approve_share",
+      "success": true,
+      "at": "2026-11-14T10:57:44.625Z"
+    }
+  },
+  "tokenOwners": {
+    "s1": "writer-a.royltee-dev.testnet",
+    "s2": "buyer-pub.royltee-dev.testnet",
+    "s3": "writer-a.royltee-dev.testnet",
+    "s4": "buyer-pub.royltee-dev.testnet",
+    "s5": "writer-a.royltee-dev.testnet",
+    "s6": "writer-b.royltee-dev.testnet",
+    "s7": "writer-b.royltee-dev.testnet",
+    "s8": "writer-a.royltee-dev.testnet",
+    "s9": "writer-b.royltee-dev.testnet",
+    "s10": "buyer-pub.royltee-dev.testnet",
+    "s11": "writer-b.royltee-dev.testnet",
+    "s12": "writer-a.royltee-dev.testnet",
+    "s13": "writer-b.royltee-dev.testnet",
+    "s14": "writer-a.royltee-dev.testnet",
+    "s15": "writer-b.royltee-dev.testnet"
+  },
+  "vaults": [
+    {
+      "account": "s1.reg.royltee-dev.testnet",
+      "codeHash": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU"
+    },
+    {
+      "account": "s2.reg.royltee-dev.testnet",
+      "codeHash": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU"
+    },
+    {
+      "account": "s3.reg.royltee-dev.testnet",
+      "codeHash": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU"
+    },
+    {
+      "account": "s4.reg.royltee-dev.testnet",
+      "codeHash": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU"
+    },
+    {
+      "account": "s5.reg.royltee-dev.testnet",
+      "codeHash": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU"
+    },
+    {
+      "account": "s6.reg.royltee-dev.testnet",
+      "codeHash": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU"
+    },
+    {
+      "account": "s7.reg.royltee-dev.testnet",
+      "codeHash": "BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU"
+    },
+    {
+      "account": "s8.reg.royltee-dev.testnet",
+      "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
+    },
+    {
+      "account": "s9.reg.royltee-dev.testnet",
+      "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
+    },
+    {
+      "account": "s10.reg.royltee-dev.testnet",
+      "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
+    },
+    {
+      "account": "s11.reg.royltee-dev.testnet",
+      "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
+    },
+    {
+      "account": "s12.reg.royltee-dev.testnet",
+      "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
+    },
+    {
+      "account": "s13.reg.royltee-dev.testnet",
+      "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
+    },
+    {
+      "account": "s14.reg.royltee-dev.testnet",
+      "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
+    },
+    {
+      "account": "s15.reg.royltee-dev.testnet",
+      "codeHash": "BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP"
+    }
+  ],
+  "agentKeys": [
+    {
+      "permission": "function_call",
+      "contract": "reg.royltee-dev.testnet",
+      "methods": [
+        "pay_from_allowance",
+        "report"
+      ]
+    }
+  ]
+}
