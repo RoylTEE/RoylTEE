@@ -1,8 +1,8 @@
 # RoylTEE
 
-**The verified payout address for every share of every song, human or AI.**
+**RoylTEE turns each share of a song into an NFT with its own verified payout address, for human and AI music alike.**
 
-The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.
+A writer's share of a song can be sold, split or disputed, but the place royalties are sent should never break. Each share's payout account has no keys, so nobody can sign money out of it. Payers and AI agents can send money in, and only the holder of the share NFT can collect it.
 
 ## Judges, start here
 

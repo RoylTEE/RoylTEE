@@ -5,7 +5,7 @@ import '../styles/landing.css';
 import { SOURCE_URL } from '../consts';
 
 const faq: { q: string; a: string; href?: string; cta?: string }[] = [
-  { q: 'What is RoylTEE?', a: 'A permissioned registry of music rights shares on NEAR testnet. Each share is an NFT that controls its own payout vault. The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.', href: '/how-it-works', cta: 'How it works' },
+  { q: 'What is RoylTEE?', a: 'A permissioned registry of music rights shares on NEAR testnet. Each share is an NFT that controls its own payout vault. A writer\'s share of a song can be sold, split or disputed, but the place royalties are sent should never break. Each share\'s payout account has no keys, so nobody can sign money out of it. Payers and AI agents can send money in, and only the holder of the share NFT can collect it.', href: '/how-it-works', cta: 'How it works' },
   { q: 'Is this real money?', a: 'No. It runs on testnet only, and payments use Mock USDC (testnet), a mock token with no value. Everything that depends on money or identity outside the chain is Simulated.', href: '/security#trust', cta: 'Real and Simulated' },
   { q: 'Can I buy a share?', a: 'No. It is a permissioned record among verified industry members, not a public sale and not an investment product. Nothing on this site is legal advice.' },
   { q: 'Is a share a legal title?', a: 'No. The token is a record of an assignment as declared by members, plus a payment instruction. It is evidence and a payout address. A participation agreement that would give the record legal effect is roadmap, and the registry does not check that a signed legal assignment exists.' },

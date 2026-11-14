@@ -2,14 +2,12 @@
 /* Thin bar above the site header. Plain, factual, one link. */
 ---
 <a class="announce" href="/how-it-works">
-  <span class="announce-tag">New</span>
   <span class="announce-text">Every rights share is an NEP-171 NFT that owns its own royalty vault.</span>
   <span class="announce-go" aria-hidden="true">See how it works &rarr;</span>
 </a>
 <style>
   .announce { display: flex; justify-content: center; align-items: center; gap: .75rem; min-height: 2.5rem; padding: .35rem var(--gutter); background: var(--ink); color: #f4ecdf; font-size: var(--fs-14); text-decoration: none; text-align: center; }
   .announce:hover .announce-go { text-decoration: underline; text-underline-offset: 3px; }
-  .announce-tag { font-family: var(--mono); font-size: var(--fs-12); letter-spacing: .06em; text-transform: uppercase; color: var(--ink); background: var(--amber); padding: .1rem .45rem; border-radius: 3px; font-weight: 700; }
   .announce-go { color: var(--amber); font-weight: 600; white-space: nowrap; }
   @media (max-width: 639px) { .announce-go { display: none; } .announce { font-size: var(--fs-12); } }
 </style>

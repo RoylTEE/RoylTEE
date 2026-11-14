@@ -23,7 +23,7 @@ import Closing from '../components/landing/Closing.astro';
       <div class="hero-copy">
         <p class="l-eyebrow">A permissioned registry for music rights shares on NEAR</p>
         <h1>{PITCH}</h1>
-        <p class="sub">The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.</p>
+        <p class="sub">A writer's share of a song can be sold, split or disputed, but the place royalties are sent should never break. Each share's payout account has no keys, so nobody can sign money out of it. Payers and AI agents can send money in, and only the holder of the share NFT can collect it.</p>
         <div class="actions">
           <a class="btn l-btn-amber" href={DASHBOARD_URL}>Open the testnet app</a>
           <a class="btn l-btn-ghost" href="/verify">Verify on testnet</a>
@@ -49,23 +49,23 @@ import Closing from '../components/landing/Closing.astro';
 </Base>
 
 <style>
-  .hero { position: relative; isolation: isolate; background: var(--night); color: var(--cream); height: clamp(40rem, 55vw, 57.5rem); display: flex; align-items: center; overflow: hidden; }
+  .hero { position: relative; isolation: isolate; background: var(--night); color: var(--cream); height: clamp(42rem, 58vw, 60rem); display: flex; align-items: center; overflow: hidden; }
   .hero-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 72% 15%; z-index: -2; }
   .hero-scrim { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(19,12,10,.92) 0%, rgba(19,12,10,.82) 34%, rgba(19,12,10,.4) 56%, rgba(19,12,10,0) 72%), linear-gradient(0deg, rgba(19,12,10,.35) 0%, rgba(19,12,10,0) 30%); }
-  .hero-copy { display: grid; gap: var(--s5); justify-items: start; max-width: 36rem; padding: var(--s8) 0; }
+  .hero-copy { display: grid; gap: var(--s4); justify-items: start; max-width: 38rem; padding: var(--s7) 0; }
   .hero-copy .l-eyebrow { color: var(--amber); }
-  .hero-copy h1 { font-size: clamp(2.5rem, 1.6rem + 2.6vw, 4rem); font-weight: 400; line-height: 1.04; letter-spacing: -.035em; color: #fff; }
-  .hero-copy .sub { font-size: var(--fs-18); line-height: 1.5; color: var(--cream); max-width: 32rem; }
+  .hero-copy h1 { font-size: clamp(2.125rem, 1.35rem + 1.85vw, 3.125rem); font-weight: 400; line-height: 1.12; letter-spacing: -.03em; color: #fff; }
+  .hero-copy .sub { font-size: var(--fs-16); line-height: 1.55; color: var(--cream); max-width: 36rem; }
   .hero-copy .caption { color: var(--cream-dim); max-width: 32rem; line-height: 1.5; }
   .hero-copy .caption a { color: var(--cream); }
   .hero .btn.primary { min-height: 3rem; }
   .hero .btn.l-btn-ghost { min-height: 3rem; }
   @media (max-width: 767px) {
     .hero { display: block; height: auto; }
-    .hero-art { position: relative; inset: auto; height: 17.5rem; object-position: 78% 20%; }
-    .hero-scrim { inset: 0 0 auto 0; height: 17.5rem; background: linear-gradient(0deg, rgba(19,12,10,1) 0%, rgba(19,12,10,0) 45%); }
-    .hero-copy { padding: var(--s2) 0 var(--s7); }
-    .hero-copy h1 { font-size: 2.375rem; }
+    .hero-art { position: relative; inset: auto; height: 13.5rem; object-position: 78% 20%; }
+    .hero-scrim { inset: 0 0 auto 0; height: 13.5rem; background: linear-gradient(0deg, rgba(19,12,10,1) 0%, rgba(19,12,10,0) 45%); }
+    .hero-copy { padding: var(--s2) 0 var(--s6); gap: var(--s3); }
+    .hero-copy h1 { font-size: 1.875rem; }
   }
 </style>
 <style is:global>

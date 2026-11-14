@@ -5,7 +5,7 @@ Sources: the repository README, DESIGN.md, THREAT_MODEL.md, DEPLOY_PLAN.md, DECI
 ## What RoylTEE is
 
 - A permissioned registry of music rights shares on NEAR testnet. Each share is an NFT that controls its own payout vault.
-- Product line: the verified payout address for every share of every song, human or AI. The payout address never changes, only who controls it. An agent can pay it, but it cannot steal from it.
+- Product line: RoylTEE turns each share of a song into an NFT with its own verified payout address, for human and AI music alike. A writer's share of a song can be sold, split or disputed, but the place royalties are sent should never break. Each share's payout account has no keys, so nobody can sign money out of it. Payers and AI agents can send money in, and only the holder of the share NFT can collect it.
 - It is a business to business record among verified industry members. It is not sold to the public, it is not an investment product, and nothing here is legal advice.
 - The token is a record of a signed assignment plus a payment instruction among members. It is evidence and a payout address, not legal title. A participation agreement that would give the record legal effect is roadmap.
 - Built at NEAR HACKATHON for the track "NFTs That Do Something".

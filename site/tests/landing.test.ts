@@ -43,7 +43,7 @@ describe('landing page', () => {
   });
   it('the top bars name the NFT standard and the testnet demo, and the hero opens the testnet app', () => {
     const bar = read('src/components/AnnounceBar.astro');
-    expect(bar).toContain('announce-tag');
+    expect(bar).not.toContain('announce-tag');
     expect(bar).toContain('Every rights share is an NEP-171 NFT that owns its own royalty vault.');
     expect(bar).toContain('See how it works &rarr;');
     expect(bar).toContain('href="/how-it-works"');
@@ -55,15 +55,23 @@ describe('landing page', () => {
     const hero = read('src/pages/index.astro');
     expect(hero).toContain('Open the testnet app');
     expect(hero).toContain('Live on NEAR testnet. Money in the demo is Simulated.');
+    expect(hero).toContain("A writer's share of a song can be sold, split or disputed, but the place royalties are sent should never break.");
     expect(hero).not.toContain('Open the demo dashboard');
+    expect(read('src/consts.ts')).toContain("PITCH = 'RoylTEE turns each share of a song into an NFT with its own verified payout address, for human and AI music alike.'");
     const nav = read('src/components/Nav.astro');
     expect(nav).toContain('Open the testnet app');
     expect(nav).not.toContain('badge ok net');
     expect(nav).not.toContain('Open the demo dashboard');
     expect(read('src/components/landing/Proof.astro')).toContain('href="/auction"');
+    expect(read('src/components/landing/Closing.astro')).toContain('Open the testnet app');
+    expect(read('src/components/landing/Closing.astro')).not.toContain('Open the demo dashboard');
     const app = read('src/layouts/App.astro');
     expect(app).toContain('class="badge ok app-net"');
     expect(app).toContain('Live demo. Payments use Mock USDC.');
+    expect(app).toContain('Identity checks, payers and payer statements are Simulated. Nothing here is an investment product or legal advice.');
+    expect(app).not.toMatch(/app-foot[\s\S]*badge sim/);
+    expect(app).toContain('.side-link[aria-current="page"] { background: var(--surface); }');
+    expect(app).not.toMatch(/inset 3px 0 0 var\(--amber\)/);
   });
   it('passes the wording check (no dashes, no banned names, no local paths)', () => {
     for (const f of landingFiles) expect(forbidden(read(f)), f).toEqual([]);

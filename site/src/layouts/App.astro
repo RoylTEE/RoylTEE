@@ -67,7 +67,6 @@ const cspNonce = Astro.locals.cspNonce;
         <RegistryHeader area={area} tab={tab} title={title} intro={intro} crumb={crumb} period={period} />
         <div class="app-content"><slot /></div>
         <footer class="app-foot" id="notice">
-          <span class="badge sim">Simulated</span>
           <span>Identity checks, payers and payer statements are Simulated. Nothing here is an investment product or legal advice.</span>
           <span class="app-foot-end">Built at NEAR HACKATHON</span>
         </footer>
@@ -93,11 +92,11 @@ const cspNonce = Astro.locals.cspNonce;
   .side-t { font-size: var(--fs-14); font-weight: 600; }
   .side-p { font-size: var(--fs-12); color: var(--dim); line-height: 1.35; }
   .side-link:hover { background: var(--surface); }
-  .side-link[aria-current="page"] { background: var(--surface); box-shadow: inset 3px 0 0 var(--amber), var(--shadow-1); }
+  .side-link[aria-current="page"] { background: var(--surface); }
   .side-sub { margin: 2px 0 var(--s2) var(--s4) !important; border-left: 1px solid var(--edge); }
   .side-sub a { display: flex; align-items: center; min-height: 2.5rem; padding: 0 var(--s3); font-size: var(--fs-14); color: var(--muted); text-decoration: none; margin-left: -1px; border-left: 2px solid transparent; }
   .side-sub a:hover { color: var(--text); }
-  .side-sub a[aria-current="page"] { color: var(--text); font-weight: 600; border-left-color: var(--ink); }
+  .side-sub a[aria-current="page"] { color: var(--text); font-weight: 600; }
   .side-foot { margin-top: auto; display: grid; gap: var(--s1); padding: var(--s4) var(--s3) 0; border-top: 1px solid var(--edge); }
   .side-back { display: inline-flex; align-items: center; min-height: 2.75rem; font-size: var(--fs-14); }
   .side-backdrop { display: none; }
