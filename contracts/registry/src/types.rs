@@ -302,6 +302,7 @@ pub struct ForwardWatchView {
     pub amount: U128,
     pub count: u32,
     pub released_through: U64,
+    pub resolved_through: U64,
     pub written_off: U128,
 }
 

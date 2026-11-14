@@ -127,8 +127,11 @@ fn pay_share(c: &mut Registry, token_id: &TokenId, amount: u128) {
     let msg = json!({ "pay_share": { "token_id": token_id, "period": "2026-Q3", "statement_hash": h('f') } });
     let r = c.ft_on_transfer(acc("payer.near"), U128(amount), msg.to_string());
     assert!(matches!(r, PromiseOrValue::Value(U128(0))));
+    let since = c
+        .get_forward_watch(token_id.clone())
+        .map_or(0, |w| w.latest_block.0);
     callback(ok(b""));
-    assert!(c.on_forward(token_id.clone(), U128(amount), Some(U64(0))));
+    assert!(c.on_forward(token_id.clone(), U128(amount), Some(U64(since))));
 }
 
 fn ledger(c: &Registry, t: &TokenId) -> LedgerView {
@@ -1338,19 +1341,19 @@ fn stale_payout_lock_released_only_after_timeout_and_late_callback_is_safe() {
         100 + STALE_LOCK_BLOCKS,
     );
     let _ = c.release_stale_lock(t.clone());
-    // The lock is cleared by the balance read, not before it (audit F3).
+    // The release never clears a payout lock (audit RR-2). The balance read
+    // is a diagnostic only.
     assert!(ledger(&c, &t).payout_in_flight.is_some());
-    let epoch = c.ledgers.get(&t).unwrap().epoch;
-    // The vault is empty: the withdraw happened.
     callback(ok(b"\"0\""));
-    assert!(c.on_release_payout(t.clone(), U64(epoch), U64(100), U128(700_000)));
-    assert!(ledger(&c, &t).payout_in_flight.is_none());
-    assert!(get_logs().join("\n").contains("lock_released_stale"));
+    c.on_release_payout(t.clone(), U64(100), U128(700_000));
+    assert!(ledger(&c, &t).payout_in_flight.is_some());
+    assert!(get_logs().join("\n").contains("payout_uncertain"));
 
-    // A late success of the old claim must not touch state beyond the epoch.
+    // The real claim callback still matches the lock and settles it.
     callback(ok(b""));
     assert!(c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(100)));
     let l = ledger(&c, &t);
+    assert!(l.payout_in_flight.is_none());
     assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
 }
 
@@ -1388,7 +1391,7 @@ fn late_resolve_after_stale_release_keeps_current_owner() {
 }
 
 #[test]
-fn late_failed_claim_after_stale_release_changes_no_balance() {
+fn late_failed_claim_after_stale_release_rolls_back_through_the_real_callback() {
     let mut c = setup();
     let w = work(&mut c, "USRC12600001");
     let t = mint(&mut c, w, "bob.near", 10_000);
@@ -1402,20 +1405,20 @@ fn late_failed_claim_after_stale_release_changes_no_balance() {
         5 + STALE_LOCK_BLOCKS,
     );
     let _ = c.release_stale_lock(t.clone());
-    let epoch = c.ledgers.get(&t).unwrap().epoch;
-    // The vault still holds the 700000: the withdraw never happened, so
-    // the release undoes the debit (audit F3).
+    // The vault still holds the 700000, yet the debit is not undone from the
+    // balance: the lock stays (audit RR-2).
     callback(ok(b"\"700000\""));
-    assert!(c.on_release_payout(t.clone(), U64(epoch), U64(5), U128(700_000)));
+    c.on_release_payout(t.clone(), U64(5), U128(700_000));
     let l = ledger(&c, &t);
-    assert_eq!((l.known_balance.0, l.total_paid_out.0), (700_000, 0));
-    assert_eq!(l.earned.0, 700_000);
-    // The late failed callback finds no lock and changes no balance.
+    assert!(l.payout_in_flight.is_some());
+    assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
+    // The real failed callback arrives and undoes the debit exactly.
     callback(PromiseResult::Failed);
     assert!(!c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(5)));
-    assert!(get_logs().join("\n").contains("late_claim_callback"));
     let l = ledger(&c, &t);
+    assert!(l.payout_in_flight.is_none());
     assert_eq!((l.known_balance.0, l.total_paid_out.0), (700_000, 0));
+    assert_eq!(l.earned.0, 700_000);
     // A later sync reads the same balance and counts nothing twice.
     call(&acc("bob.near"), NearToken::from_yoctonear(0));
     let _ = c.sync(t.clone());
@@ -1423,7 +1426,6 @@ fn late_failed_claim_after_stale_release_changes_no_balance() {
     callback(ok(b"\"700000\""));
     assert!(c.on_sync(t.clone(), U64(epoch)).is_some());
     assert_eq!(ledger(&c, &t).claimable.0, 700_000);
-    assert_eq!(ledger(&c, &t).earned.0, 700_000);
 }
 
 // ---------- block 4: disputes, resolve, confirm_share ----------
@@ -1436,8 +1438,11 @@ fn pay_work_msg(c: &mut Registry, w: WorkId, amount: u128) -> PromiseOrValue<U12
 }
 
 fn settle(c: &mut Registry, t: &TokenId, amount: u128) {
+    let since = c
+        .get_forward_watch(t.clone())
+        .map_or(0, |w| w.latest_block.0);
     callback(ok(b""));
-    assert!(c.on_forward(t.clone(), U128(amount), Some(U64(0))));
+    assert!(c.on_forward(t.clone(), U128(amount), Some(U64(since))));
 }
 
 fn resolve(c: &mut Registry, id: DisputeId, outcome: Outcome) {

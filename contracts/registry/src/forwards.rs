@@ -39,6 +39,12 @@ pub(crate) struct ForwardWatch {
     /// Forwards that started at or before this block were quarantined by
     /// `release_stale_forward`. Their callbacks are "late" (see below).
     pub released_through: u64,
+    /// Forwards that started at or before this block belong to a quarantine
+    /// the registrar already touched (`resolve_written_off`). Their
+    /// callbacks change nothing and emit an anomaly, so an old callback can
+    /// never settle a later, unrelated quarantine (audit RR-1, R-M1). Never
+    /// above `released_through`.
+    pub resolved_through: u64,
     /// Amount of quarantined forwards whose outcome is not known. Still in
     /// `forwards_in_flight_total`, in no other bucket: not credited, not
     /// undelivered, never resent. `sync` is refused while it is above zero.
@@ -67,7 +73,7 @@ pub(crate) fn written_off(token_id: &TokenId) -> u128 {
 }
 
 pub(crate) fn write_watch(token_id: &TokenId, w: &ForwardWatch) {
-    if w.count == 0 && w.released_through == 0 && w.written_off == 0 {
+    if w.count == 0 && w.released_through == 0 && w.resolved_through == 0 && w.written_off == 0 {
         env::storage_remove(&watch_key(token_id));
         return;
     }
@@ -108,6 +114,9 @@ pub(crate) enum Settle {
     Normal,
     /// The forward was quarantined by `release_stale_forward`: `settle_late_forward` settles it.
     Late,
+    /// The registrar already resolved the quarantine this forward belonged
+    /// to: change nothing, emit an anomaly.
+    Fenced,
 }
 
 /// Called from `on_forward`. `since` is the start block passed to the
@@ -117,6 +126,9 @@ pub(crate) fn watch_settle(token_id: &TokenId, amount: u128, since: Option<u64>)
         return Settle::Normal;
     };
     let mut w = read_watch(token_id).unwrap_or_default();
+    if w.resolved_through > 0 && since <= w.resolved_through {
+        return Settle::Fenced;
+    }
     if w.released_through > 0 && since <= w.released_through {
         return Settle::Late;
     }
@@ -127,6 +139,15 @@ pub(crate) fn watch_settle(token_id: &TokenId, amount: u128, since: Option<u64>)
     }
     write_watch(token_id, &w);
     Settle::Normal
+}
+
+/// A late callback of a quarantine the registrar already resolved: nothing
+/// changes (its amount left `forwards_in_flight_total` at the decision).
+pub(crate) fn emit_fenced(token_id: &TokenId, amount: u128, ok: bool) {
+    emit(
+        "anomaly",
+        json!({ "token_id": token_id, "kind": "late_forward_callback_fenced", "ok": ok, "amount": U128(amount), "detail": "its quarantine was already resolved by the registrar; nothing changed" }),
+    );
 }
 
 impl Registry {
@@ -180,8 +201,42 @@ impl Registry {
             amount: U128(w.amount),
             count: w.count,
             released_through: U64(w.released_through),
+            resolved_through: U64(w.resolved_through),
             written_off: U128(w.written_off),
         })
+    }
+
+    /// Deploy barrier (audit RR-4, R-L3). The redeploy runs it in the same
+    /// transaction as the code deploy (`with-init-call assert_quiescent`), so
+    /// a busy registry rolls the whole deploy back. Panics unless the whole
+    /// registry is quiet: `forwards_in_flight_total` is 0 and every share
+    /// has `inbound_pending` 0, no payout lock, no transfer lock and no
+    /// forward watch with anything in flight or quarantined. A watch entry
+    /// in a damaged or older format panics too (`read_watch`), so two watch
+    /// formats can never meet. Changes nothing. It iterates over ALL tokens,
+    /// so its gas grows with the token count (about 0.21 Tgas per
+    /// token measured, THREAT_MODEL T19b): fine for the 13 tokens on
+    /// testnet at 100 Tgas, and a registry with several hundred tokens
+    /// would need more gas than one call can carry.
+    #[private]
+    pub fn assert_quiescent(&self) {
+        require!(
+            self.forwards_in_flight_total == 0,
+            "not quiet: forwards in flight"
+        );
+        for token_id in self.shares.keys() {
+            if let Some(l) = self.ledgers.get(token_id) {
+                require!(l.inbound_pending == 0, "not quiet: pending forward");
+                require!(l.payout_in_flight.is_none(), "not quiet: payout lock");
+                require!(l.transfer_pending.is_none(), "not quiet: transfer lock");
+            }
+            if let Some(w) = read_watch(token_id) {
+                require!(
+                    w.count == 0 && w.amount == 0 && w.written_off == 0,
+                    "not quiet: forward watch"
+                );
+            }
+        }
     }
 
     /// Quarantines a payment forward whose callback never ran (T19b).
@@ -224,6 +279,7 @@ impl Registry {
                 amount: 0,
                 count: 0,
                 released_through: w.released_through.max(w.latest),
+                resolved_through: w.resolved_through,
                 written_off: w.written_off + w.amount,
             },
         );
@@ -237,27 +293,45 @@ impl Registry {
         );
     }
 
-    /// Registrar only. Settles the amount a release quarantined when its
-    /// callback never arrives. `delivered` is whether the token transfer
-    /// reached the vault, read from the public receipt outcome off chain.
-    /// `true`: the amount is credited to the share and leaves
-    /// `forwards_in_flight_total`; refused while the share is in a dispute or
-    /// waits for approval, like `sync`. `false`: the registry still holds it,
-    /// so it moves to `undelivered` for `retry_forward`. The `doc_hash` ties
-    /// the decision to a document. The whole quarantine of the share is
-    /// settled at once. A wrong answer is a registrar error, see
-    /// THREAT_MODEL T12 and T19b.
+    /// Registrar only. Settles amounts a release quarantined when their
+    /// callbacks never arrive, from the final receipt outcome of the original
+    /// transfers read off chain (a missing or pending receipt is not
+    /// evidence; THREAT_MODEL T19b has the procedure). `delivered_amount` is
+    /// what reached the vault: it is credited to the share and leaves
+    /// `forwards_in_flight_total`; refused above zero for a share in a
+    /// dispute or waiting for approval, like `sync`. `failed_amount` is what
+    /// failed: the registry still holds it, so it leaves
+    /// `forwards_in_flight_total` and moves to `undelivered` for
+    /// `retry_forward`. The two must sum to more than zero and at most the
+    /// quarantined amount; any remainder stays quarantined for another call.
+    /// Whatever the amounts, the callbacks of everything quarantined so far
+    /// are fenced (`resolved_through`): a late callback changes nothing, so
+    /// it can never settle a later quarantine (audit RR-1). The `doc_hash`
+    /// is a reference to the evidence (the receipt id). A wrong answer is a
+    /// registrar error, see THREAT_MODEL T12 and T19b.
     #[payable]
-    pub fn resolve_written_off(&mut self, token_id: TokenId, delivered: bool, doc_hash: Hash32) {
+    pub fn resolve_written_off(
+        &mut self,
+        token_id: TokenId,
+        delivered_amount: U128,
+        failed_amount: U128,
+        doc_hash: Hash32,
+    ) {
         near_sdk::assert_one_yocto();
         self.assert_registrar();
         require!(
             logic::is_hash32(&doc_hash),
             "doc_hash must be 64 lowercase hex characters"
         );
+        let (delivered, failed) = (delivered_amount.0, failed_amount.0);
         let mut w = read_watch(&token_id).unwrap_or_default();
         require!(w.written_off > 0, "nothing written off");
-        if delivered {
+        let total = delivered
+            .checked_add(failed)
+            .unwrap_or_else(|| env::panic_str("amounts overflow"));
+        require!(total > 0, "nothing to resolve");
+        require!(total <= w.written_off, "more than is written off");
+        if delivered > 0 {
             require!(
                 self.share(&token_id).dispute.is_none(),
                 "share is in dispute: resolve after it ends"
@@ -267,24 +341,19 @@ impl Registry {
                 "share is not approved by the work registrant"
             );
         }
-        let amount = w.written_off;
-        w.written_off = 0;
+        w.written_off -= total;
+        w.resolved_through = w.released_through;
         write_watch(&token_id, &w);
-        self.forwards_in_flight_total = self.forwards_in_flight_total.saturating_sub(amount);
-        if !delivered {
-            self.undelivered_total += amount;
-        }
+        self.forwards_in_flight_total = self.forwards_in_flight_total.saturating_sub(total);
+        self.undelivered_total += failed;
         let l = self.ledger_mut(&token_id);
         l.epoch += 1;
-        if delivered {
-            l.known_balance += amount;
-            l.total_routed_in += amount;
-        } else {
-            l.undelivered += amount;
-        }
+        l.known_balance += delivered;
+        l.total_routed_in += delivered;
+        l.undelivered += failed;
         emit(
             "written_off_resolved",
-            json!({ "token_id": token_id, "delivered": delivered, "amount": U128(amount), "doc_hash": doc_hash }),
+            json!({ "token_id": token_id, "delivered_amount": delivered_amount, "failed_amount": failed_amount, "remaining": U128(w.written_off), "doc_hash": doc_hash }),
         );
     }
 }

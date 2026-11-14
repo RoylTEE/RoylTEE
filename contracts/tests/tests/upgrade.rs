@@ -372,15 +372,17 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_
     e.worker.patch_state(e.reg.id(), b"STATE", &root).await?;
     // The forward started "a day ago": block 1 for the watch, so no
     // fast-forward of 150000 blocks is needed. Borsh `ForwardWatch`: since,
-    // latest (u64), amount (u128), count (u32), released_through (u64),
+    // latest (u64), amount (u128), count (u32), released_through,
+    // resolved_through (u64),
     // written_off (u128).
     let mut watch_raw = vec![];
     watch_raw.extend_from_slice(&1u64.to_le_bytes());
     watch_raw.extend_from_slice(&1u64.to_le_bytes());
     watch_raw.extend_from_slice(&80_000u128.to_le_bytes());
     watch_raw.extend_from_slice(&1u32.to_le_bytes());
-    watch_raw.extend_from_slice(&0u64.to_le_bytes());
-    watch_raw.extend_from_slice(&0u128.to_le_bytes());
+    watch_raw.extend_from_slice(&0u64.to_le_bytes()); // released_through
+    watch_raw.extend_from_slice(&0u64.to_le_bytes()); // resolved_through
+    watch_raw.extend_from_slice(&0u128.to_le_bytes()); // written_off
     let mut watch_key = b"fwd:".to_vec();
     watch_key.extend_from_slice(s3.as_bytes());
     e.worker
@@ -467,12 +469,15 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_
     let r = ok(e
         .registrar
         .call(e.reg.id(), "resolve_written_off")
-        .args_json(json!({ "token_id": s3, "delivered": true, "doc_hash": hash('d') }))
+        .args_json(json!({ "token_id": s3, "delivered_amount": "80000", "failed_amount": "0", "doc_hash": hash('d') }))
         .deposit(ONE_YOCTO)
         .max_gas()
         .transact()
         .await?);
-    assert_eq!(event(&r, "written_off_resolved")["delivered"], true);
+    assert_eq!(
+        event(&r, "written_off_resolved")["delivered_amount"],
+        "80000"
+    );
     let l = e.ledger(&s3).await?;
     assert_eq!(
         (num(&l["known_balance"]), num(&l["total_routed_in"])),
@@ -485,4 +490,136 @@ async fn u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_
     check(e.claim(&e.writer_a, &s3).await?);
     assert_eq!(e.balance(&e.vault(&s3)).await?, 0);
     e.assert_solvent().await
+}
+
+// ---------- final fixes: the deploy and the quiescence check in one transaction ----------
+
+/// Audit RR-4 and R-L3: the redeploy is ONE transaction, a deploy action
+/// followed by a call of `assert_quiescent` on the new code (what
+/// `near contract deploy ... with-init-call assert_quiescent` sends). Actions
+/// of one receipt are atomic, so a busy registry rolls the deploy back. This
+/// test deploys the new wasm over the exact deployed one in a single batch:
+/// a forward in flight and a payout lock each make the batch fail with the
+/// old code still in place and the state untouched; the quiet state passes
+/// and the new code is live. It also measures the gas of `assert_quiescent`.
+#[tokio::test]
+async fn u03_deploy_and_assert_quiescent_in_one_transaction_roll_back_when_busy(
+) -> anyhow::Result<()> {
+    use near_workspaces::types::Gas;
+    let e = setup_with_registry(&deployed_registry_wasm()).await?;
+    let w0 = e.register_work("USRC12600001").await?;
+    let s1 = e.mint(w0, e.writer_a.id(), 5_000).await?;
+    let s2 = e.mint(w0, e.writer_b.id(), 5_000).await?;
+    check(e.pay_work(w0, 1_000_000).await?);
+    let new_wasm = wasm("registry");
+    let old_hash = code_hash(&e, e.reg.id()).await?;
+    let batch = |wasm: &Vec<u8>| {
+        e.reg
+            .as_account()
+            .batch(e.reg.id())
+            .deploy(wasm)
+            .call(
+                near_workspaces::operations::Function::new("assert_quiescent")
+                    .args_json(json!({}))
+                    .gas(Gas::from_tgas(100)),
+            )
+            .transact()
+    };
+
+    // 1. A forward in flight (counter and ledger as an unfinished forward leaves them).
+    let key = ledger_key(&s1);
+    let state = e.worker.view_state(e.reg.id()).await?;
+    let clean_ledger = state.get(&key).expect("ledger entry").clone();
+    let clean_root = state.get(&b"STATE"[..]).expect("root").clone();
+    let mut busy = clean_ledger.clone();
+    busy[80..84].copy_from_slice(&1u32.to_le_bytes()); // inbound_pending
+    e.worker.patch_state(e.reg.id(), &key, &busy).await?;
+    let mut root = clean_root.clone();
+    let n = root.len();
+    root[n - 40..n - 24].copy_from_slice(&1_000u128.to_le_bytes());
+    e.worker.patch_state(e.reg.id(), b"STATE", &root).await?;
+    let r = batch(&new_wasm).await?;
+    assert!(r.is_failure(), "a busy registry must reject the batch");
+    assert!(format!("{:?}", r.failures()).contains("not quiet: forwards in flight"));
+    assert_eq!(
+        code_hash(&e, e.reg.id()).await?,
+        old_hash,
+        "the deploy rolled back with the failed call"
+    );
+    assert_eq!(
+        e.worker.view_code(e.reg.id()).await?,
+        deployed_registry_wasm()
+    );
+
+    // 2. A payout lock: ledger layout is five u128, inbound u32, then the
+    // locks. Write `Some(Lock)` for the payout lock by rebuilding the entry.
+    e.worker
+        .patch_state(e.reg.id(), &key, &clean_ledger)
+        .await?;
+    e.worker
+        .patch_state(e.reg.id(), b"STATE", &clean_root)
+        .await?;
+    let mut locked = clean_ledger[..84].to_vec();
+    locked.push(1);
+    let holder = e.writer_a.id().as_str();
+    locked.extend_from_slice(&(holder.len() as u32).to_le_bytes());
+    locked.extend_from_slice(holder.as_bytes());
+    locked.extend_from_slice(&1u128.to_le_bytes());
+    locked.extend_from_slice(&1u64.to_le_bytes());
+    locked.push(0);
+    locked.extend_from_slice(&clean_ledger[clean_ledger.len() - 8..]);
+    e.worker.patch_state(e.reg.id(), &key, &locked).await?;
+    assert!(
+        batch(&new_wasm).await?.is_failure(),
+        "a payout lock rejects the batch"
+    );
+    assert_eq!(code_hash(&e, e.reg.id()).await?, old_hash);
+
+    // 3. Quiet: the same batch succeeds and the new code is live.
+    e.worker
+        .patch_state(e.reg.id(), &key, &clean_ledger)
+        .await?;
+    let r = batch(&new_wasm).await?;
+    let g3 = r.total_gas_burnt.as_gas();
+    check(r);
+    assert_eq!(e.worker.view_code(e.reg.id()).await?, new_wasm);
+    println!(
+        "GAS deploy + assert_quiescent, 2 tokens: {:.3} Tgas burnt in total",
+        g3 as f64 / 1e12
+    );
+    // The method is private: an outsider cannot call it.
+    assert!(e
+        .outsider
+        .call(e.reg.id(), "assert_quiescent")
+        .args_json(json!({}))
+        .max_gas()
+        .transact()
+        .await?
+        .is_failure());
+    // Gas per token: more tokens, same call from the registry account.
+    let call_gas = || async {
+        let r = e
+            .reg
+            .as_account()
+            .call(e.reg.id(), "assert_quiescent")
+            .args_json(json!({}))
+            .gas(Gas::from_tgas(100))
+            .transact()
+            .await?;
+        anyhow::Ok(ok(r).total_gas_burnt.as_gas())
+    };
+    let a = call_gas().await?;
+    let w1 = e.register_work("USRC12600002").await?;
+    for _ in 0..4 {
+        e.mint(w1, e.writer_a.id(), 2_000).await?;
+    }
+    let b = call_gas().await?;
+    println!(
+        "GAS assert_quiescent: {:.3} Tgas at 2 tokens, {:.3} Tgas at 6 tokens, about {:.3} Tgas per token",
+        a as f64 / 1e12,
+        b as f64 / 1e12,
+        (b - a) as f64 / 4.0 / 1e12
+    );
+    let _ = (&s2, &s1);
+    Ok(())
 }

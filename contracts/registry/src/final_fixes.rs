@@ -50,9 +50,19 @@ fn watch(c: &Registry, t: &TokenId) -> ForwardWatchView {
     c.get_forward_watch(t.clone()).unwrap()
 }
 
-fn resolve_wo(c: &mut Registry, t: &TokenId, delivered: bool) {
+fn resolve_amounts(c: &mut Registry, t: &TokenId, delivered: u128, failed: u128) {
     call(&registrar(), NearToken::from_yoctonear(1));
-    c.resolve_written_off(t.clone(), delivered, h('d'));
+    c.resolve_written_off(t.clone(), U128(delivered), U128(failed), h('d'));
+}
+
+/// Settles the whole quarantine of the share in one direction.
+fn resolve_wo(c: &mut Registry, t: &TokenId, delivered: bool) {
+    let all = watch(c, t).written_off.0;
+    if delivered {
+        resolve_amounts(c, t, all, 0);
+    } else {
+        resolve_amounts(c, t, 0, all);
+    }
 }
 
 fn resolve_payout(c: &mut Registry, t: &TokenId, paid: bool, height: u64) {
@@ -319,16 +329,17 @@ fn a_write_off_settled_as_not_delivered_moves_to_undelivered_once() {
 #[test]
 fn only_the_registrar_with_one_yocto_and_a_hash_can_resolve() {
     let (mut c, t) = quarantined(80_000);
+    let r = |c: &mut Registry, d: u128, f: u128, hash: &str| {
+        c.resolve_written_off(t.clone(), U128(d), U128(f), hash.to_string())
+    };
     call(&anyone(), NearToken::from_yoctonear(1));
-    assert_panics("registrar", || {
-        c.resolve_written_off(t.clone(), true, h('d'))
-    });
+    assert_panics("registrar", || r(&mut c, 80_000, 0, &h('d')));
     call(&registrar(), NearToken::from_yoctonear(0));
-    assert_panics("1 yocto", || c.resolve_written_off(t.clone(), true, h('d')));
+    assert_panics("1 yocto", || r(&mut c, 80_000, 0, &h('d')));
     call(&registrar(), NearToken::from_yoctonear(1));
-    assert_panics("doc_hash", || {
-        c.resolve_written_off(t.clone(), true, "xyz".to_string())
-    });
+    assert_panics("doc_hash", || r(&mut c, 80_000, 0, "xyz"));
+    assert_panics("more than is written off", || r(&mut c, 80_000, 1, &h('d')));
+    assert_panics("nothing to resolve", || r(&mut c, 0, 0, &h('d')));
     assert_eq!(watch(&c, &t).written_off.0, 80_000);
 }
 
@@ -422,8 +433,11 @@ fn unwatched_pending_forward_does_not_block_stale_payout_release() {
         0,
         100 + STALE_LOCK_BLOCKS,
     );
-    assert_panics("cannot be read", || drop(c.release_stale_lock(t.clone())));
-    assert!(ledger(&c, &t).payout_in_flight.is_some(), "no blind clear");
+    let _ = c.release_stale_lock(t.clone());
+    assert!(
+        ledger(&c, &t).payout_in_flight.is_some(),
+        "no automatic clear"
+    );
     resolve_payout(&mut c, &t, true, 100 + STALE_LOCK_BLOCKS);
     let l = ledger(&c, &t);
     assert!(l.payout_in_flight.is_none());
@@ -448,7 +462,11 @@ fn legacy_missing_watch_and_stale_payout_is_settled_by_the_registrar() {
     }
     c.forwards_in_flight_total = 80_000;
     at(&anyone(), NearToken::from_yoctonear(0), 0, 1_700);
-    assert_panics("cannot be read", || drop(c.release_stale_lock(t.clone())));
+    let _ = c.release_stale_lock(t.clone());
+    assert!(
+        ledger(&c, &t).payout_in_flight.is_some(),
+        "no automatic clear"
+    );
     assert_panics("no recorded forward", || c.release_stale_forward(t.clone()));
     resolve_payout(&mut c, &t, false, 1_700);
     let l = ledger(&c, &t);
@@ -559,9 +577,11 @@ fn a_drip_of_payments_cannot_postpone_a_stale_release() {
     assert_eq!(acct(&c), (80_000, 10_000));
 }
 
-// ---------- audit F3, A-02, A-03: stale payout lock ----------
+// ---------- audit F3, A-02, A-03, RR-2: stale payout lock ----------
 
-fn claim_and_go_stale(c: &mut Registry, t: &TokenId, amount: u128, block: u64) -> u64 {
+/// A claim of `amount` at `block` whose callback is lost, then the stale
+/// release call. The lock must stay.
+fn claim_and_go_stale(c: &mut Registry, t: &TokenId, amount: u128, block: u64) {
     pay_share(c, t, amount);
     at(&acc("bob.near"), NearToken::from_yoctonear(1), 0, block);
     let _ = c.claim(t.clone());
@@ -572,32 +592,105 @@ fn claim_and_go_stale(c: &mut Registry, t: &TokenId, amount: u128, block: u64) -
         block + STALE_LOCK_BLOCKS,
     );
     let _ = c.release_stale_lock(t.clone());
-    c.ledgers.get(t).unwrap().epoch
 }
 
-fn finish_payout(
-    c: &mut Registry,
-    t: &TokenId,
-    epoch: u64,
-    block: u64,
-    amount: u128,
-    vault: &str,
-) -> bool {
+fn diagnose(c: &mut Registry, t: &TokenId, block: u64, amount: u128, vault: &str) {
     callback(ok(format!("\"{vault}\"").as_bytes()));
-    c.on_release_payout(t.clone(), U64(epoch), U64(block), U128(amount))
+    c.on_release_payout(t.clone(), U64(block), U128(amount));
+}
+
+fn lock_and_debit(c: &Registry, t: &TokenId) -> (bool, u128, u128) {
+    let l = ledger(c, t);
+    (
+        l.payout_in_flight.is_some(),
+        l.known_balance.0,
+        l.total_paid_out.0,
+    )
+}
+
+/// Audit RR-2: the release never decides a payout from a balance. Whatever
+/// the vault shows, the lock and the debit stay as they are.
+fn stale_lock_stays_for(vault: &str) {
+    let (mut c, t) = fresh();
+    claim_and_go_stale(&mut c, &t, 700_000, 100);
+    diagnose(&mut c, &t, 100, 700_000, vault);
+    assert!(
+        get_logs().join("\n").contains("payout_uncertain"),
+        "{vault}"
+    );
+    assert_eq!(lock_and_debit(&c, &t), (true, 0, 700_000), "{vault}");
 }
 
 #[test]
-fn f3_failed_stale_payout_is_undone_so_earned_stays_true() {
+fn a_stale_payout_lock_stays_when_the_vault_looks_paid() {
+    stale_lock_stays_for("0");
+}
+
+#[test]
+fn a_stale_payout_lock_stays_when_the_vault_looks_failed() {
+    stale_lock_stays_for("700000");
+}
+
+#[test]
+fn a_stale_payout_lock_stays_for_any_other_balance() {
+    stale_lock_stays_for("900000");
+}
+
+/// Audit RR-2, the reviewer's equal-deposit counterexample: a claim of
+/// 100000 really succeeded and lost its callback, then a deposit of 100000
+/// restored the vault to the failure balance. The old exact match undid the
+/// debit and erased the paid-out history. Now nothing changes, and the late
+/// real callback still settles the lock.
+#[test]
+fn an_equal_deposit_cannot_turn_a_paid_payout_into_a_failed_one() {
     let (mut c, t) = fresh();
-    let epoch = claim_and_go_stale(&mut c, &t, 700_000, 100);
-    assert!(finish_payout(&mut c, &t, epoch, 100, 700_000, "700000"));
+    claim_and_go_stale(&mut c, &t, 100_000, 100);
+    diagnose(&mut c, &t, 100, 100_000, "100000");
+    assert_eq!(lock_and_debit(&c, &t), (true, 0, 100_000));
+    // The real success callback arrives late and settles the lock.
+    callback(ok(b""));
+    assert!(c.on_claim(t.clone(), acc("bob.near"), U128(100_000), U64(100)));
+    assert_eq!(lock_and_debit(&c, &t), (false, 0, 100_000));
+    assert!(sync_with(&mut c, &t, 100_000));
     let l = ledger(&c, &t);
     assert_eq!(
         (l.known_balance.0, l.total_paid_out.0, l.earned.0),
-        (700_000, 0, 700_000)
+        (100_000, 100_000, 200_000),
+        "received 200000, paid 100000"
     );
-    assert!(l.payout_in_flight.is_none());
+}
+
+/// Audit RR-2, the ownership consequence: while the payout lock stays, the
+/// share cannot be transferred, so an old withdraw cannot empty a new
+/// holder's vault.
+#[test]
+fn a_share_with_a_stale_payout_lock_cannot_be_sold_before_it_is_settled() {
+    let (mut c, t) = fresh();
+    claim_and_go_stale(&mut c, &t, 100_000, 100);
+    diagnose(&mut c, &t, 100, 100_000, "100000");
+    at(
+        &acc("bob.near"),
+        NearToken::from_yoctonear(1),
+        0,
+        100 + STALE_LOCK_BLOCKS,
+    );
+    assert_panics("", || {
+        c.nft_transfer(acc("carol.near"), t.clone(), None, None, None);
+    });
+    assert_eq!(c.owner_of(&t), Some(acc("bob.near")));
+}
+
+#[test]
+fn a_registrar_decision_that_the_payout_failed_undoes_the_debit_once() {
+    let (mut c, t) = fresh();
+    claim_and_go_stale(&mut c, &t, 700_000, 100);
+    resolve_payout(&mut c, &t, false, 100 + STALE_LOCK_BLOCKS);
+    assert_eq!(lock_and_debit(&c, &t), (false, 700_000, 0));
+    assert!(get_logs().join("\n").contains("payout_resolved"));
+    // The late real callback finds no lock and changes nothing.
+    callback(PromiseResult::Failed);
+    assert!(!c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(100)));
+    assert_eq!(lock_and_debit(&c, &t), (false, 700_000, 0));
     assert!(sync_with(&mut c, &t, 700_000));
     let l = ledger(&c, &t);
     assert_eq!(
@@ -607,51 +700,30 @@ fn f3_failed_stale_payout_is_undone_so_earned_stays_true() {
 }
 
 #[test]
-fn f3_paid_stale_payout_keeps_its_debit() {
+fn a_registrar_decision_that_the_payout_was_paid_keeps_the_debit() {
     let (mut c, t) = fresh();
-    let epoch = claim_and_go_stale(&mut c, &t, 700_000, 100);
-    assert!(finish_payout(&mut c, &t, epoch, 100, 700_000, "0"));
-    let l = ledger(&c, &t);
-    assert_eq!(
-        (l.known_balance.0, l.total_paid_out.0, l.earned.0),
-        (0, 700_000, 700_000)
-    );
+    claim_and_go_stale(&mut c, &t, 700_000, 100);
+    resolve_payout(&mut c, &t, true, 100 + STALE_LOCK_BLOCKS);
+    assert_eq!(lock_and_debit(&c, &t), (false, 0, 700_000));
 }
 
-/// Audit A-03: the reviewer's harness. A failed payout plus a plain deposit
-/// is an unclear balance. The lock stays, no history is published, and the
-/// registrar's decision gives a true `earned` after the next sync.
+/// Audit A-03: the reviewer's harness. A failed payout plus a plain deposit:
+/// the lock stays, no history is published, and the registrar's decision
+/// gives a true `earned` after the next sync.
 #[test]
 fn a_failed_payout_plus_a_deposit_keeps_the_lock_and_never_inflates_earned() {
     let (mut c, t) = fresh();
-    pay_share(&mut c, &t, 100_000);
-    at(&acc("bob.near"), NearToken::from_yoctonear(1), 0, 100);
-    let _ = c.claim(t.clone());
-    at(
-        &anyone(),
-        NearToken::from_yoctonear(0),
-        0,
-        100 + STALE_LOCK_BLOCKS,
-    );
-    let _ = c.release_stale_lock(t.clone());
-    let epoch = c.ledgers.get(&t).unwrap().epoch;
-    // The withdraw failed, the vault still holds 100000, a plain deposit of
-    // 20000 arrived.
-    assert!(!finish_payout(&mut c, &t, epoch, 100, 100_000, "120000"));
+    claim_and_go_stale(&mut c, &t, 100_000, 100);
+    diagnose(&mut c, &t, 100, 100_000, "120000");
     assert!(get_logs().join("\n").contains("payout_uncertain"));
-    let l = ledger(&c, &t);
-    assert!(l.payout_in_flight.is_some(), "lock stays");
-    assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 100_000));
-    // A sync cannot publish it either: the lock blocks it.
+    assert_eq!(lock_and_debit(&c, &t), (true, 0, 100_000));
     call(&acc("bob.near"), NearToken::from_yoctonear(0));
     assert_panics("", || drop(c.sync(t.clone())));
-    // The registrar read the public receipt: the withdraw failed.
     assert_panics("registrar", || {
         call(&anyone(), NearToken::from_yoctonear(1));
         c.resolve_stale_payout(t.clone(), false, h('e'));
     });
     resolve_payout(&mut c, &t, false, 100 + STALE_LOCK_BLOCKS);
-    assert!(get_logs().join("\n").contains("payout_resolved"));
     assert!(sync_with(&mut c, &t, 120_000));
     let l = ledger(&c, &t);
     assert_eq!(
@@ -661,7 +733,7 @@ fn a_failed_payout_plus_a_deposit_keeps_the_lock_and_never_inflates_earned() {
 }
 
 /// Audit A-02: the reviewer's harness. A failed payout and a failed forward
-/// are not conflated: the payout lock is not cleared blindly.
+/// are not conflated: the payout lock is never cleared by the release.
 #[test]
 fn a_failed_payout_and_a_failed_forward_are_not_conflated() {
     let (mut c, t) = fresh();
@@ -675,11 +747,11 @@ fn a_failed_payout_and_a_failed_forward_are_not_conflated() {
         0,
         200 + STALE_LOCK_BLOCKS,
     );
-    assert_panics("cannot be read", || drop(c.release_stale_lock(t.clone())));
+    let _ = c.release_stale_lock(t.clone());
     assert!(ledger(&c, &t).payout_in_flight.is_some());
-    // The forward is quarantined, the payout still cannot be read.
     release_fwd(&mut c, &t, 200 + STALE_F);
-    assert_panics("cannot be read", || drop(c.release_stale_lock(t.clone())));
+    let _ = c.release_stale_lock(t.clone());
+    assert!(ledger(&c, &t).payout_in_flight.is_some());
     // Both are settled from the public outcome: both failed.
     resolve_payout(&mut c, &t, false, 200 + STALE_F);
     resolve_wo(&mut c, &t, false);
@@ -703,79 +775,33 @@ fn a_failed_payout_and_a_failed_forward_are_not_conflated() {
 }
 
 #[test]
-fn f3_failed_read_or_a_moved_ledger_keeps_the_lock() {
+fn a_failed_balance_read_or_a_moved_lock_changes_nothing() {
     let (mut c, t) = fresh();
-    let epoch = claim_and_go_stale(&mut c, &t, 700_000, 100);
+    claim_and_go_stale(&mut c, &t, 700_000, 100);
     callback(PromiseResult::Failed);
-    assert!(!c.on_release_payout(t.clone(), U64(epoch), U64(100), U128(700_000)));
-    assert!(ledger(&c, &t).payout_in_flight.is_some());
+    c.on_release_payout(t.clone(), U64(100), U128(700_000));
     assert!(get_logs().join("\n").contains("release_discarded"));
-    // The real claim callback arrives during a later read.
-    callback(ok(b"\"0\""));
+    assert_eq!(lock_and_debit(&c, &t), (true, 0, 700_000));
+    // The real claim callback settles the lock; a later read finds none.
+    callback(ok(b""));
     assert!(c.on_claim(t.clone(), acc("bob.near"), U128(700_000), U64(100)));
-    assert!(!finish_payout(&mut c, &t, epoch, 100, 700_000, "700000"));
-    let l = ledger(&c, &t);
-    assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
-}
-
-/// Positive controls from the reviewer: a claim during the read invalidates
-/// it, and two concurrent releases commit once.
-#[test]
-fn two_concurrent_payout_reads_commit_once() {
-    let (mut c, t) = fresh();
-    let e1 = claim_and_go_stale(&mut c, &t, 700_000, 100);
-    at(
-        &anyone(),
-        NearToken::from_yoctonear(0),
-        0,
-        100 + STALE_LOCK_BLOCKS,
-    );
-    let _ = c.release_stale_lock(t.clone());
-    let e2 = c.ledgers.get(&t).unwrap().epoch;
-    assert!(e2 > e1);
-    assert!(!finish_payout(&mut c, &t, e1, 100, 700_000, "700000"));
-    assert!(finish_payout(&mut c, &t, e2, 100, 700_000, "700000"));
-    let l = ledger(&c, &t);
-    assert_eq!((l.known_balance.0, l.total_paid_out.0), (700_000, 0));
+    diagnose(&mut c, &t, 100, 700_000, "700000");
+    assert!(get_logs().join("\n").contains("release_discarded"));
+    assert_eq!(lock_and_debit(&c, &t), (false, 0, 700_000));
 }
 
 #[test]
-fn a_payout_read_started_before_a_quarantine_is_discarded() {
-    let (mut c, t) = fresh();
-    let epoch = claim_and_go_stale(&mut c, &t, 700_000, 100);
-    let w = forwards::ForwardWatch {
-        written_off: 1,
-        ..Default::default()
-    };
-    forwards::write_watch(&t, &w);
-    assert!(!finish_payout(&mut c, &t, epoch, 100, 700_000, "700000"));
-    assert!(ledger(&c, &t).payout_in_flight.is_some());
-}
-
-#[test]
-fn a_payout_lock_with_a_pending_forward_is_never_cleared_blindly() {
+fn a_payout_lock_with_a_pending_forward_is_never_cleared() {
     let (mut c, t) = fresh();
     pay_share(&mut c, &t, 700_000);
     at(&acc("bob.near"), NearToken::from_yoctonear(1), 0, 100);
     let _ = c.claim(t.clone());
     pay_open(&mut c, &t, 20_000, 100 + STALE_LOCK_BLOCKS - 5);
-    at(
-        &anyone(),
-        NearToken::from_yoctonear(0),
-        0,
-        100 + STALE_LOCK_BLOCKS,
-    );
-    assert_panics("cannot be read", || drop(c.release_stale_lock(t.clone())));
-    at(
-        &anyone(),
-        NearToken::from_yoctonear(0),
-        0,
-        100 + 2 * STALE_LOCK_BLOCKS,
-    );
-    assert_panics("cannot be read", || drop(c.release_stale_lock(t.clone())));
-    let l = ledger(&c, &t);
-    assert!(l.payout_in_flight.is_some());
-    assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
+    for h in [100 + STALE_LOCK_BLOCKS, 100 + 2 * STALE_LOCK_BLOCKS] {
+        at(&anyone(), NearToken::from_yoctonear(0), 0, h);
+        let _ = c.release_stale_lock(t.clone());
+    }
+    assert_eq!(lock_and_debit(&c, &t), (true, 0, 700_000));
 }
 
 #[test]
@@ -800,16 +826,14 @@ fn resolve_stale_payout_needs_a_stale_lock() {
         100 + STALE_LOCK_BLOCKS,
     );
     c.resolve_stale_payout(t.clone(), true, h('e'));
-    let l = ledger(&c, &t);
-    assert!(l.payout_in_flight.is_none());
-    assert_eq!((l.known_balance.0, l.total_paid_out.0), (0, 700_000));
+    assert_eq!(lock_and_debit(&c, &t), (false, 0, 700_000));
     assert_panics("no stale payout lock", || {
         c.resolve_stale_payout(t.clone(), true, h('e'))
     });
 }
 
-/// Review L4: a stale transfer lock is released even when the stale payout
-/// lock beside it cannot be read.
+/// Review L4: a stale transfer lock is released even when a stale payout
+/// lock sits beside it, and the payout lock stays.
 #[test]
 fn a_stale_transfer_lock_is_released_even_if_the_payout_lock_must_wait() {
     let (mut c, t) = fresh();
@@ -836,15 +860,191 @@ fn a_stale_transfer_lock_is_released_even_if_the_payout_lock_must_wait() {
     let _ = c.release_stale_lock(t.clone());
     let l = ledger(&c, &t);
     assert!(l.transfer_pending.is_none(), "transfer lock released");
-    assert!(
-        l.payout_in_flight.is_some(),
-        "payout lock waits for the live forward"
-    );
+    assert!(l.payout_in_flight.is_some(), "payout lock stays");
+}
+
+// ---------- audit RR-1, R-M1: a resolved quarantine fences its callbacks ----------
+
+/// RR-1, success case. A (80000) reaches the vault, its callback is delayed,
+/// the registrar truthfully credits it. Later B (50000) fails and is
+/// quarantined. A's late success callback must not consume B's quarantine.
+#[test]
+fn a_late_success_callback_of_a_resolved_quarantine_never_settles_a_later_one() {
+    let (mut c, t) = fresh();
+    pay_open(&mut c, &t, 80_000, 500);
+    release_fwd(&mut c, &t, 500 + STALE_F);
+    resolve_wo(&mut c, &t, true);
+    assert_eq!(ledger(&c, &t).known_balance.0, 80_000);
+    let b_start = 600 + STALE_F;
+    pay_open(&mut c, &t, 50_000, b_start);
+    release_fwd(&mut c, &t, b_start + STALE_F);
+    assert_eq!(watch(&c, &t).written_off.0, 50_000);
+    // A's callback finally runs.
+    assert!(settle_at(&mut c, &t, 80_000, 500, true));
+    assert!(get_logs()
+        .join("\n")
+        .contains("late_forward_callback_fenced"));
+    let l = ledger(&c, &t);
+    assert_eq!((l.known_balance.0, l.total_routed_in.0), (80_000, 80_000));
+    assert_eq!(watch(&c, &t).written_off.0, 50_000, "B untouched");
+    assert_eq!(acct(&c), (50_000, 0));
+    // B's real callback (failed) still settles B, once.
+    assert!(!settle_at(&mut c, &t, 50_000, b_start, false));
+    assert_eq!(watch(&c, &t).written_off.0, 0);
+    assert_eq!(ledger(&c, &t).undelivered.0, 50_000);
+    assert_eq!(acct(&c), (0, 50_000));
+}
+
+/// RR-1, failure case. A (80000) failed and was truthfully resolved as
+/// failed, then retried and succeeded. B (50000) reaches the vault and is
+/// quarantined. A's late failed callback must not make B retryable.
+#[test]
+fn a_late_failure_callback_of_a_resolved_quarantine_never_settles_a_later_one() {
+    let (mut c, t) = fresh();
+    pay_open(&mut c, &t, 80_000, 500);
+    release_fwd(&mut c, &t, 500 + STALE_F);
+    resolve_wo(&mut c, &t, false);
     at(
         &anyone(),
         NearToken::from_yoctonear(0),
         0,
-        1_000 + STALE_LOCK_BLOCKS + 1,
+        500 + STALE_F + 1,
     );
-    assert_panics("cannot be read", || drop(c.release_stale_lock(t.clone())));
+    c.retry_forward(t.clone());
+    assert!(settle_at(&mut c, &t, 80_000, 500 + STALE_F + 1, true));
+    let b_start = 600 + 2 * STALE_F;
+    pay_open(&mut c, &t, 50_000, b_start);
+    release_fwd(&mut c, &t, b_start + STALE_F);
+    // A's late failed callback.
+    assert!(!settle_at(&mut c, &t, 80_000, 500, false));
+    assert!(get_logs()
+        .join("\n")
+        .contains("late_forward_callback_fenced"));
+    assert_eq!(ledger(&c, &t).undelivered.0, 0, "B is not retryable");
+    assert_eq!(watch(&c, &t).written_off.0, 50_000);
+    at(
+        &anyone(),
+        NearToken::from_yoctonear(0),
+        0,
+        b_start + STALE_F + 1,
+    );
+    assert_panics("nothing undelivered", || c.retry_forward(t.clone()));
+    assert_eq!(acct(&c), (50_000, 0));
+}
+
+// ---------- audit RR-3: mixed outcomes ----------
+
+#[test]
+fn a_mixed_quarantine_is_settled_with_separate_delivered_and_failed_amounts() {
+    let (mut c, t) = fresh();
+    pay_open(&mut c, &t, 40_000, 500);
+    pay_open(&mut c, &t, 60_000, 510);
+    release_fwd(&mut c, &t, 500 + STALE_F);
+    assert_eq!(watch(&c, &t).written_off.0, 100_000);
+    resolve_amounts(&mut c, &t, 40_000, 60_000);
+    let l = ledger(&c, &t);
+    assert_eq!(
+        (l.known_balance.0, l.total_routed_in.0, l.undelivered.0),
+        (40_000, 40_000, 60_000)
+    );
+    assert_eq!(acct(&c), (0, 60_000));
+    assert_eq!(watch(&c, &t).written_off.0, 0);
+    assert!(get_logs().join("\n").contains("written_off_resolved"));
+}
+
+#[test]
+fn a_remainder_stays_quarantined_and_its_callbacks_stay_fenced() {
+    let (mut c, t) = fresh();
+    pay_open(&mut c, &t, 40_000, 500);
+    pay_open(&mut c, &t, 60_000, 510);
+    release_fwd(&mut c, &t, 500 + STALE_F);
+    resolve_amounts(&mut c, &t, 40_000, 0);
+    assert_eq!(watch(&c, &t).written_off.0, 60_000, "remainder");
+    assert_eq!(acct(&c), (60_000, 0));
+    // No callback of that quarantine may settle the remainder by amount.
+    assert!(settle_at(&mut c, &t, 40_000, 500, true));
+    assert_eq!(watch(&c, &t).written_off.0, 60_000);
+    assert_eq!(ledger(&c, &t).known_balance.0, 40_000);
+    // The registrar settles the rest.
+    resolve_amounts(&mut c, &t, 0, 60_000);
+    assert_eq!(acct(&c), (0, 60_000));
+    assert_eq!(watch(&c, &t).written_off.0, 0);
+}
+
+#[test]
+fn a_delivered_part_is_held_for_a_disputed_share_but_a_failed_part_is_not() {
+    let (mut c, t) = fresh();
+    pay_open(&mut c, &t, 40_000, 500);
+    pay_open(&mut c, &t, 60_000, 510);
+    release_fwd(&mut c, &t, 500 + STALE_F);
+    c.shares.get_mut(&t).unwrap().dispute = Some(0);
+    assert_panics("in dispute", || resolve_amounts(&mut c, &t, 40_000, 60_000));
+    resolve_amounts(&mut c, &t, 0, 60_000);
+    assert_eq!(ledger(&c, &t).undelivered.0, 60_000);
+    assert_eq!(watch(&c, &t).written_off.0, 40_000);
+}
+
+// ---------- audit RR-4, R-L3: the deploy barrier ----------
+
+fn self_call() {
+    at(&acc("reg.near"), NearToken::from_yoctonear(0), 0, 10);
+}
+
+#[test]
+fn assert_quiescent_passes_on_a_quiet_registry() {
+    let (c, _t) = fresh();
+    self_call();
+    c.assert_quiescent();
+}
+
+#[test]
+fn assert_quiescent_refuses_a_forward_in_flight_and_passes_once_it_settles() {
+    let (mut c, t) = fresh();
+    pay_open(&mut c, &t, 20_000, 500);
+    self_call();
+    assert_panics("not quiet", || c.assert_quiescent());
+    assert!(settle_at(&mut c, &t, 20_000, 500, true));
+    self_call();
+    c.assert_quiescent();
+}
+
+#[test]
+fn assert_quiescent_refuses_a_payout_lock() {
+    let (mut c, t) = fresh();
+    claim_and_go_stale(&mut c, &t, 700_000, 100);
+    self_call();
+    assert_panics("payout lock", || c.assert_quiescent());
+}
+
+#[test]
+fn assert_quiescent_refuses_a_transfer_lock() {
+    let (mut c, t) = fresh();
+    c.ledgers.get_mut(&t).unwrap().transfer_pending = Some(Lock {
+        account: acc("bob.near"),
+        amount: U128(0),
+        since_block: U64(1),
+    });
+    self_call();
+    assert_panics("transfer lock", || c.assert_quiescent());
+}
+
+#[test]
+fn assert_quiescent_refuses_a_quarantine_until_it_is_resolved() {
+    let (mut c, t) = quarantined(80_000);
+    self_call();
+    assert_panics("not quiet", || c.assert_quiescent());
+    resolve_wo(&mut c, &t, false);
+    // The amount sits in undelivered, which is not a forward.
+    self_call();
+    c.assert_quiescent();
+}
+
+#[test]
+fn assert_quiescent_refuses_a_watch_in_another_format() {
+    let (c, t) = fresh();
+    let mut key = b"fwd:".to_vec();
+    key.extend_from_slice(t.as_bytes());
+    env::storage_write(&key, &[0u8; 36]);
+    self_call();
+    assert_panics("malformed forward watch", || c.assert_quiescent());
 }

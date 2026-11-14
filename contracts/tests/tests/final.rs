@@ -84,8 +84,42 @@ async fn stuck_failed_payout(e: &Env, s: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Calls `release_stale_lock` and returns the result of the diagnostic
+/// callback's gas, so the test can measure it.
+fn diag_gas(r: &near_workspaces::result::ExecutionFinalResult, reg: &str) -> u64 {
+    let g: Vec<u64> = r
+        .receipt_outcomes()
+        .iter()
+        .filter(|o| {
+            o.executor_id.as_str() == reg && o.logs.iter().any(|l| l.contains("payout_uncertain"))
+        })
+        .map(|o| o.gas_burnt.as_gas())
+        .collect();
+    assert_eq!(g.len(), 1);
+    g[0]
+}
+
+async fn resolve_payout(
+    e: &Env,
+    who: &near_workspaces::Account,
+    s: &str,
+    paid: bool,
+    deposit: NearToken,
+) -> anyhow::Result<near_workspaces::result::ExecutionFinalResult> {
+    Ok(who
+        .call(e.reg.id(), "resolve_stale_payout")
+        .args_json(json!({ "token_id": s, "paid": paid, "doc_hash": hash('e') }))
+        .deposit(deposit)
+        .max_gas()
+        .transact()
+        .await?)
+}
+
+/// Audit RR-2: a stale payout lock whose withdraw never left the vault is
+/// not undone from the balance. The release only reports the balance. The
+/// registrar settles it from the receipt outcome.
 #[tokio::test]
-async fn f01_stale_payout_that_never_left_the_vault_is_undone() -> anyhow::Result<()> {
+async fn f01_stale_payout_lock_stays_until_the_registrar_settles_it() -> anyhow::Result<()> {
     let e = setup().await?;
     let w = e.register_work("USRC12600001").await?;
     let s = e.mint(w, e.writer_a.id(), 10_000).await?;
@@ -100,25 +134,34 @@ async fn f01_stale_payout_that_never_left_the_vault_is_undone() -> anyhow::Resul
     assert!(call(&e.outsider).await?.is_failure(), "too early");
     e.worker.fast_forward(1_300).await?;
     let r = ok(call(&e.outsider).await?);
-    assert!(r
-        .logs()
-        .iter()
-        .any(|l| l.contains("withdraw_failed_debit_undone")));
-    let cb_gas: Vec<u64> = r
-        .receipt_outcomes()
-        .iter()
-        .filter(|o| {
-            o.executor_id.as_str() == e.reg.id().as_str()
-                && o.logs.iter().any(|l| l.contains("lock_released_stale"))
-        })
-        .map(|o| o.gas_burnt.as_gas())
-        .collect();
-    assert_eq!(cb_gas.len(), 1);
+    let ev = event(&r, "payout_uncertain");
+    assert_eq!(ev["observed"], "80000", "the balance is a diagnostic");
+    let gas = diag_gas(&r, e.reg.id().as_str());
     println!(
         "GAS on_release_payout {:.3} Tgas (reserved 10)",
-        cb_gas[0] as f64 / 1e12
+        gas as f64 / 1e12
     );
-    assert!(cb_gas[0] < 10_000_000_000_000);
+    assert!(gas < 10_000_000_000_000);
+    let l = e.ledger(&s).await?;
+    assert_eq!(
+        (num(&l["known_balance"]), num(&l["total_paid_out"])),
+        (0, 80_000),
+        "nothing changed"
+    );
+    assert!(l["payout_in_flight"].is_object(), "the lock stays");
+    // The holder cannot claim or sell past the lock.
+    assert!(e.claim(&e.writer_a, &s).await?.is_failure());
+    // Only the registrar, with 1 yocto, settles it.
+    assert!(resolve_payout(&e, &e.outsider, &s, false, ONE_YOCTO)
+        .await?
+        .is_failure());
+    assert!(
+        resolve_payout(&e, &e.registrar, &s, false, NearToken::from_yoctonear(0))
+            .await?
+            .is_failure()
+    );
+    let r = ok(resolve_payout(&e, &e.registrar, &s, false, ONE_YOCTO).await?);
+    assert_eq!(event(&r, "payout_resolved")["paid"], false);
     let l = e.ledger(&s).await?;
     assert_eq!(
         (
@@ -126,8 +169,7 @@ async fn f01_stale_payout_that_never_left_the_vault_is_undone() -> anyhow::Resul
             num(&l["total_paid_out"]),
             num(&l["earned"])
         ),
-        (80_000, 0, 80_000),
-        "debit undone: earned is the 80000 that was paid in, no more"
+        (80_000, 0, 80_000)
     );
     assert!(l["payout_in_flight"].is_null());
     // The holder claims it, once.
@@ -146,7 +188,8 @@ async fn f01_stale_payout_that_never_left_the_vault_is_undone() -> anyhow::Resul
 }
 
 #[tokio::test]
-async fn f02_stale_payout_that_was_paid_keeps_its_debit() -> anyhow::Result<()> {
+async fn f02_stale_payout_that_was_paid_keeps_its_debit_when_the_registrar_says_so(
+) -> anyhow::Result<()> {
     let e = setup().await?;
     let w = e.register_work("USRC12600001").await?;
     let s = e.mint(w, e.writer_a.id(), 10_000).await?;
@@ -176,7 +219,10 @@ async fn f02_stale_payout_that_was_paid_keeps_its_debit() -> anyhow::Result<()> 
         .max_gas()
         .transact()
         .await?);
-    assert!(r.logs().iter().any(|l| l.contains("withdraw_happened")));
+    assert_eq!(event(&r, "payout_uncertain")["observed"], "0");
+    let l: Value = e.ledger(&s).await?;
+    assert!(l["payout_in_flight"].is_object(), "the lock stays");
+    let _ = ok(resolve_payout(&e, &e.registrar, &s, true, ONE_YOCTO).await?);
     let l: Value = e.ledger(&s).await?;
     assert_eq!(
         (
@@ -272,7 +318,8 @@ async fn f04_a_written_off_forward_is_quarantined_then_resolved_and_resent_once(
     watch.extend_from_slice(&1u64.to_le_bytes()); // latest
     watch.extend_from_slice(&80_000u128.to_le_bytes());
     watch.extend_from_slice(&1u32.to_le_bytes());
-    watch.extend_from_slice(&0u64.to_le_bytes());
+    watch.extend_from_slice(&0u64.to_le_bytes()); // released_through
+    watch.extend_from_slice(&0u64.to_le_bytes()); // resolved_through
     watch.extend_from_slice(&0u128.to_le_bytes()); // written_off
     let mut watch_key = b"fwd:".to_vec();
     watch_key.extend_from_slice(s.as_bytes());
@@ -327,7 +374,7 @@ async fn f04_a_written_off_forward_is_quarantined_then_resolved_and_resent_once(
     // Only the registrar settles it, with 1 yocto and a document hash.
     let resolve = |who: &near_workspaces::Account, deposit| {
         who.call(e.reg.id(), "resolve_written_off")
-            .args_json(json!({ "token_id": s, "delivered": false, "doc_hash": hash('d') }))
+            .args_json(json!({ "token_id": s, "delivered_amount": "0", "failed_amount": "80000", "doc_hash": hash('d') }))
             .deposit(deposit)
             .max_gas()
             .transact()
@@ -337,7 +384,7 @@ async fn f04_a_written_off_forward_is_quarantined_then_resolved_and_resent_once(
         .await?
         .is_failure());
     let r = ok(resolve(&e.registrar, ONE_YOCTO).await?);
-    assert_eq!(event(&r, "written_off_resolved")["amount"], "80000");
+    assert_eq!(event(&r, "written_off_resolved")["failed_amount"], "80000");
     let acct: Value = e.reg.view("get_accounting").await?.json()?;
     assert_eq!(
         (
