@@ -41,6 +41,30 @@ describe('landing page', () => {
     expect(files).not.toMatch(/placeholder/i);
     expect(read('src/consts.ts')).toContain("SOURCE_URL = 'https://github.com/RoylTEE/RoylTEE'");
   });
+  it('the top bars name the NFT standard and the testnet demo, and the hero opens the testnet app', () => {
+    const bar = read('src/components/AnnounceBar.astro');
+    expect(bar).toContain('announce-tag');
+    expect(bar).toContain('Every rights share is an NEP-171 NFT that owns its own royalty vault.');
+    expect(bar).toContain('See how it works &rarr;');
+    expect(bar).toContain('href="/how-it-works"');
+    const base = read('src/layouts/Base.astro');
+    expect(base).toContain('class="badge ok"');
+    expect(base).toContain('NEAR testnet');
+    expect(base).toContain('Live demo. Payments use Mock USDC.');
+    expect(base).not.toMatch(/badge sim/);
+    const hero = read('src/pages/index.astro');
+    expect(hero).toContain('Open the testnet app');
+    expect(hero).toContain('Live on NEAR testnet. Money in the demo is Simulated.');
+    expect(hero).not.toContain('Open the demo dashboard');
+    const nav = read('src/components/Nav.astro');
+    expect(nav).toContain('Open the testnet app');
+    expect(nav).not.toContain('badge ok net');
+    expect(nav).not.toContain('Open the demo dashboard');
+    expect(read('src/components/landing/Proof.astro')).toContain('href="/auction"');
+    const app = read('src/layouts/App.astro');
+    expect(app).toContain('class="badge ok app-net"');
+    expect(app).toContain('Live demo. Payments use Mock USDC.');
+  });
   it('passes the wording check (no dashes, no banned names, no local paths)', () => {
     for (const f of landingFiles) expect(forbidden(read(f)), f).toEqual([]);
   });

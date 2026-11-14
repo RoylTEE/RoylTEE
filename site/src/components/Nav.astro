@@ -20,8 +20,7 @@ const links = [
       {links.map((l) => <a href={l.href} aria-current={current === l.key ? 'page' : undefined}>{l.t}</a>)}
     </nav>
     <div class="head-end">
-      <span class="badge ok net">NEAR testnet</span>
-      <a class="btn primary head-cta" href={DASHBOARD_URL}>Open the demo dashboard</a>
+      <a class="btn primary head-cta" href={DASHBOARD_URL}>Open the testnet app</a>
       <button class="menu-btn" type="button" aria-expanded="false" aria-controls="mobile-menu" data-menu-btn>
         <span class="sr">Menu</span><span class="bars" aria-hidden="true"></span>
       </button>
@@ -29,7 +28,7 @@ const links = [
   </div>
   <nav class="mobile-menu" id="mobile-menu" aria-label="Main" hidden data-menu>
     {links.map((l) => <a href={l.href} aria-current={current === l.key ? 'page' : undefined}>{l.t}</a>)}
-    <a class="btn primary" href={DASHBOARD_URL}>Open the demo dashboard</a>
+    <a class="btn primary" href={DASHBOARD_URL}>Open the testnet app</a>
   </nav>
 </header>
 <style>
@@ -56,7 +55,7 @@ const links = [
     .head-nav, .head-cta { display: none; }
     .menu-btn { display: block; }
   }
-  @media (max-width: 1199px) { .net { display: none; } .head-row { gap: var(--s4); } }
-  @media (max-width: 479px) { .net { display: none; } .head-row { gap: var(--s3); } }
+  @media (max-width: 1199px) { .head-row { gap: var(--s4); } }
+  @media (max-width: 479px) { .head-row { gap: var(--s3); } }
 </style>
 <script>import '../scripts/nav.ts';</script>

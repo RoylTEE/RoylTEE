@@ -25,8 +25,8 @@ const cspNonce = Astro.locals.cspNonce;
     <a class="skip" href="#main">Skip to content</a>
     {announce && <AnnounceBar />}
     <div class="testnet-bar" role="note">
-      <span class="badge sim">Testnet</span>
-      <span>NEAR testnet only. Payments use Mock USDC (testnet), a token with no value.</span>
+      <span class="badge ok">NEAR testnet</span>
+      <span>Live demo. Payments use Mock USDC.</span>
     </div>
     <Nav current={current} />
     <main id="main"><slot /></main>
