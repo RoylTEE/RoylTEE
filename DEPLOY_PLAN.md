@@ -373,7 +373,7 @@ near account create-account fund-myself $AUCTION '6 NEAR' \
   autogenerate-new-keypair save-to-legacy-keychain sign-as $ROOT $NET $SIGN
 ```
 
-17b. Publish the WASI module with FastFS (1 tx, fails out of gas by design, same as the spike). Build the payload with `spike/outlayer/scripts/fastfs_payload.py`, then check the URL serves the same hash:
+17b. Publish the WASI module with FastFS. The module serves one account, fixed when it is built (default `auction.royltee-dev.testnet`; for any other auction account rebuild with `ROYLTEE_AUCTION_ACCOUNT=<account>` first, and use the new hash everywhere below; findings C1 and B-02). Publish it (1 tx, fails out of gas by design, same as the spike). Build the payload with `spike/outlayer/scripts/fastfs_payload.py`, then check the URL serves the same hash:
 
 ```bash
 python3 spike/outlayer/scripts/fastfs_payload.py $WASI /tmp/auction_fastfs.bin
@@ -382,14 +382,20 @@ near contract call-function as-transaction $OL __fastdata_fastfs file-args /tmp/
 curl -s $WASI_URL | sha256sum                                                  # must print $WASI_HASH
 ```
 
-17c. Deploy and initialise in one transaction (no one can initialise in between):
+17c. Deploy and initialise in one transaction, signed by the auction account itself (finding B-07). `new` refuses any caller other than the contract account, and the deploy plus init batch makes the first caller that account, so nobody can initialise it with other settings in between:
 
 ```bash
 near contract deploy $AUCTION use-file contracts/res/auction.wasm \
   with-init-call new json-args "{\"registry\":\"$REG\",\"usdc\":\"$USDC\",\"setup\":{\"outlayer\":\"$OL\",\"wasm_url\":\"$WASI_URL\",\"wasm_hash\":\"$WASI_HASH\",\"secrets_account\":\"$OL_OWNER\",\"secrets_profile\":\"royltee-auction\"}}" \
   prepaid-gas '100 Tgas' attached-deposit '0 NEAR' $NET $SIGN
 near contract call-function as-read-only $AUCTION get_config json-args '{}' $NET now
+# Check every pinned field by eye before going on: registry, usdc, outlayer, wasm_url, wasm_hash (equal to $WASI_HASH),
+# secrets_account and secrets_profile. Also check the deployed code is the built file:
+near contract download-wasm regular $AUCTION save-to-file /tmp/auction_deployed.wasm network-config testnet now
+sha256sum /tmp/auction_deployed.wasm contracts/res/auction.wasm   # the two hashes must be equal
 ```
+
+Do not credential the auction (17d) or send it anything until the printed config is exactly what the plan says.
 
 17d. Credential for the auction (1 tx, registrar; this also registers it with mock USDC so it can receive bids):
 
@@ -402,11 +408,11 @@ near contract call-function as-read-only $REG is_active_member json-args "{\"acc
 
 17e. OWNER, in the OutLayer dashboard (a wallet signs; no key is typed anywhere): create the secret profile `royltee-auction` for `$OL_OWNER`, bound to the WASM hash `$WASI_HASH`, with one auto-generated TEE secret `PROTECTED_AUCTION_MASTER` (hex32).
 
-The access condition is what stops anyone else from asking OutLayer to run the module against the secret (the decryption oracle, finding C1). The module also refuses every request whose `NEAR_PREDECESSOR_ID` is not the auction (see "Two layers" below), so the condition is a second layer, but it is required. Pick the first of these the dashboard can build:
+The access condition is what stops anyone else from asking OutLayer to run the module against the secret (the decryption oracle, findings C1 and B-02). The module also refuses every request unless `NEAR_PREDECESSOR_ID` equals the auction account compiled into it (not an account named in the request) and the request names the same account, so the condition is a second, independent layer. The plan requires the target condition: a signer whitelist alone is not enough, because it is judged against the transaction signer and not against the account that called OutLayer. Check that no other secret row or profile exposes the same master. Pick the first of these the dashboard can build:
 
 1. **Target:** `And[WasmHash($WASI_HASH), Predecessor{Whitelist[$AUCTION]}]`. Only a run of this exact build, and only a request that reaches OutLayer through the auction contract, can read the secret. Any account may sign the transaction, so `settle` stays open to anyone.
-2. **Fallback:** the dashboard's "Direct calls only" panel with readers `[$OL_OWNER]`, "Also through these contracts" `$AUCTION`, and "Lock to this build". The condition is then `And[Whitelist[$OL_OWNER], Predecessor{Whitelist[$OL_OWNER, $AUCTION]}, WasmHash(...)]`. It also closes the oracle (an attacker is neither the signer nor the predecessor), but only transactions signed by `$OL_OWNER` are admitted, so `publish_key` and every `settle` must be signed by the owner's wallet.
-3. **Neither:** stop. A default hash row admits everyone (OutLayer CLI docs: "a new hash row admits everyone"); the module check would then be the only layer. Ask the owner before going on.
+2. **Rehearsal only fallback (not accepted for a real listing, review B-02):** the dashboard's "Direct calls only" panel with readers `[$OL_OWNER]`, "Also through these contracts" `$AUCTION`, and "Lock to this build". The condition is then `And[Whitelist[$OL_OWNER], Predecessor{Whitelist[$OL_OWNER, $AUCTION]}, WasmHash(...)]`. It also closes the oracle against an outsider (an attacker is neither the signer nor the predecessor), but it is not the required condition, and only transactions signed by `$OL_OWNER` are admitted, so `publish_key` and every `settle` must be signed by the owner's wallet.
+3. **Neither:** stop. A real listing needs option 1; with fallback 2 only the demo share may be used. A default hash row admits everyone (OutLayer CLI docs: "a new hash row admits everyone"); the module check would then be the only layer. Ask the owner before going on.
 
 What is verified and what is not (read 2026-11-14 UTC):
 
@@ -423,7 +429,7 @@ near contract call-function as-read-only $OL get_secrets json-args "{\"accessor\
 
 (`get_secrets` and `secrets_exist` exist in the contract source; `secrets_exist` was run and returned false before the owner stored the row. `get_secrets` has not been run on a stored row yet.)
 
-17f. Publish the TEE public key (1 tx, anyone, or the owner for fallback 2; OutLayer refunds what it does not use). This is the first real call of OutLayer by the auction:
+17f. Publish the TEE public key (the answer must carry `key_version` 1 and a key that is not a low order point, or the contract refuses it) (1 tx, anyone, or the owner for fallback 2; OutLayer refunds what it does not use). This is the first real call of OutLayer by the auction:
 
 ```bash
 near contract call-function as-transaction $AUCTION publish_key json-args '{}' \
@@ -433,14 +439,14 @@ near contract call-function as-read-only $AUCTION get_tee_pubkey json-args '{}' 
 
 If `get_tee_pubkey` stays null, read the transaction on an explorer: the answer shape, the charge and any refund are the first facts about the real OutLayer (finding M4). The key is permanent once stored: if the master secret is ever replaced, every bid sealed to the old key becomes unreadable and each auction ends in no sale.
 
-17g. Throwaway check that a direct request from another account is refused (finding C1; 1 tx from an account that is not the auction, here `$OUTSIDER`, about 0.02 NEAR attached, the rest refunded). It tries the attack: two sealed bids, one at the maximum, and a direct `request_execution` that names the auction as `contract`. Run it before any listing, after 17e and 17f:
+17g. Throwaway check that a direct request from another account is refused (finding C1; 1 tx from an account that is not the auction, here `$OUTSIDER`, about 0.02 NEAR attached, the rest refunded). It tries the attack: two sealed bids, one at the maximum, and a direct `request_execution` that names the auction as `contract` (the real attack, with the published key as the contract would send it). Run it before any listing, after 17e and 17f. Then run it a second time with `$OUTSIDER` in place of `$AUCTION` in the `contract` field (an attacker contract naming itself, finding B-02): that must be refused too, by the module even if the keystore were open:
 
 ```bash
 PUB=<the 64 hex characters printed by get_tee_pubkey in 17f>
 CT1=$(node scripts/auction/encrypt-bid.mjs --pubkey $PUB --auction 0 --contract $AUCTION --bidder $BIDDER1 --amount 70000000 --reserve $RESERVE --max-deposit $MAX | jq -r .ciphertext)
 CT2=$(node scripts/auction/encrypt-bid.mjs --pubkey $PUB --auction 0 --contract $AUCTION --bidder $OUTSIDER --amount $MAX --reserve $RESERVE --max-deposit $MAX | jq -r .ciphertext)
-INPUT=$(jq -nc --arg c $AUCTION --arg r $RESERVE --arg m $MAX --arg b1 $BIDDER1 --arg c1 $CT1 --arg b2 $OUTSIDER --arg c2 $CT2 \
-  '{mode:"settle",auction_id:"0",contract:$c,reserve:$r,max_deposit:$m,bids:[{bidder:$b1,ct:$c1},{bidder:$b2,ct:$c2}]}')
+INPUT=$(jq -nc --arg c $AUCTION --arg pk $PUB --arg r $RESERVE --arg m $MAX --arg b1 $BIDDER1 --arg c1 $CT1 --arg b2 $OUTSIDER --arg c2 $CT2 \
+  '{mode:"settle",auction_id:"0",contract:$c,pubkey:$pk,key_version:1,reserve:$r,max_deposit:$m,bids:[{bidder:$b1,ct:$c1},{bidder:$b2,ct:$c2}]}')
 ARGS=$(jq -nc --arg u $WASI_URL --arg h $WASI_HASH --arg i "$INPUT" --arg o $OL_OWNER \
   '{source:{WasmUrl:{url:$u,hash:$h,build_target:"wasm32-wasip1"}},resource_limits:{max_instructions:1000000000,max_memory_mb:64,max_execution_seconds:30},input_data:$i,secrets_ref:{profile:"royltee-auction",account_id:$o},response_format:"Json"}')
 near contract call-function as-transaction $OL request_execution json-args "$ARGS" \
@@ -517,7 +523,7 @@ near contract call-function as-read-only $AUCTION get_accounting json-args '{}' 
 
 Off chain proof: verify the settle transaction with `outlayer-verify tx <hash> --network testnet --api https://testnet-api.outlayer.ai` (see `spike/outlayer/README.md`). UNVERIFIED for this module until run.
 
-17n. Optional: delete the auction's full-access key after the rehearsal and the demo, then prove zero keys. Only do this when no further fix is wanted: the contract has no owner or admin method, so a bug can only be fixed while the key exists, and while the key exists its holder can claim vault money of listed shares and move all escrow (T-A19).
+17n. Optional and NOT recommended yet: delete the auction's full-access key, then prove zero keys. Review B says do not delete it on the present evidence, because the key is also the only way to fix a bug or to rescue a stranded share (T-A16, T-A19). Do it only when the owner decides that no further fix is wanted after the rehearsal and the demo. The contract has no owner or admin method, so a bug can only be fixed while the key exists, and while the key exists its holder can claim vault money of listed shares and move all escrow (T-A19).
 
 ```bash
 near account delete-keys $AUCTION public-keys <the one key printed in 17a> network-config testnet sign-with-legacy-keychain send
