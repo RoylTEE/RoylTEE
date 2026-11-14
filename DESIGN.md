@@ -336,11 +336,16 @@ pub fn sync(&mut self, token_id: TokenId) -> Promise;
 
 pub fn release_stale_lock(&mut self, token_id: TokenId);
 // Anyone. Only if a lock is older than STALE_LOCK_BLOCKS. A transfer lock is cleared at once.
-// A payout lock is cleared after a vault balance read (on_release_payout): debit undone only if
-// the balance shows the withdraw never happened (audit F3, T19). epoch += 1.
-pub fn release_stale_forward(&mut self, token_id: TokenId) -> Promise;
-// Anyone, STALE_LOCK_BLOCKS after the newest recorded forward, no lock open (T19b). Reads the
-// vault balance, credits at most the recorded amount, the rest to undelivered.
+// A payout lock is read only with no pending or quarantined forward; on_release_payout clears it
+// only on an exact balance match (withdraw happened: debit stays; failed: debit undone), else it
+// stays (T19, audit F3, A-02, A-03). epoch += 1.
+pub fn release_stale_forward(&mut self, token_id: TokenId);
+// Anyone, STALE_FORWARD_BLOCKS (about a day) after the busy period start, inbound_pending equal to
+// the recorded count (T19b). Reads no balance, credits and resends nothing: the amount moves to
+// written_off and inbound_pending to 0. sync is refused while written_off > 0.
+#[payable] pub fn resolve_written_off(&mut self, token_id: TokenId, delivered: bool, doc_hash: Hash32);
+#[payable] pub fn resolve_stale_payout(&mut self, token_id: TokenId, paid: bool, doc_hash: Hash32);
+// Registrar only, 1 yocto, public receipt outcome. See T12, T19, T19b.
 ```
 
 ### Agents
@@ -664,9 +669,9 @@ pub fn retry_forward(&mut self, token_id: TokenId);
 // Anyone. Re-sends the share's undelivered amount; debits undelivered before the forward, a second
 // failure puts it back. Emits forward_retried.
 pub fn release_stale_lock(&mut self, token_id: TokenId) -> PromiseOrValue<()>;
-// Anyone, once a lock is STALE_LOCK_BLOCKS (1200) blocks old. A payout lock is cleared after a
-// vault balance read (debit undone only if the withdraw never happened, audit F3); bumps the
-// epoch, emits lock_released_stale (and anomaly when the balance is unclear).
+// Anyone, once a lock is STALE_LOCK_BLOCKS (1200) blocks old. A payout lock is read only with
+// nothing else pending and cleared only on an exact balance match (audit F3, A-02, A-03); any
+// other balance keeps it (payout_uncertain). Bumps the epoch, emits lock_released_stale.
 ```
 
 Callbacks now carry the lock they belong to. `on_claim` gets the lock's `since_block`; `nft_resolve_transfer` gets an extra `lock_block`. A callback whose lock is gone (released as stale) changes no balance and no owner: `on_claim` only emits an `anomaly` (`late_claim_callback`), `nft_resolve_transfer` returns true. See THREAT_MODEL T36.

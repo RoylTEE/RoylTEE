@@ -327,6 +327,10 @@ Proves: the deployed state reads back unchanged under the new code. The same upg
 
 Same commands as step 15, with the wasm built from branch `fix/audit` (local sha256 `423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a`, 712958 bytes; vault unchanged, `9e9ef97840a3a3e6967565b43a9c2a467c1925153ea8c5577d666c9b16966cda`). Transaction `BGBUJDTnnjpevSUZkdmfeVASxbKHn1FQDAZqj75kH5rU`, fee 0.0051480829649394 NEAR, code hash `5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo`. Read back after: accounting, owners and approvals unchanged; `deployments/testnet.json` was resynced and `npm run verify:testnet` passed. The upgrade from the step 15 build was not rehearsed in the sandbox (UNVERIFIED there).
 
+### Step 15c. Redeploy the registry in place with the final contract fixes (DRAFT, not run, needs the owner's yes)
+
+Precondition, read-only: `npm run check:quiescent` must print `QUIET: SAFE TO REDEPLOY`. It fails unless every ledger has `inbound_pending` 0 and no payout or transfer lock, and `forwards_in_flight_total` is 0. A forward or lock in flight at the deploy has no watch record and recovery for it is not supported (THREAT_MODEL T19b). Then build (`bash scripts/build-wasm.sh`, twice, same sha256), check the registry balance covers the larger code, deploy with the same command as step 15 (`without-init-call`), compare the on-chain code hash with the local build, and read back `get_accounting`, `nft_tokens` and one `get_ledger`. Rehearsed in the sandbox from the exact registry deployed before (fixture `registry-deployed-423e3799.wasm`) by `u02_deployed_build_upgrades_in_place_and_a_lost_forward_is_quarantined_and_resolved`. After the deploy, update `deployments/testnet.json` and run `npm run verify:testnet`.
+
 ### Step 16. Split sheet demo (DRAFT, not run, needs the owner's yes; about 7 transactions)
 
 ```bash
