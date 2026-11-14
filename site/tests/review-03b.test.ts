@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createTicket, listTickets } from '../src/server/tickets';
 import { MemoryStore } from '../src/server/store';
-import { SCENES } from '../src/data/testnet';
+import { SCENES, MINTS } from '../src/data/testnet';
 
 describe('review 03b L2: ticket paging survives a cursor ticket that disappears', () => {
   it('keeps walking older tickets when the cursor ticket expired between pages', async () => {
@@ -38,7 +38,7 @@ describe('review 03b L2: ticket paging survives a cursor ticket that disappears'
 describe('review 03c L3: the agent payment is not labelled Simulated payer', () => {
   it('marks the agent scene as a scripted agent', () => {
     const agent = SCENES.filter(s => s.step === 'Agent' && s.what.startsWith('Agent pays'));
-    expect(agent.length).toBe(1);
+    expect(agent.length).toBe(3);
     for (const s of agent) { expect(s.simulated).toBeFalsy(); expect(s.agent).toBe(true); }
   });
 });
@@ -50,9 +50,9 @@ describe('review 03c M2: power claims match the deployed build', () => {
       expect(read(f)).not.toMatch(/[Ee]very registrar action (is an event with|carries) a document hash/);
     }
   });
-  it('marks branch-only split sheet approval and the registrar credential refusal', () => {
-    expect(read('pages/registrar.astro')).toMatch(/Hold a credential \(after the planned registry update/);
-    expect(read('pages/member.astro')).toMatch(/Not on the deployed build yet/);
+  it('states split sheet approval and the registrar credential refusal as deployed', () => {
+    expect(read('pages/registrar.astro')).toMatch(/Hold a credential \(refused by the deployed build/);
+    expect(read('pages/member.astro')).not.toMatch(/Not on the deployed build yet/);
     expect(read('pages/index.astro')).toMatch(/Change a split alone \(except the registrar/);
   });
 });
@@ -178,7 +178,8 @@ describe('second reviewer 03b item 5: grounding notes match the deployed snapsho
   it('drops the stale six shares and not on chain lines', () => {
     expect(notes).not.toContain('six shares s1 to s6');
     expect(notes).not.toContain('Not on chain yet: the scripted agent and the dispute scene');
-    expect(notes).toContain('seven shares s1 to s7');
+    expect(notes).not.toContain('seven shares s1 to s7');
+    expect(notes).toContain('13 shares s1 to s13');
   });
 });
 
@@ -238,5 +239,17 @@ describe('review 03d L5: the verify page accepts recorded vault builds and agree
     const r = JSON.parse(readFileSync(rec, 'utf8'));
     expect(r.wasm.registry.on_chain_code_hash_base58).toBe(DEPLOY_RECORD.registry.codeHash);
     expect(r.wasm.registry.on_chain_sha256).toBe(DEPLOY_RECORD.registry.sha256);
+    expect(r.wasm.vault.on_chain_code_hash_base58).toBe(DEPLOY_RECORD.vault.codeHash);
+    expect(r.wasm.vault.on_chain_sha256).toBe(DEPLOY_RECORD.vault.sha256);
+    expect([...DEPLOY_RECORD.earlierVaultCodeHashes].sort()).toEqual(r.wasm.vault.earlier_builds.map((b: { on_chain_code_hash_base58: string }) => b.on_chain_code_hash_base58).sort());
+    const vaultHashes = new Set([DEPLOY_RECORD.vault.codeHash, ...DEPLOY_RECORD.earlierVaultCodeHashes]);
+    for (const a of Object.values(r.accounts) as { variable: string; code_hash_base58: string }[]) if (/^S\d+$/.test(a.variable)) expect(vaultHashes.has(a.code_hash_base58), a.variable).toBe(true);
+    const recorded = new Map((r.transactions as { transaction_hash: string; block_timestamp_utc?: string }[]).map((t) => [t.transaction_hash, t]));
+    expect(Object.keys(MINTS).sort()).toEqual(Object.keys(r.token_owners.owners).sort());
+    for (const [id, m] of Object.entries(MINTS)) {
+      expect(recorded.has(m.tx), id).toBe(true);
+      expect(recorded.get(m.tx)!.block_timestamp_utc!.slice(0, 19), id).toBe(m.at.slice(0, 19));
+    }
+    for (const s of SCENES) for (const t of s.txs) expect(recorded.has(t), t).toBe(true);
   });
 });

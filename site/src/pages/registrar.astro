@@ -2,7 +2,7 @@
 import App from '../layouts/App.astro';
 import PowerTable from '../components/PowerTable.astro';
 import { REGISTRAR, REGISTRAR_EVENTS, REGISTRAR_EVENT_KINDS, accountUrl, txUrl } from '../data/testnet';
-const cannot = ['Hold a credential (after the planned registry update; the deployed build does not refuse it yet)', 'Claim from a share account it does not hold (on the deployed build it could be granted a credential and hold one)', "Move an active member's share", 'Sign for a share account (they have no keys)'];
+const cannot = ['Hold a credential (refused by the deployed build since the 2026-11-13 registry update)', 'Claim from a share account it does not hold (it cannot hold a credential, so it cannot hold a share)', "Move an active member's share", 'Sign for a share account (they have no keys)'];
 const count = (k: string) => REGISTRAR_EVENTS.filter((e) => e.kind === k).length;
 const one: Record<string, string> = { credential_granted: 'Credential granted', credential_suspended: 'Credential suspended', credential_reinstated: 'Credential reinstated', payer_role_granted: 'Payer role granted', payer_role_revoked: 'Payer role revoked', registrar_transfer: 'Registrar transfer', dispute_resolved: 'Dispute resolved' };
 const none = REGISTRAR_EVENT_KINDS.filter(([k]) => !count(k)).map(([, l]) => l);
@@ -57,7 +57,7 @@ const short = (a: string) => a.replace(/\.royltee-dev\.testnet$/, '');
       <p class="label">Cannot</p>
       <div class="method-list">{cannot.map((c) => <span class="method no">{c}</span>)}</div>
     </div>
-    <p class="panel-foot">Methods checked against the contract code on 2026-11-13; items marked for the planned registry update are on the branch code only. A multisig council with a time delay is roadmap.</p>
+    <p class="panel-foot">Methods checked against the contract code on 2026-11-14; the deployed registry runs that code (code hash 5Taw8Syz, see Verify). A multisig council with a time delay is roadmap.</p>
   </section>
 </App>
 <script>import '../scripts/registrar.ts';</script>

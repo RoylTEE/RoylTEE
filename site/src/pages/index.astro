@@ -10,7 +10,7 @@ const sheet = [
 const sale = SCENES.filter((s) => s.tokens.includes('s2') || (s.step === 'Refusal'));
 const people = [
   { who: 'Songwriters and artists', job: 'Check the split on record, see what each share earned, claim it.', where: 'Your shares', href: '/member' },
-  { who: 'Publishers and labels', job: 'Hold shares, run a payment agent, and approve split sheets for works they registered (after the planned registry update; not on the deployed build yet).', where: 'Split sheets', href: '/catalog/splits/' },
+  { who: 'Publishers and labels', job: 'Hold shares, run a payment agent, and approve split sheets for works they registered.', where: 'Split sheets', href: '/catalog/splits/' },
   { who: 'Catalog buyers', job: 'Confirm the share, the payout account, that the seller kept no key, and that unclaimed money came along.', where: 'Share accounts', href: '/shares/accounts/' },
   { who: 'Payers and their agents', job: 'Pay a work once, inside fixed limits, without ever choosing the payee.', where: 'Agents', href: '/agents' },
   { who: 'Registrar', job: 'Admit members, resolve disputes with a document hash, answer support.', where: 'Registrar', href: '/registrar' },
@@ -186,7 +186,7 @@ const curl = `curl -s https://rpc.testnet.near.org -H 'content-type: application
         <p class="lead">Ask a public testnet node for the access keys of the share account that was sold. The answer is an empty list.</p>
       </div>
       <pre class="code"><code>{curl}</code></pre>
-      <p class="muted">From a clone of the repository, <code class="mono">npm run verify:testnet</code> checks all seven share accounts, the code hashes and the balances.</p>
+      <p class="muted">From a clone of the repository, <code class="mono">npm run verify:testnet</code> checks all 13 share accounts, the code hashes and the balances.</p>
     </div>
   </section>
 </Base>

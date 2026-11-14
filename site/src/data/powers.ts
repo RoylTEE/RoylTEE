@@ -11,7 +11,7 @@ export const POWERS: Power[] = [
   { method: 'claim', who: 'holder', what: 'Pay the share account balance to the current holder', ui: '/member#holdings' },
   { method: 'nft_transfer', who: 'holder', what: 'Move the share to another verified member; unclaimed money goes with it', ui: '/member#transfer' },
   { method: 'register_share', who: 'holder', what: 'Add shares to a work from a reviewed split sheet', ui: '/member#draft', note: 'UNVERIFIED' },
-  { method: 'approve_share, reject_share', who: 'holder', what: 'The work registrant signs or rejects a share someone else registered', ui: '/member#approvals', note: 'Not on the deployed build yet' },
+  { method: 'approve_share, reject_share', who: 'holder', what: 'The work registrant signs or rejects a share someone else registered', ui: '/member#approvals', note: 'On the deployed build; not sent from this site on testnet yet' },
   { method: 'set_share_note', who: 'holder', what: 'Set a short public note. Payouts and agents never read it', ui: null },
   { method: 'confirm_share', who: 'holder', what: 'A co-holder confirms a share, raising its evidence tier', ui: null },
   { method: 'sync', who: 'holder', what: 'Pull a plain deposit into the share ledger', ui: null },

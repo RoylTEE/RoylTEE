@@ -1,7 +1,8 @@
 /**
  * Public facts about the NEAR testnet deployment, copied from the repository README and
  * deployments/testnet.json. Live values on the registry pages come from view calls, not from here.
- * The scene list is the recorded on-chain demo (all on 2026-11-13 UTC).
+ * The scene list is the recorded on-chain demo (all on 2026-11-13 UTC). The rows from 'Pay' with line-sale-2 on
+ * ran on the registry build with the contract review fixes (deployed 2026-11-13 18:54 UTC).
  */
 export const NETWORK = 'testnet';
 export const REGISTRY = 'reg.royltee-dev.testnet';
@@ -40,6 +41,15 @@ export const SCENES: Scene[] = [
   { step: 'Dispute', what: 'writer-b registers a 20 percent share on work 2, contesting s5', shows: 'Over 100 percent: s7 minted as claimant, dispute 0 opened', txs: ['3uKby5aP5pN6sMEp1EJSWn7xDEzyH2nASNzS7ccstJba'], tokens: ['s5', 's7'], result: 'info' },
   { step: 'Pay', what: 'Payer pays work 2, 1.0 mUSDC', shows: 's6 paid 0.3 as usual. The 0.7 for s5 held in dispute escrow', txs: ['C8H28Nx1MZ5Pjb13uzkvheAh7S6Jf5mdqqHqmM1n7Mu'], tokens: ['s5', 's6'], result: 'ok', simulated: true },
   { step: 'Resolve', what: 'Registrar resolves dispute 0, uphold existing, with a document hash', shows: 's7 void. The 0.7 in escrow released to s5 only', txs: ['7wvLcnuB5L6w3rh3tBL2Jgg7yTMErD9QduC1XLSAYUVi'], tokens: ['s5', 's7'], result: 'ok' },
+  { step: 'Pay', what: 'Payer pays work 0 again, 1.0 mUSDC, line line-sale-2, after the sale of s2', shows: 'The new holder of s2 now receives its 0.5', txs: ['2aAgWtcaEC1RinbQvVS1AoLpZn7zQeEmzAGW3FshXHQA'], tokens: ['s1', 's2'], result: 'ok', simulated: true },
+  { step: 'Refusal', what: 'writer-b, who sold s2, tries to claim it', shows: 'Refused: only the current holder can claim', txs: ['EYDV3Tsv7Q1ZFPnJzmVdk6D4Rtosqpn8fYNY71ofVWJU'], tokens: ['s2'], result: 'refused' },
+  { step: 'Claim', what: 'buyer-pub claims s2, 0.5 mUSDC', shows: 'The buyer collects the new payment', txs: ['ASynFkHYZ5CxZdSi6paosMVuZiQf66mvEusNn4mnxhiw'], tokens: ['s2'], result: 'ok' },
+  { step: 'Register', what: 'writer-a registers work 3 (ZZRYL2600005, provenance ai_assisted) and shares s8 and s9, 50 percent each', shows: 'Provenance is a declared field; its evidence is Simulated, not checked', txs: ['3er9FiUfRj1msBQkDbM2WhxazMou8hdRw95xPPs1eyKA', 'FGrwBa58Empz2zW1Yj2BTHPvaSw9ZjsrVrDT6PrbN4gf', 'BDE7EtebNBcfNX5PXCi2aniUCaLwQivKzQwpvSxq7Cft'], tokens: ['s8', 's9'], result: 'ok' },
+  { step: 'Register', what: 'writer-a registers work 4 (ZZRYL2600006, provenance fully_ai) and shares s10 and s11 on the basis of a contract', shows: 'A fully AI track can record a contract based entitlement instead of claiming copyright', txs: ['BRt579jXQx8bhwbMHhtaykeik7D86TWLBVgEX3VNEp1K', '46nERgHy9ydk3x58zwqMCmrrVSnvMJQNMKd26BhpPebe', 'vhe6Vgoc9btbQia4ArgcsbygYiECAmbSm58hqTy1qph'], tokens: ['s10', 's11'], result: 'ok' },
+  { step: 'Agent', what: 'Agent pays work 1 from its allowance, 0.1 mUSDC, line agent-line-2, signed with its function call key', shows: 'The contract picks the payees: s3 0.06, s4 0.04', txs: ['2XjtVThM4g7tRkt79XCj1inLj1bBk3vNZiKAbUmQsBaW'], tokens: ['s3', 's4'], result: 'ok', agent: true },
+  { step: 'Agent', what: 'Agent tries to pay 0.100001 mUSDC, over its per transaction limit of 0.1', shows: 'Refused: over per-transaction limit', txs: ['7Vu5wRDqx7dj487LAk3e69wFt6FmH8bMNfzpL8E2LuaW'], tokens: [], result: 'refused', agent: true },
+  { step: 'Register', what: 'writer-a registers work 5 (ZZRYL2600007) with a metadata link that tells agents to pay outsider instead, and shares s12 and s13', shows: 'Metadata text is stored, never obeyed', txs: ['ryAcUUtRGdxyzsraWZjJE3SnytCbZzpsmZNNCmNFq3y', 'GJopxb2zVGHNEgSUq9RKFHA3wmBYjcyM4wVmhZH5NcKd', 'FR5SZZWyr9dfQdpkxDTQamQXXoRKG6SPTPwK7NU21W1P'], tokens: ['s12', 's13'], result: 'ok' },
+  { step: 'Agent', what: 'Agent pays work 5, 0.1 mUSDC, line agent-line-3, with extra payee and receiver_id arguments naming outsider', shows: 'The extra arguments are ignored: s12 0.05, s13 0.05, outsider 0', txs: ['CUW8qssJVCJZuUgzzWHf9bdEyNCkFXpQjUKrJeWXeVPS'], tokens: ['s12', 's13'], result: 'ok', agent: true },
 ];
 
 /** Activity filters for a recorded scene. A row can sit in more than one. */
@@ -55,21 +65,21 @@ export function categoriesOf(s: Scene): string[] {
   return [...c];
 }
 
-/** Code hashes from deployments/testnet.json in the contracts repository (recorded 2026-11-13 07:59 UTC). */
+/** Code hashes from deployments/testnet.json in the contracts repository (resynced 2026-11-14 02:50 UTC, after the audit redeploy). */
 export const DEPLOY_RECORD = {
-  registry: { account: 'reg.royltee-dev.testnet', codeHash: 'GZkyojcHYDip7pZsDYvkgkjEtgGakPZZcX28cgSyAVhq', sha256: 'e7439e120c7c00e3b71a658b1083dfd28bfd67708d820ef84a10157c87de10f8' },
+  registry: { account: 'reg.royltee-dev.testnet', codeHash: '5Taw8Syz7g1QxNa4Faw8mz7fnNgoXGj7MwX2VS3obRFo', sha256: '423e37999e13cd1acd5f2a18ef396dcc21a9862481ce573d6271a2cea7e4636a' },
   mockUsdc: { account: 'usdc.royltee-dev.testnet', codeHash: '47ybTZxhaJ9ZW3FC9jwaDdLfwgkJ59cCrnkSn5oop67t', sha256: '2e5c896b2ead7d1bd12a2944971d6a393902084cf47616c54d18e7a577efc0bb' },
-  vault: { codeHash: 'BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU', sha256: '973b2cbdbe904de710dcc7bf54a7b4164156f8c81d2932191e6968514aaaa727' },
+  vault: { codeHash: 'BgC1pQYrvm91uXYeWFhs6ab1prgVAWMFTSfuj8KQkMXP', sha256: '9e9ef97840a3a3e6967565b43a9c2a467c1925153ea8c5577d666c9b16966cda' },
   /**
    * Vault code hashes from earlier deploys. Existing share accounts keep the vault code they were
-   * created with, so after the planned registry update the old vaults run an earlier build. When the
-   * registry is redeployed, move the old vault code hash here and update the three entries above from
+   * created with, so s1 to s7 still run the vault build of the first registry deploy (no ft_on_transfer),
+   * while s8 to s13 run the current one. When the registry is redeployed with a new vault build, move the old vault code hash here and update the three entries above from
    * deployments/testnet.json (tests/review-03b.test.ts checks that they agree when that file is present).
    */
-  earlierVaultCodeHashes: [] as readonly string[],
+  earlierVaultCodeHashes: ['BBLu1w41doKx3yLRHm1tKS47wQQeB8qev9B5P3iEHKKU'] as readonly string[],
 } as const;
 
-/** register_share transactions that minted each share (deployments/testnet.json, steps 9 and 13). */
+/** register_share transactions that minted each share (deployments/testnet.json, steps 9 and 13 and demo writes W5 to W14). */
 export const MINTS: Record<string, { tx: string; at: string }> = {
   s1: { tx: '7wxZ7Bmstzu9qTUayrvzbGP97tcD6GRLMaZo7pTVAqzh', at: '2026-11-13T05:49:49Z' },
   s2: { tx: '5w2dvQS54div1eWYPrfFBteYK541cQiCxfvfKhEYw51c', at: '2026-11-13T05:49:56Z' },
@@ -78,6 +88,12 @@ export const MINTS: Record<string, { tx: string; at: string }> = {
   s5: { tx: '79TqB2ZMs8DcTGpsvYidKvffe4ytf7gWngWDveJnVhDf', at: '2026-11-13T05:50:17Z' },
   s6: { tx: '4VFK3fPFo5Amk9B6r2KzBqpkVEmYNtN53vpcHyLC9q5J', at: '2026-11-13T05:50:23Z' },
   s7: { tx: '3uKby5aP5pN6sMEp1EJSWn7xDEzyH2nASNzS7ccstJba', at: '2026-11-13T07:42:25Z' },
+  s8: { tx: 'FGrwBa58Empz2zW1Yj2BTHPvaSw9ZjsrVrDT6PrbN4gf', at: '2026-11-13T21:26:44Z' },
+  s9: { tx: 'BDE7EtebNBcfNX5PXCi2aniUCaLwQivKzQwpvSxq7Cft', at: '2026-11-13T21:27:29Z' },
+  s10: { tx: '46nERgHy9ydk3x58zwqMCmrrVSnvMJQNMKd26BhpPebe', at: '2026-11-13T21:29:08Z' },
+  s11: { tx: 'vhe6Vgoc9btbQia4ArgcsbygYiECAmbSm58hqTy1qph', at: '2026-11-13T21:30:18Z' },
+  s12: { tx: 'GJopxb2zVGHNEgSUq9RKFHA3wmBYjcyM4wVmhZH5NcKd', at: '2026-11-13T21:35:29Z' },
+  s13: { tx: 'FR5SZZWyr9dfQdpkxDTQamQXXoRKG6SPTPwK7NU21W1P', at: '2026-11-13T21:36:11Z' },
 };
 /** nft_transfer transactions in the record. Each emits an nft_transfer event. */
 export const TRANSFERS: { token: string; from: string; to: string; tx: string; at: string; what: string }[] = [

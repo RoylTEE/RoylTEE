@@ -3,7 +3,7 @@ import App from '../../layouts/App.astro';
 ---
 <App area="catalog" tab="splits" title="Split sheets" intro="One sheet per work: rightholder, role and percent for every share, and proof that each right adds up to 100%.">
   <div class="stack" data-splits><p class="loading">Reading split sheets</p></div>
-  <div class="empty"><p>Adding a share to a work starts with a draft split sheet, reviewed before your wallet signs it. Approval by the work registrant comes with the planned registry update; on the deployed build a new share is paid as soon as it is minted.</p><a class="btn" href="/member#draft">Draft a split sheet</a></div>
+  <div class="empty"><p>Adding a share to a work starts with a draft split sheet, reviewed before your wallet signs it. A share someone else registers on your work waits for your approval before it is paid; a share you register on your own work is approved at mint.</p><a class="btn" href="/member#draft">Draft a split sheet</a></div>
 </App>
 <script>import '../../scripts/splits.ts';</script>
 <style is:global>

@@ -36,7 +36,7 @@ describe('registry pages: no new hosts, no secrets, honest data', () => {
     expect(directive(walletPolicy('a'.repeat(24)), 'script-src')).not.toContain("'unsafe-inline'");
   });
   it('the recorded scenes are real explorer transaction ids for the testnet accounts', () => {
-    expect(SCENES.length).toBe(13);
+    expect(SCENES.length).toBe(22);
     for (const s of SCENES) for (const t of s.txs) expect(t).toMatch(/^[1-9A-HJ-NP-Za-km-z]{43,44}$/);
     expect(REGISTRY).toBe('reg.royltee-dev.testnet');
     expect(TOKEN).toBe('usdc.royltee-dev.testnet');

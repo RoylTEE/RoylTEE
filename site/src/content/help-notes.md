@@ -15,11 +15,12 @@ Sources: the repository README, DESIGN.md, THREAT_MODEL.md, DEPLOY_PLAN.md, DECI
 
 - Registry contract: reg.royltee-dev.testnet. NFT name RoylTEE, symbol ROYLT, spec nft-1.0.0. Registrar: registrar.royltee-dev.testnet. Token: usdc.royltee-dev.testnet.
 - Mock token: usdc.royltee-dev.testnet. Name "Mock USDC (testnet)", symbol mUSDC, 6 decimals. Only the simulated payer account (payer.royltee-dev.testnet) can mint it.
-- As of 2026-11-13 (UTC) the contracts are deployed and initialised, and the whole demo is on chain: three verified members (writer-a, writer-b and buyer-pub under royltee-dev.testnet), three fictional works (ISRC codes starting ZZRYL), and seven shares s1 to s7, each with its own vault holding zero keys. Share s7 is void after the dispute.
+- As of 2026-11-14 (UTC) the contracts are deployed and initialised, and the whole demo is on chain: three verified members (writer-a, writer-b and buyer-pub under royltee-dev.testnet), six fictional works 0 to 5 (ISRC codes starting ZZRYL), and 13 shares s1 to s13, each with its own vault holding zero keys. Share s7 is void after the dispute.
 - On chain: a Simulated payer work payment split 0.5 and 0.5 mUSDC into s1 and s2, a plain transfer into s3 picked up by sync, a claim by writer-a on s1, and the catalog sale: writer-b transferred s2 to buyer-pub, who then claimed the 0.5 mUSDC that moved with it. A claim on s1 by an account without the share failed on chain.
 - Also on chain: the scripted payment agent paid work 1 from its allowance, and its second submit of the same statement line was refused. The dispute scene is on chain too: a 20 percent share on work 2 opened dispute 0, the 0.7 mUSDC for s5 was held in escrow, and the registrar resolved it (uphold existing) with a document hash, releasing the escrow to s5.
 - Refused before submission, with no transaction: the agent's claim attempt with a 1 yoctoNEAR deposit. A function call key cannot attach a deposit, so the attempt never reached the chain; it was seen in a local CLI log only.
-- The deployed registry is the build from before the contract review fixes. The on-chain split sheet (approve or reject a share) is tested in the code but not deployed yet; a registry update is planned.
+- Later on 2026-11-13 (UTC), on the updated registry: a second Simulated payer payment on work 0 (line-sale-2) paid s1 and s2 0.5 mUSDC each; writer-b, who sold s2, was refused when trying to claim it; buyer-pub claimed it. Works 3 (provenance ai_assisted), 4 (fully_ai, shares on a contract basis) and 5 were registered with shares s8 to s13. The scripted agent paid work 1 with its function call key, was refused when one payment went over its per transaction limit, and paid work 5 correctly even though the work's metadata link and the call itself named outsider as the payee: the contract ignored both and paid s12 and s13 only.
+- The deployed registry has the contract review fixes and the audit fix for the payment forward gas (redeployed 2026-11-14 02:43 UTC). The split sheet (approve or reject a share) is on the deployed build; all 13 shares are approved. Vaults s1 to s7 keep the vault code they were created with, which cannot receive a token transfer call; s8 to s13 run the newer vault code.
 - The registry and token accounts still hold one full access key each, so the code can still be fixed in place. Deleting those keys (the zero keys proof for the registry) is planned once the code is final. Until then, do not claim the registry is keyless.
 - Vault accounts are created by the registry with no keys at all, ever.
 
@@ -38,7 +39,7 @@ Sources: the repository README, DESIGN.md, THREAT_MODEL.md, DEPLOY_PLAN.md, DECI
 ## Members and the registrar
 
 - Only verified members (accounts with an active credential) can register works, hold shares and receive them.
-- The registrar grants and suspends credentials, grants the payer role, and resolves disputes. Every registrar action that moves a share or money carries a document hash and emits an event; sync and revoke_role take none. Refusing a credential for the registrar account comes with the planned registry update.
+- The registrar grants and suspends credentials, grants the payer role, and resolves disputes. Every registrar action that moves a share or money carries a document hash and emits an event; sync and revoke_role take none. The deployed registry refuses a credential for the registrar account.
 - The registrar cannot move vault money to itself, cannot transfer shares it does not hold and cannot claim. It can move a share only while its holder is suspended (registrar_transfer). A multisig council with a time delay is roadmap.
 - KYB and organisation identity are Simulated: the credential hashes are hashes of dummy documents.
 
@@ -62,7 +63,7 @@ KYB and identity, the fiat rail and payer statements, payer attestations, proven
 ## The registry pages
 
 - The registry is an app with a menu by purpose. Registry: Overview (statement since mint and what needs attention), Catalog (works and rights, split sheets), Shares (ledger, share accounts with their live keys and NEAR against the storage minimum, claims), Activity (the recorded demo, filterable), Verify (code hashes against the deploy record, keyless share accounts, the full access keys still on the registry and Mock USDC accounts). Oversight: Governance (agents, disputes, registrar). You: Your shares. Support: Help (chat, support, docs, whitepaper). Balances, owners, keys and code hashes are read live from NEAR testnet with view calls; Activity, the Registrar log, share holders and history, and the landing split sheet are the recorded demo.
-- Your shares: look up any account read only, or connect a testnet wallet. A connected holder can claim, a work registrant can approve or reject a pending share (after the planned registry update; not on the deployed build), and a member can draft a split sheet with a review step before signing. Sending these from the site has not been run on testnet yet, so it is UNVERIFIED.
+- Your shares: look up any account read only, or connect a testnet wallet. A connected holder can claim, a work registrant can approve or reject a pending share (on the deployed build), and a member can draft a split sheet with a review step before signing. Sending these from the site has not been run on testnet yet, so it is UNVERIFIED.
 - Statements on these pages use Opening balance, activity and Closing balance since mint. A view by statement period needs an event indexer, which is roadmap.
 
 ## Not built
