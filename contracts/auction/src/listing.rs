@@ -51,8 +51,11 @@ impl AuctionContract {
         if m.ends_at.0 < now + MIN_DURATION_NS || m.ends_at.0 > now + MAX_DURATION_NS {
             return Err("ends_at must be 1 minute to 14 days from now".into());
         }
-        if self.free_balance() < MIN_FREE_BALANCE {
-            return Err("auction contract is low on NEAR".into());
+        if m.max_deposit.0 > MAX_TERM {
+            return Err("max_deposit must have at most 38 digits".into());
+        }
+        if self.free_balance() < self.listing_floor() {
+            return Err("auction contract is low on NEAR for another auction".into());
         }
         if self.token_auction.contains_key(&token_id) {
             return Err("this share already has an auction".into());
@@ -85,6 +88,7 @@ impl AuctionContract {
             last_error: None,
         };
         self.auctions.insert(id, rec);
+        self.open_auctions += 1;
         self.token_auction.insert(token_id.clone(), id);
         emit(
             "auction_listed",

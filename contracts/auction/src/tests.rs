@@ -12,6 +12,7 @@ fn acc(s: &str) -> AccountId {
 
 fn base(pred: &str) -> VMContextBuilder {
     let mut b = VMContextBuilder::new();
+
     b.current_account_id(acc("auction.root.testnet"))
         .predecessor_account_id(acc(pred))
         .account_balance(NearToken::from_near(50))
@@ -925,7 +926,7 @@ fn a_failed_payout_puts_the_credit_back() {
         after_end() + 2 * SEC,
         PromiseResult::Failed,
     );
-    assert!(!c.on_withdrawn(acc("seller.testnet"), U128(30_000_000)));
+    assert!(!c.on_withdrawn(0, acc("seller.testnet"), U128(30_000_000)));
     assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
     assert_eq!(c.owed_total, 2 * MAX);
 }
@@ -977,7 +978,7 @@ fn publish_key_stores_a_valid_key_once() {
         20_000_000_000_000_000_000_000,
     );
     let _ = c.publish_key();
-    let good = format!(r#"{{"v":1,"ok":true,"pubkey":"{PK}"}}"#);
+    let good = format!(r#"{{"v":1,"ok":true,"key_version":1,"pubkey":"{PK}"}}"#);
     ctx_result("auction.root.testnet", T0 + 101 * SEC, ok_bytes(&good));
     assert!(c.on_key());
     assert_eq!(c.get_tee_pubkey().as_deref(), Some(PK));
@@ -1010,20 +1011,20 @@ fn publish_key_rejects_bad_answers_and_low_deposit() {
     for bad in [
         ok_bytes("null"),
         PromiseResult::Failed,
-        ok_bytes(r#"{"v":1,"ok":true,"pubkey":"zz"}"#),
+        ok_bytes(r#"{"v":1,"ok":true,"key_version":1,"pubkey":"zz"}"#),
         ok_bytes(
-            r#"{"v":1,"ok":false,"pubkey":"c99e0b3a826c8f3852bd2c40073f4c3b857f24af0d3ce42561e761402056ea7f"}"#,
+            r#"{"v":1,"ok":false,"key_version":1,"pubkey":"c99e0b3a826c8f3852bd2c40073f4c3b857f24af0d3ce42561e761402056ea7f"}"#,
         ),
         ok_bytes(r#"{"v":1,"ok":true}"#),
         // L6: a wrapper that says the run failed, or is malformed.
         ok_bytes(&format!(
-            r#"{{"success":false,"result":{{"v":1,"ok":true,"pubkey":"{PK}"}}}}"#
+            r#"{{"success":false,"result":{{"v":1,"ok":true,"key_version":1,"pubkey":"{PK}"}}}}"#
         )),
         ok_bytes(&format!(
-            r#"{{"result":{{"v":1,"ok":true,"pubkey":"{PK}"}}}}"#
+            r#"{{"result":{{"v":1,"ok":true,"key_version":1,"pubkey":"{PK}"}}}}"#
         )),
         ok_bytes(&format!(
-            r#"{{"success":"yes","result":{{"v":1,"ok":true,"pubkey":"{PK}"}}}}"#
+            r#"{{"success":"yes","result":{{"v":1,"ok":true,"key_version":1,"pubkey":"{PK}"}}}}"#
         )),
     ] {
         ctx_result("auction.root.testnet", T0 + 101 * SEC, bad);
@@ -1092,7 +1093,7 @@ fn request_arguments_match_the_outlayer_shape() {
 /// and a wrapper that did not succeed never counts.
 #[test]
 fn answers_are_read_from_every_known_shape_and_only_when_successful() {
-    let inner = format!(r#"{{"v":1,"ok":true,"pubkey":"{PK}"}}"#);
+    let inner = format!(r#"{{"v":1,"ok":true,"key_version":1,"pubkey":"{PK}"}}"#);
     let shapes = [
         inner.clone(),
         format!(r#"{{"success":true,"result":{inner}}}"#),
@@ -1331,4 +1332,299 @@ fn a_lost_return_callback_is_reconciled() {
         assert!(!c.on_reconciled(0, 0));
         assert!(c.auction(0).returning);
     });
+}
+
+// ---------- audit B: init, key, terms, storage, pending withdrawals ----------
+
+/// B-07: `new` only works when the contract account itself calls it, which is
+/// what a deploy plus init batch signed by that account does.
+#[test]
+fn init_only_works_from_the_contract_account() {
+    ctx("attacker.testnet", T0, 0);
+    assert!(panics(|| {
+        AuctionContract::new(
+            acc("reg.root.testnet"),
+            acc("usdc.root.testnet"),
+            OutlayerSetup {
+                outlayer: acc("outlayer.testnet"),
+                wasm_url: "https://x".into(),
+                wasm_hash: "a".repeat(64),
+                secrets_account: acc("owner.testnet"),
+                secrets_profile: "p".into(),
+            },
+        );
+    }));
+}
+
+/// B-08: a published key must not be a low order point, whatever the top bit.
+#[test]
+fn low_order_and_malformed_keys_are_never_usable() {
+    assert!(logic::is_usable_pubkey(PK));
+    let bad = [
+        "0".repeat(64),
+        format!("01{}", "0".repeat(62)),
+        "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800".to_string(),
+        // top bit of the last byte set: X25519 ignores it
+        "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b880".to_string(),
+        "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157".to_string(),
+        format!("ec{}7f", "ff".repeat(30)),
+        format!("ed{}ff", "ff".repeat(30)),
+        format!("ee{}7f", "ff".repeat(30)),
+        "A".repeat(64),
+        "ab".to_string(),
+    ];
+    for k in bad {
+        assert!(!logic::is_usable_pubkey(&k), "{k}");
+    }
+}
+
+#[test]
+fn the_key_answer_needs_a_usable_key_and_the_known_version() {
+    let zero = "0".repeat(64);
+    let answers = [
+        format!(r#"{{"v":1,"ok":true,"key_version":1,"pubkey":"{zero}"}}"#),
+        format!(r#"{{"v":1,"ok":true,"pubkey":"{PK}"}}"#),
+        format!(r#"{{"v":1,"ok":true,"key_version":2,"pubkey":"{PK}"}}"#),
+        format!(r#"{{"v":1,"ok":true,"key_version":"1","pubkey":"{PK}"}}"#),
+    ];
+    for a in answers {
+        fresh(move || {
+            let mut c = new_contract();
+            ctx(
+                "anyone.testnet",
+                T0 + 100 * SEC,
+                20_000_000_000_000_000_000_000,
+            );
+            let _ = c.publish_key();
+            ctx_result("auction.root.testnet", T0 + 101 * SEC, ok_bytes(&a));
+            assert!(!c.on_key(), "{a}");
+            assert_eq!(c.get_tee_pubkey(), None);
+        });
+    }
+}
+
+/// B-09: terms above 38 digits are refused at listing, so the module, the
+/// script and the callback all work on the same range.
+#[test]
+fn listing_terms_are_capped_at_38_digits() {
+    assert_eq!(MAX_TERM.to_string().len(), 38);
+    assert_eq!((MAX_TERM + 1).to_string().len(), 39);
+    for (max, kept) in [(MAX_TERM, true), (MAX_TERM + 1, false), (u128::MAX, false)] {
+        fresh(move || {
+            let mut c = with_key();
+            ctx("reg.root.testnet", T0, 0);
+            let msg = json!({"reserve": "1", "max_deposit": max.to_string(),
+                "ends_at": (T0 + 3600 * SEC).to_string()})
+            .to_string();
+            let keep = c.nft_on_transfer(
+                acc("seller.testnet"),
+                acc("seller.testnet"),
+                "s1".into(),
+                msg,
+            );
+            assert_eq!(!keep, kept, "max_deposit {max}");
+        });
+    }
+}
+
+fn list_n(c: &mut AuctionContract, token: &str, balance: NearToken) -> bool {
+    let mut b = base("reg.root.testnet");
+    b.account_balance(balance);
+    testing_env!(b.build());
+    !c.nft_on_transfer(
+        acc("seller.testnet"),
+        acc("seller.testnet"),
+        token.into(),
+        list_msg(3600),
+    )
+}
+
+/// B-04: the reserve of every open auction is subtracted from what the next
+/// listing may use, so accepted auctions can always complete.
+#[test]
+fn admission_counts_the_reserve_of_every_open_auction() {
+    let mut c = with_key();
+    // Free balance is balance minus the storage already used. Start from a
+    // known point: room for the floor plus two and a half reserves.
+    ctx("reg.root.testnet", T0, 0);
+    let locked = env::storage_byte_cost().saturating_mul(u128::from(env::storage_usage()));
+    let balance = locked
+        .saturating_add(MIN_FREE_BALANCE)
+        .saturating_add(c.reserve_per_auction().saturating_mul(5).saturating_div(2));
+    assert!(list_n(&mut c, "s1", balance));
+    assert!(list_n(&mut c, "s2", balance));
+    assert!(!list_n(&mut c, "s3", balance), "third listing must not fit");
+    assert_eq!(c.open_auctions, 2);
+    assert_eq!(c.get_accounting().open_auctions, 2);
+}
+
+/// B-04 and B-06: a finished auction gives its reserve back and drops the
+/// ciphertexts.
+#[test]
+fn a_finished_auction_releases_its_reserve_and_ciphertexts() {
+    let c = sold();
+    assert_eq!(c.open_auctions, 0);
+    let a = c.auction(0);
+    assert_eq!(a.bids.len(), 2);
+    assert!(a.bids.iter().all(|b| b.ciphertext.is_empty()));
+    let mut c = settling();
+    assert_eq!(c.open_auctions, 1);
+    ctx("anyone.testnet", after_end() + SETTLING_STALE_NS + 1, 0);
+    c.cancel(U64(0));
+    assert_eq!(c.open_auctions, 0);
+    assert!(c.auction(0).bids.iter().all(|b| b.ciphertext.is_empty()));
+}
+
+/// B-06: listing and cancelling with no bids leaves nothing behind.
+#[test]
+fn a_cancelled_auction_with_no_bids_leaves_no_record() {
+    let mut c = listed();
+    ctx("seller.testnet", T0 + 20 * SEC, 0);
+    assert!(c.cancel(U64(0)).is_some());
+    assert_eq!(c.open_auctions, 0);
+    ctx_result(
+        "auction.root.testnet",
+        T0 + 21 * SEC,
+        PromiseResult::Successful(vec![]),
+    );
+    assert!(c.on_returned(0));
+    assert!(c.get_auction(U64(0)).is_none());
+    assert_eq!(c.auction_for_token("s1".into()), None);
+    // Listing the share again works and costs one record only.
+    ctx("reg.root.testnet", T0 + 30 * SEC, 0);
+    let msg = list_msg(3600);
+    assert!(!c.nft_on_transfer(
+        acc("seller.testnet"),
+        acc("seller.testnet"),
+        "s1".into(),
+        msg
+    ));
+    assert_eq!(c.open_auctions, 1);
+    assert_eq!(c.auction_for_token("s1".into()), Some(U64(1)));
+}
+
+fn long_name(prefix: char, i: usize) -> String {
+    // 64 characters, the longest account id.
+    format!("{}{i}.testnet", prefix.to_string().repeat(55))
+}
+
+/// Bytes the contract's map entries take on a real node: key plus value plus
+/// 40 bytes of record overhead each. The mock does not track storage use, so
+/// the stored entries are counted directly (this empties the mock).
+fn stored_bytes() -> u64 {
+    near_sdk::mock::with_mocked_blockchain(|b| {
+        b.take_storage()
+            .iter()
+            .map(|(k, v)| (k.len() + v.len() + 40) as u64)
+            .sum()
+    })
+}
+
+/// Runs the worst case flow and returns the stored bytes after the bids
+/// (`stop` 0) or after the sale (`stop` 1).
+fn worst_case(stop: u8) -> u64 {
+    let r = std::thread::spawn(move || {
+        let mut c = with_key();
+        let seller = long_name('s', 0);
+        ctx("reg.root.testnet", T0, 0);
+        assert!(!c.nft_on_transfer(acc(&seller), acc(&seller), "s123456".into(), list_msg(3600)));
+        let bidders: Vec<String> = (1..=8).map(|i| long_name('b', i)).collect();
+        for who in &bidders {
+            ctx("usdc.root.testnet", T0 + 10 * SEC, 0);
+            let ct = "A".repeat(MAX_CIPHERTEXT);
+            let _ = c.ft_on_transfer(
+                acc(who),
+                U128(MAX),
+                json!({"auction_id": "0", "ciphertext": ct}).to_string(),
+            );
+            ctx_result("auction.root.testnet", T0 + 10 * SEC, ok_bytes("true"));
+            assert_eq!(c.on_bid_checked(acc(who), U128(MAX), 0, ct).0, 0);
+        }
+        if stop == 1 {
+            ctx(
+                "anyone.testnet",
+                after_end(),
+                20_000_000_000_000_000_000_000,
+            );
+            assert!(c.settle(U64(0)).is_some());
+            let out = answer(&c, Some((&bidders[0], 30_000_000)));
+            ctx_result("auction.root.testnet", after_end() + SEC, ok_bytes(&out));
+            assert!(c.on_settled(0, 1));
+            ctx_result(
+                "auction.root.testnet",
+                after_end() + 2 * SEC,
+                PromiseResult::Successful(vec![]),
+            );
+            assert!(c.on_delivered(0));
+            assert_eq!(c.auction(0).status, Status::Sold);
+            assert_eq!(c.owed_total, 8 * MAX);
+        }
+        // The store collections write on flush (normally when the contract
+        // value is dropped at the end of a call).
+        c.auctions.flush();
+        c.owed.flush();
+        c.token_auction.flush();
+        stored_bytes()
+    })
+    .join()
+    .expect("worst case run failed");
+    r
+}
+
+/// B-04: measures the worst case against `STORAGE_RESERVE_BYTES`: a seller and
+/// eight bidders with 64 character names, eight 512 character ciphertexts,
+/// nine owed entries after the sale.
+#[test]
+fn the_storage_reserve_covers_the_worst_case() {
+    let after_bids = worst_case(0);
+    let after_sale = worst_case(1);
+    println!("worst case stored bytes: after bids {after_bids}, after sale {after_sale}");
+    assert!(after_bids <= STORAGE_RESERVE_BYTES, "bids use {after_bids}");
+    assert!(
+        after_sale <= STORAGE_RESERVE_BYTES,
+        "sale uses {after_sale}"
+    );
+}
+
+/// B-05: a withdrawal leaves a durable record until its callback closes it.
+/// A lost callback keeps the claim visible; it is never refunded blindly.
+#[test]
+fn a_withdrawal_leaves_a_pending_record_until_its_callback() {
+    let mut c = sold();
+    ctx("anyone.testnet", after_end() + SEC, 0);
+    c.withdraw(vec![acc("seller.testnet")]);
+    let p = c.get_pending_withdrawal(U64(0)).expect("pending record");
+    assert_eq!(p.account, acc("seller.testnet"));
+    assert_eq!(p.amount.0, 30_000_000);
+    assert_eq!(c.get_accounting().pending_total.0, 30_000_000);
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
+    // The callback never runs: the record and the total stay, no refund.
+    ctx("anyone.testnet", after_end() + 100 * 3600 * SEC, 0);
+    assert!(c.get_pending_withdrawal(U64(0)).is_some());
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 0);
+    // A normal callback closes it.
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + 2 * SEC,
+        PromiseResult::Successful(vec![]),
+    );
+    assert!(c.on_withdrawn(0, acc("seller.testnet"), U128(30_000_000)));
+    assert!(c.get_pending_withdrawal(U64(0)).is_none());
+    assert_eq!(c.get_accounting().pending_total.0, 0);
+}
+
+#[test]
+fn a_failed_withdrawal_closes_its_record_and_restores_the_credit() {
+    let mut c = sold();
+    ctx("anyone.testnet", after_end() + SEC, 0);
+    c.withdraw(vec![acc("seller.testnet")]);
+    ctx_result(
+        "auction.root.testnet",
+        after_end() + 2 * SEC,
+        PromiseResult::Failed,
+    );
+    assert!(!c.on_withdrawn(0, acc("seller.testnet"), U128(30_000_000)));
+    assert!(c.get_pending_withdrawal(U64(0)).is_none());
+    assert_eq!(c.get_accounting().pending_total.0, 0);
+    assert_eq!(c.get_owed(acc("seller.testnet")).0, 30_000_000);
 }

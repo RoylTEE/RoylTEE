@@ -12,6 +12,32 @@ pub fn is_pubkey_hex(s: &str) -> bool {
     is_hash64(s)
 }
 
+/// X25519 public keys with a small order (the point at zero, one, the two
+/// order 8 points, and the three encodings of the field prime and its
+/// neighbours). A shared secret made with one of them is the same for every
+/// private key, so a key like that must never be published. The top bit of
+/// the last byte is ignored by X25519, so it is cleared before comparing.
+const LOW_ORDER: [&str; 7] = [
+    "0000000000000000000000000000000000000000000000000000000000000000",
+    "0100000000000000000000000000000000000000000000000000000000000000",
+    "e0eb7a7c3b41b8ae1656e3faf19fc46ada098deb9c32b1fd866205165f49b800",
+    "5f9c95bca3508c24b1d0b1559c83ef5b04445cc4581c8e86d8224eddd09f1157",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+    "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+    "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+];
+
+/// A published key: 64 lowercase hex characters and not a low order point.
+pub fn is_usable_pubkey(s: &str) -> bool {
+    if !is_pubkey_hex(s) {
+        return false;
+    }
+    let (head, last) = s.split_at(62);
+    let top = u8::from_str_radix(last, 16).unwrap_or(0) & 0x7f;
+    let masked = format!("{head}{top:02x}");
+    !LOW_ORDER.contains(&masked.as_str())
+}
+
 /// Base64 alphabet check only (standard alphabet, optional `=` padding at the end).
 pub fn looks_like_base64(s: &str) -> bool {
     let t = s.trim_end_matches('=');

@@ -109,6 +109,23 @@ pub struct Config {
 pub struct Accounting {
     pub escrow_total: U128,
     pub owed_total: U128,
+    /// mUSDC taken out of the ledger for a `ft_transfer` whose callback has
+    /// not reported yet. Token balance = escrow + owed + pending.
+    pub pending_total: U128,
+    /// Accepted auctions that are not finished (each holds a storage reserve).
+    pub open_auctions: u32,
+    /// NEAR (yocto) the contract must keep free for each open auction.
+    pub reserve_per_auction: U128,
+}
+
+/// A withdrawal that was sent and has not reported back yet. Kept so a lost
+/// callback leaves evidence of the claim instead of erasing it.
+#[near(serializers = [borsh, json])]
+#[derive(Clone, Debug, PartialEq)]
+pub struct Pending {
+    pub account: AccountId,
+    pub amount: U128,
+    pub at: U64,
 }
 
 /// Where OutLayer runs and what it runs. Passed once to `new`.

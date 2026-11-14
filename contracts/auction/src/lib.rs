@@ -65,6 +65,19 @@ pub const MIN_SETTLE_DEPOSIT: NearToken = NearToken::from_millinear(10);
 /// NEAR this contract must keep free (balance minus storage) before it takes
 /// a new auction or bid, so later credits can always be written.
 pub const MIN_FREE_BALANCE: NearToken = NearToken::from_millinear(250);
+/// Largest reserve or `max_deposit` a listing may name: 38 decimal digits.
+/// The module, the bid script and the callback all read amounts at this
+/// width, so one limit holds everywhere.
+pub const MAX_TERM: u128 = 99_999_999_999_999_999_999_999_999_999_999_999_999;
+/// Storage, in bytes, the contract reserves for every accepted auction until
+/// it finishes: eight maximum size bids, the refund or payout entries for
+/// nine accounts with 64 character names, and the record itself. A test
+/// measures the real worst case against this number.
+pub const STORAGE_RESERVE_BYTES: u64 = 8_000;
+/// Version of the key and bid format. The module prints it with its public
+/// key and refuses a settle request that names another version or another
+/// key, so a changed master secret fails loudly instead of ending in no sale.
+pub const KEY_VERSION: u64 = 1;
 /// Most accounts one `withdraw` call pays.
 pub const MAX_WITHDRAW: usize = 9;
 /// Longest OutLayer answer read in the callback, in bytes.
@@ -96,6 +109,7 @@ enum StorageKey {
     Auctions,
     Owed,
     TokenAuction,
+    Pending,
 }
 
 #[near(contract_state)]
@@ -120,6 +134,12 @@ pub struct AuctionContract {
     /// mUSDC deposits of auctions that are not finished yet.
     escrow_total: u128,
     owed_total: u128,
+    /// Accepted auctions that are not finished; each holds a storage reserve.
+    open_auctions: u32,
+    /// Withdrawals sent whose callback has not reported yet.
+    pending: LookupMap<u64, Pending>,
+    next_pending: u64,
+    pending_total: u128,
 }
 
 #[near]
@@ -130,6 +150,12 @@ impl AuctionContract {
     /// TEE master secret.
     #[init]
     pub fn new(registry: AccountId, usdc: AccountId, setup: OutlayerSetup) -> Self {
+        // Deploy and init in one transaction signed by this account, so no
+        // one else can be first to choose the pinned settings.
+        require!(
+            env::predecessor_account_id() == env::current_account_id(),
+            "init must be called by the contract account itself"
+        );
         require!(
             setup.wasm_url.starts_with("https://") && setup.wasm_url.len() <= 300,
             "wasm_url must be an https URL"
@@ -159,6 +185,10 @@ impl AuctionContract {
             owed: LookupMap::new(StorageKey::Owed),
             escrow_total: 0,
             owed_total: 0,
+            open_auctions: 0,
+            pending: LookupMap::new(StorageKey::Pending),
+            next_pending: 0,
+            pending_total: 0,
         }
     }
 
@@ -210,7 +240,15 @@ impl AuctionContract {
         Accounting {
             escrow_total: U128(self.escrow_total),
             owed_total: U128(self.owed_total),
+            pending_total: U128(self.pending_total),
+            open_auctions: self.open_auctions,
+            reserve_per_auction: U128(self.reserve_per_auction().as_yoctonear()),
         }
+    }
+
+    /// A withdrawal that has not reported back yet, by id (see the `withdraw_sent` event).
+    pub fn get_pending_withdrawal(&self, id: U64) -> Option<Pending> {
+        self.pending.get(&id.0).cloned()
     }
 
     /// sha256 hex of the bid list as it stands now: what a settle result must
@@ -251,6 +289,29 @@ impl AuctionContract {
         env::account_balance().saturating_sub(locked)
     }
 
+    /// NEAR kept free for each accepted auction until it finishes.
+    pub(crate) fn reserve_per_auction(&self) -> NearToken {
+        env::storage_byte_cost().saturating_mul(u128::from(STORAGE_RESERVE_BYTES))
+    }
+
+    /// Free NEAR needed to accept one more auction: the floor plus the
+    /// reserve of every open auction and of the new one.
+    pub(crate) fn listing_floor(&self) -> NearToken {
+        MIN_FREE_BALANCE.saturating_add(
+            self.reserve_per_auction()
+                .saturating_mul(u128::from(self.open_auctions) + 1),
+        )
+    }
+
+    /// An auction reached a final state: its reserve is released and the bid
+    /// ciphertexts, which are no longer needed, are dropped to free storage.
+    pub(crate) fn finish_record(&mut self, id: u64) {
+        self.open_auctions = self.open_auctions.saturating_sub(1);
+        for b in &mut self.auction_mut(id).bids {
+            b.ciphertext = String::new();
+        }
+    }
+
     /// Refunds every deposit of the auction into the owed ledger.
     pub(crate) fn credit_all_deposits(&mut self, id: u64) {
         let (max, bidders) = {
@@ -275,6 +336,7 @@ impl AuctionContract {
             a.status = Status::Cancelled;
             a.cancel_reason = Some(reason.to_string());
         }
+        self.finish_record(id);
         emit(
             "auction_cancelled",
             json!({ "auction_id": U64(id), "reason": reason }),

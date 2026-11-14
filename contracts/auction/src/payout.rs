@@ -35,6 +35,22 @@ impl AuctionContract {
             self.owed.remove(acct);
             self.owed_total -= amount;
             paid += 1;
+            // A durable record of the money in flight, removed by the callback.
+            let pid = self.next_pending;
+            self.next_pending += 1;
+            self.pending.insert(
+                pid,
+                Pending {
+                    account: acct.clone(),
+                    amount: U128(amount),
+                    at: U64(env::block_timestamp()),
+                },
+            );
+            self.pending_total += amount;
+            emit(
+                "withdraw_sent",
+                json!({ "id": U64(pid), "account": acct, "amount": U128(amount) }),
+            );
             let _ = Promise::new(self.usdc.clone())
                 .function_call(
                     "ft_transfer".to_string(),
@@ -49,15 +65,21 @@ impl AuctionContract {
                 .then(
                     Self::ext(env::current_account_id())
                         .with_static_gas(GAS_WITHDRAW_CB)
-                        .on_withdrawn(acct.clone(), U128(amount)),
+                        .on_withdrawn(pid, acct.clone(), U128(amount)),
                 );
         }
         require!(paid > 0, "nothing is owed to these accounts");
     }
 
-    /// Puts the credit back if the token transfer failed. Never panics.
+    /// Closes the pending record. Puts the credit back if the token transfer
+    /// failed. If this callback is lost the record stays in `pending`, so the
+    /// claim is never erased; it is not refunded automatically, because a
+    /// delayed transfer could still land (double payment).
     #[private]
-    pub fn on_withdrawn(&mut self, account: AccountId, amount: U128) -> bool {
+    pub fn on_withdrawn(&mut self, id: u64, account: AccountId, amount: U128) -> bool {
+        if self.pending.remove(&id).is_some() {
+            self.pending_total = self.pending_total.saturating_sub(amount.0);
+        }
         if callback_result(64).is_some() {
             emit("withdrawn", json!({ "account": account, "amount": amount }));
             return true;
@@ -247,6 +269,12 @@ impl AuctionContract {
         if ok {
             self.token_auction.remove(&token_id);
             emit("share_returned", json!({ "auction_id": U64(auction_id) }));
+            // A cancelled auction that never had a bid owes nobody anything:
+            // drop its record so listing and cancelling again cannot grow
+            // storage the contract pays for.
+            if self.auction(auction_id).bids.is_empty() {
+                self.auctions.remove(&auction_id);
+            }
         } else {
             emit(
                 "share_return_failed",
@@ -270,6 +298,7 @@ impl AuctionContract {
             a.token_id.clone()
         };
         self.token_auction.remove(&token_id);
+        self.finish_record(id);
         emit(
             "auction_cancelled",
             json!({ "auction_id": U64(id), "reason": reason }),

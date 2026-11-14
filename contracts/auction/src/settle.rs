@@ -46,11 +46,12 @@ impl AuctionContract {
             .and_then(|v| logic::unwrap_answer(v).ok())
             .and_then(|v| {
                 (v.get("ok").and_then(Value::as_bool) == Some(true)
-                    && v.get("v").and_then(Value::as_u64) == Some(1))
+                    && v.get("v").and_then(Value::as_u64) == Some(1)
+                    && v.get("key_version").and_then(Value::as_u64) == Some(KEY_VERSION))
                 .then(|| v.get("pubkey").and_then(Value::as_str).map(str::to_owned))
                 .flatten()
             })
-            .filter(|k| logic::is_pubkey_hex(k));
+            .filter(|k| logic::is_usable_pubkey(k));
         match key {
             Some(k) => {
                 emit("tee_key_published", json!({ "pubkey": k }));
@@ -92,10 +93,16 @@ impl AuctionContract {
             deposit >= MIN_SETTLE_DEPOSIT,
             "attach at least 0.01 NEAR for OutLayer"
         );
+        let pubkey = self
+            .tee_pubkey
+            .clone()
+            .unwrap_or_else(|| env::panic_str("the TEE public key is not published yet"));
         let input = {
             let a = self.auction(id);
             json!({
                 "mode": "settle",
+                "pubkey": pubkey,
+                "key_version": KEY_VERSION,
                 "auction_id": id.to_string(),
                 "contract": env::current_account_id(),
                 "reserve": a.reserve,
@@ -277,6 +284,7 @@ impl AuctionContract {
             a.token_id.clone()
         };
         self.token_auction.remove(&token_id);
+        self.finish_record(auction_id);
         emit(
             "auction_sold",
             json!({ "auction_id": U64(auction_id), "winner": winner, "price": price, "seller": seller }),

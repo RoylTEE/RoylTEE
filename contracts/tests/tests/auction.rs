@@ -113,7 +113,7 @@ async fn setup_auction() -> anyhow::Result<A> {
     let pubkey = helper(&["pubkey", auction.id().as_str()]);
     check(
         mock.call("set_answer")
-            .args_json(json!({ "answer": json!({"v":1,"ok":true,"pubkey":pubkey}).to_string() }))
+            .args_json(json!({ "answer": json!({"v":1,"ok":true,"key_version":1,"pubkey":pubkey}).to_string() }))
             .transact()
             .await?,
     );
@@ -745,9 +745,15 @@ async fn a08_seller_cancels_before_bids() -> anyhow::Result<()> {
             .await?,
     );
     assert_eq!(a.e.owner(&token).await?, a.e.writer_a.id().as_str());
-    let v = a.auction_view(0).await?;
-    assert_eq!(v["status"], "cancelled");
-    assert_eq!(v["share_held"], false);
+    // B-06: an auction that never had a bid leaves no record behind.
+    assert!(a.auction_view(0).await?.is_null());
+    assert!(a
+        .auction
+        .view("auction_for_token")
+        .args_json(json!({"token_id": token}))
+        .await?
+        .json::<Value>()?
+        .is_null());
     // The share can be listed again.
     check(a.list(&token, 600).await?);
     assert_eq!(a.auction_view(1).await?["status"], "open");
@@ -957,6 +963,7 @@ async fn a13_a_direct_request_from_another_caller_is_refused() -> anyhow::Result
     let victim_ct = v["bids"][0]["ciphertext"].as_str().unwrap().to_string();
     let crafted = json!({
         "mode": "settle", "auction_id": "0", "contract": a.auction.id(),
+        "pubkey": a.pubkey, "key_version": 1,
         "reserve": RESERVE.to_string(), "max_deposit": MAX.to_string(),
         "bids": [
             {"bidder": victim.id(), "ct": victim_ct},
@@ -992,7 +999,16 @@ async fn a13_a_direct_request_from_another_caller_is_refused() -> anyhow::Result
     assert!(refused.get("winner").is_none() && refused.get("price").is_none());
     assert!(!refused.to_string().contains(&(55 * MUSDC).to_string()));
     // Naming the auction as the caller inside the input does not help: the
-    // module trusts only the environment OutLayer sets.
+    // module trusts only the environment OutLayer sets. Naming the attacker's
+    // own account as the contract does not help either (B-02): the module
+    // serves one account, fixed when it was built.
+    let own = crafted.replace(a.auction.id().as_str(), attacker.as_str());
+    let path = temp_json(&own);
+    let out = helper(&["run", path.to_str().unwrap(), attacker.as_str()]);
+    let _ = std::fs::remove_file(&path);
+    let own_out: Value = serde_json::from_str(&out)?;
+    assert_eq!(own_out["ok"], false);
+    assert!(own_out.get("price").is_none());
     // The auction itself is answered, with the price that would leak.
     let answered = run(a.auction.id().as_str());
     assert_eq!(answered["price"], (55 * MUSDC).to_string());
@@ -1015,38 +1031,25 @@ async fn a13_a_direct_request_from_another_caller_is_refused() -> anyhow::Result
     a.e.assert_solvent().await
 }
 
-/// Test A14 (H1): a delivery whose callback cannot commit is recovered with
-/// `reconcile`. The auction is drained of NEAR just before the second settle,
-/// so `on_delivered` cannot write the credits and the auction stays
-/// Delivering with the share already at the winner. After 15 minutes and a
-/// top up, anyone calls `reconcile`, which reads the registry and pays the
-/// sale.
+/// Test A14 (B-04): a sale completes when the auction account has almost no
+/// spare NEAR. The payout callback writes credits for up to nine accounts, but
+/// the ciphertexts it no longer needs are freed in the same call, and each
+/// open auction keeps a storage reserve at listing, so the callback fits. (An
+/// earlier version of this test drained the account to make the callback fail
+/// and then recovered with `reconcile`; with the ciphertexts dropped that
+/// failure cannot be produced here, so `reconcile` is covered by unit tests.)
 #[tokio::test]
-async fn a14_delivery_that_cannot_commit_is_reconciled() -> anyhow::Result<()> {
+async fn a14_a_sale_completes_with_almost_no_spare_near() -> anyhow::Result<()> {
     let a = setup_auction().await?;
     let token = a.new_share("USRC12600113").await?;
     check(a.list(&token, 62).await?);
     a.bid(&a.e.buyer, 0, 90 * MUSDC).await?;
     a.bid(&a.e.writer_b, 0, 60 * MUSDC).await?;
     a.wait_until_ended(0).await?;
-    // First settle records the request; run the real module on it.
-    a.set_answer(None).await?;
-    check(a.settle(0).await?);
-    let rec: Value = a.mock.view("last_request").await?.json()?;
-    let path = temp_json(rec["input_data"].as_str().unwrap());
-    let out = helper(&[
-        "run",
-        path.to_str().unwrap(),
-        rec["caller"].as_str().unwrap(),
-    ]);
-    let _ = std::fs::remove_file(&path);
-    a.set_answer(Some(out)).await?;
-    // Leave the auction account 130 bytes of free storage stake (measured:
-    // `on_settled` needs less, the three credits of `on_delivered` need more,
-    // and 100 and 160 bytes both behave the same way).
+    // Leave the auction account 100 bytes of free storage stake (the transfer costs a little gas, and `on_settled` stores the winner and the price before the payout frees the ciphertexts).
     let info = a.auction.view_account().await?;
     let locked = info.storage_usage as u128 * 10u128.pow(19);
-    let keep = locked + 130 * 10u128.pow(19);
+    let keep = locked + 100 * 10u128.pow(19);
     let spare = info.balance.as_yoctonear() - keep;
     let root = a.e.worker.root_account()?;
     check(
@@ -1055,51 +1058,16 @@ async fn a14_delivery_that_cannot_commit_is_reconciled() -> anyhow::Result<()> {
             .transfer_near(root.id(), NearToken::from_yoctonear(spare))
             .await?,
     );
-    // Settle: the winner is chosen and the registry moves the share, but the
-    // payout callback cannot write its credits and rolls back.
-    let r = a.settle(0).await?;
-    println!("a14 settle logs: {:?}", r.logs());
+    check(a.settle_with_real_tee(0).await?);
     let v = a.auction_view(0).await?;
-    assert_eq!(v["status"], "delivering", "the callback did not commit");
-    assert_eq!(
-        a.e.owner(&token).await?,
-        a.e.buyer.id().as_str(),
-        "share is at the winner"
-    );
-    assert_eq!(a.accounting().await?, (2 * MAX, 0));
-    // Too early.
-    let early =
-        a.e.outsider
-            .call(a.auction.id(), "reconcile")
-            .args_json(json!({ "auction_id": "0" }))
-            .max_gas()
-            .transact()
-            .await?;
-    assert!(early.is_failure(), "reconcile waits 15 minutes");
-    // Wait, top up, reconcile.
-    let since: u64 = v["delivering_since"].as_str().unwrap().parse()?;
-    while a.now().await? < since + 15 * 60 * 1_000_000_000 {
-        a.e.worker.fast_forward(200).await?;
-    }
-    check(
-        root.transfer_near(a.auction.id(), NearToken::from_near(1))
-            .await?,
-    );
-    check(
-        a.e.outsider
-            .call(a.auction.id(), "reconcile")
-            .args_json(json!({ "auction_id": "0" }))
-            .max_gas()
-            .transact()
-            .await?,
-    );
-    let v = a.auction_view(0).await?;
-    assert_eq!(v["status"], "sold");
-    assert_eq!(v["winner"], a.e.buyer.id().as_str());
+    assert_eq!(v["status"], "sold", "the payout callback committed");
+    assert_eq!(a.e.owner(&token).await?, a.e.buyer.id().as_str());
     assert_eq!(num(&v["price"]), 60 * MUSDC);
-    assert_eq!(a.owed(a.e.writer_a.id()).await?, 60 * MUSDC);
-    assert_eq!(a.owed(a.e.buyer.id()).await?, MAX - 60 * MUSDC);
-    assert_eq!(a.owed(a.e.writer_b.id()).await?, MAX);
+    assert!(v["bids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .all(|b| b["ciphertext"] == ""));
     assert_eq!(a.accounting().await?, (0, 2 * MAX));
     a.assert_auction_solvent().await?;
     check(
@@ -1108,4 +1076,39 @@ async fn a14_delivery_that_cannot_commit_is_reconciled() -> anyhow::Result<()> {
     );
     assert_eq!(a.accounting().await?, (0, 0));
     a.e.assert_solvent().await
+}
+
+/// Test A15 (B-04): admission counts the storage reserve of every open
+/// auction. With room for the floor and one and a half reserves, the first
+/// listing is accepted and the second is refused (the registry hands the
+/// share back).
+#[tokio::test]
+async fn a15_listing_counts_the_reserve_of_every_open_auction() -> anyhow::Result<()> {
+    let a = setup_auction().await?;
+    let t1 = a.new_share("USRC12600114").await?;
+    let t2 = a.new_share("USRC12600115").await?;
+    // Free balance 0.37 NEAR: the floor is 0.25 plus 0.08 for each open
+    // auction and the new one, so one listing fits (0.33) and two do not (0.41).
+    let info = a.auction.view_account().await?;
+    let locked = info.storage_usage as u128 * 10u128.pow(19);
+    let keep = locked + 370_000_000_000_000_000_000_000u128;
+    let spare = info.balance.as_yoctonear() - keep;
+    let root = a.e.worker.root_account()?;
+    check(
+        a.auction
+            .as_account()
+            .transfer_near(root.id(), NearToken::from_yoctonear(spare))
+            .await?,
+    );
+    check(a.list(&t1, 600).await?);
+    assert_eq!(a.e.owner(&t1).await?, a.auction.id().as_str());
+    check(a.list(&t2, 600).await?);
+    assert_eq!(
+        a.e.owner(&t2).await?,
+        a.e.writer_a.id().as_str(),
+        "the second listing was refused and the share handed back"
+    );
+    let acct: Value = a.auction.view("get_accounting").await?.json()?;
+    assert_eq!(acct["open_auctions"], 1);
+    Ok(())
 }
