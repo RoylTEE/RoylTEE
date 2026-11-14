@@ -10,7 +10,7 @@ A writer's share of a song can be sold, split or disputed, but the place royalti
 
 ## Judges, start here
 
-Track: NFTs That Do Something (`nfts`). Testnet only, no real money. No wallet and no keys are needed for anything below.
+Tracks: NFTs That Do Something (`nfts`), Real-World Money (`realworld`) and AI Security and Defense (`security`). Testnet only, no real money. No wallet and no keys are needed for anything below.
 
 1. **Open the check page:** https://royltee.app/verify. It reads NEAR testnet live in your browser (view calls only) and lists every claim with its code, its test and its transaction.
 2. **Or run one command** (Node 18 or newer, no install, read only): `git clone https://github.com/RoylTEE/RoylTEE.git && cd RoylTEE && npm run verify:testnet`
@@ -21,7 +21,7 @@ Hosted site checked on 2026-11-14 at about 13:56 UTC: `https://royltee.app` and 
 
 RoylTEE is a permissioned, business to business registry of music rights shares on NEAR testnet. Each rights share is an NEP-171 NFT. Each share NFT controls its own NEAR sub-account (a "vault") that receives that share's royalty money. The vault has zero access keys. Only the registry contract can move money out of it, and only to whoever holds the NFT at that moment, with one registrar exception for rejected shares (see [Who can hold a token](#who-can-hold-a-token)). On testnet today the registry account itself still holds one full access key (kept on testnet by decision so late fixes stay possible; on mainnet it would be deleted after the final deploy, or upgrades handed to a multisig or DAO, and proven by the same zero-keys check the share vaults pass), so whoever holds that key could replace the registry code and with it these rules; the guarantee is only as strong as that key. The mock USDC account keeps its key for the same reason, and so does the auction account.
 
-- Built at NEAR HACKATHON, track "NFTs That Do Something" (track id `nfts`).
+- Built at NEAR HACKATHON, tracks "NFTs That Do Something" (`nfts`), "Real-World Money" (`realworld`) and "AI Security and Defense" (`security`).
 - Testnet only. No mainnet contract, no real money. Payments use **Mock USDC (testnet)** (symbol `mUSDC`, 6 decimals), a mock token with no value, not Circle USDC.
 - Everything off chain (identity checks, the fiat rail, payer statements, dispute documents) is **Simulated** and labeled so. See [Simulated vs real](#simulated-vs-real).
 - License: MIT ([LICENSE](LICENSE)).
