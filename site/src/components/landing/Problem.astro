@@ -1,0 +1,35 @@
+---
+const pains = [
+  ['Many copies, no shared record', 'A song\'s split lives in split sheets, contracts, society registrations and payer and distributor databases, each kept by a different party. When they disagree, money is held or misdirected until someone reconciles them.'],
+  ['Payers cannot check their own copy', 'A payer pays from its own copy of the ownership data, which can be stale and which it cannot easily check. An AI agent that pays for music has no authoritative source to read at all.'],
+  ['Money takes several hops', 'Money for a share usually passes through several intermediaries before it reaches an artist or writer. Each hop is another copy of the ownership data that can be wrong.'],
+  ['A sale has to reach every payer', 'After a catalog sale, every payer has to be told to pay the new owner. Until each one updates, money keeps arriving at the old owner and has to be passed on.'],
+];
+---
+<section class="l-sec" id="problem">
+  <div class="container">
+    <div class="l-split">
+      <div class="l-head">
+        <p class="l-eyebrow">The problem</p>
+        <h2 class="l-h2">Everyone keeps their own copy of who owns a song</h2>
+        <p class="lead">Codes such as ISRC and ISWC say what a work is. They do not say who owns each share today, or where its money should go.</p>
+      </div>
+      <figure class="l-art">
+        <img src="/art/hdr-auction.webp" width="1584" height="672" alt="Flat retro illustration: a cloud of envelopes hovers above a turntable on a cliff, each one a separate message about the same record." loading="lazy" decoding="async" />
+      </figure>
+    </div>
+    <ul class="pains">
+      {pains.map(([h, p]) => <li><h3>{h}</h3><p class="muted">{p}</p></li>)}
+    </ul>
+    <p class="cite">The scale of unmatched money shows in public data. The MLC reports that 21 services transferred historical unmatched royalties to it, with an initial value of approximately $427 million, later adjusted to approximately $397 million (The MLC, "Historical Royalties", data as of October 2026, themlc.com/historical-royalties). That figure comes from the cited source and not from this project. We state no typical payout delay or cost, because we have found no source we can cite. <a class="link" href="/whitepaper">The whitepaper has the sources</a>.</p>
+  </div>
+</section>
+<style>
+  .pains { list-style: none; margin: var(--s7) 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s5); }
+  .pains li { display: grid; gap: var(--s2); align-content: start; padding-top: var(--s4); border-top: 2px solid var(--ink); }
+  h3 { font-size: var(--fs-18); font-weight: 600; line-height: 1.25; }
+  .pains p { font-size: var(--fs-14); line-height: 1.55; }
+  .cite { margin-top: var(--s6); max-width: 52rem; font-size: var(--fs-12); line-height: 1.6; color: var(--dim); }
+  @media (max-width: 1023px) { .pains { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 599px) { .pains { grid-template-columns: 1fr; margin-top: var(--s6); } }
+</style>

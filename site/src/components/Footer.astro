@@ -3,9 +3,9 @@ import Logo from './Logo.astro';
 import { DASHBOARD_URL, WHITEPAPER_URL, SOURCE_URL, PROJECT_NAME } from '../consts';
 import { REGISTRY, accountUrl } from '../data/testnet';
 const cols = [
-  { h: 'Product', l: [['How it works', '/#how'], ['Catalog sale on testnet', '/#lifecycle'], ['Agent allowances', '/#agents'], ['Trust and privacy', '/#trust']] },
+  { h: 'Product', l: [['How it works', '/#how'], ['Why NEAR', '/#near'], ['Three tracks', '/#tracks'], ['Catalog sale on testnet', '/#lifecycle'], ['Agent allowances', '/#agents'], ['Trust and privacy', '/#trust']] },
   { h: 'Registry', l: [['Overview', DASHBOARD_URL], ['Catalog', '/catalog/'], ['Shares', '/shares/'], ['Activity', '/activity'], ['Governance', '/agents'], ['Your shares', '/member']] },
-  { h: 'Support', l: [['Help chat', '/help#chat'], ['Contact support', '/help#support'], ['Docs', '/docs'], ['Whitepaper', WHITEPAPER_URL], ['Source code (placeholder)', SOURCE_URL]] },
+  { h: 'Learn', l: [['Auction', '/auction'], ['Verify', '/verify'], ['Whitepaper', WHITEPAPER_URL], ['Docs', '/docs'], ['Help chat', '/help#chat'], ['Contact support', '/help#support'], ['Source code', SOURCE_URL]] },
 ];
 ---
 <footer class="site-foot" id="notice">
@@ -27,7 +27,7 @@ const cols = [
       <span class="badge sim">Simulated</span>
       <p>{PROJECT_NAME} runs on NEAR testnet only. Payments use Mock USDC (testnet), a mock token with no value. Identity checks, payers and payer statements are Simulated. This is not an investment product, and nothing here is legal advice.</p>
     </div>
-    <div class="foot-bottom"><span>Built at NEAR HACKATHON</span><span class="mono foot-net">network: testnet</span></div>
+    <div class="foot-bottom"><span>Built at <a href="https://nearhackathon.com" rel="noopener">NEAR HACKATHON</a></span><span class="mono foot-net">network: testnet</span></div>
   </div>
 </footer>
 <style>

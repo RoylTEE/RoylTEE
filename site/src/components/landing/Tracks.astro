@@ -1,0 +1,55 @@
+---
+import { REPO_FILE_BASE, AUCTION } from '../../data/auction';
+import { CLAIMS } from '../../data/claims';
+const passed = AUCTION.verify.checks.filter((c) => c.verdict === 'PASS').length;
+const tracks = [
+  {
+    id: 'nfts', name: 'NFTs That Do Something',
+    asks: 'The track asks for NFTs that act as accounts: assets that own money and carry rights, so that ownership has behavior.',
+    answer: 'Every share NFT owns a payout vault. The vault releases money only to the current holder, holds a payment in escrow until a split sheet is approved, travels with a catalog sale, and freezes the contested part when a dispute opens.',
+    proof: [['The split sheet, on testnet', '/verify'], ['The catalog sale, with its transactions', '/#lifecycle']],
+  },
+  {
+    id: 'privacy', name: 'Privacy & Private AI',
+    asks: 'The track asks for confidential computation and for systems that protect sensitive data.',
+    answer: `Auction bids are sealed: encrypted to a key only the TEE holds and opened inside Intel TDX hardware through OutLayer. The record shows the winner and the price, never the bids, and the attestation checks passed ${passed} of ${AUCTION.verify.checks.length}. We do not claim the registry is private. Splits and payments are public, and documents stay off chain as hashes.`,
+    proof: [['The auction and its attestation', '/auction'], ['Privacy design, whitepaper section 7', '/whitepaper']],
+  },
+  {
+    id: 'security', name: 'AI Security & Defense',
+    asks: 'The track asks for ways to give AI money without giving it the keys to everything, such as spending limits and policy engines.',
+    answer: `A payment agent spends from a capped allowance with a key limited to two methods. It cannot choose the payee, and a statement line pays once. Vaults hold zero keys. ${CLAIMS.length} claims each point to code, a test and evidence, and verify:testnet rechecks the live chain. The threat model lists T1 to T39 for the registry and T-A1 to T-A27 for the auction. The audit is a manual pass by the builder, not an independent review.`,
+    proof: [['Every claim, checked', '/verify'], ['Threat model', `${REPO_FILE_BASE}THREAT_MODEL.md`], ['Audit notes', `${REPO_FILE_BASE}AUDIT.md`]],
+  },
+];
+---
+<section class="l-sec" id="tracks">
+  <div class="container">
+    <div class="l-head">
+      <p class="l-eyebrow">Built for three tracks</p>
+      <h2 class="l-h2">One registry, three questions it answers</h2>
+      <p class="lead">RoylTEE is entered in three tracks at NEAR HACKATHON. Here is how it answers each, with the proof.</p>
+    </div>
+    <ul class="tracks">
+      {tracks.map((t) => (
+        <li>
+          <div class="top"><span class="l-tag">{t.id}</span></div>
+          <h3>{t.name}</h3>
+          <p class="asks muted">{t.asks}</p>
+          <p class="ans">{t.answer}</p>
+          <ul class="proof">{t.proof.map(([l, h]) => <li><a class="l-textlink" href={h} rel={h.startsWith('http') ? 'noopener' : undefined}>{l}</a></li>)}</ul>
+        </li>
+      ))}
+    </ul>
+  </div>
+</section>
+<style>
+  .tracks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--s5); }
+  .tracks > li { display: grid; gap: var(--s3); align-content: start; padding: var(--s5); background: var(--surface); border: 1px solid var(--edge); border-top: 4px solid var(--amber); border-radius: var(--r-card); box-shadow: var(--shadow-1); }
+  h3 { font-size: var(--fs-22); font-weight: 600; line-height: 1.2; letter-spacing: -.02em; }
+  .top .l-tag { color: var(--amber-ink); background: var(--amber-tint); border-color: var(--warn-line); }
+  .asks { font-size: var(--fs-14); line-height: 1.5; padding-bottom: var(--s3); border-bottom: 1px solid var(--rule); }
+  .ans { font-size: var(--fs-14); line-height: 1.6; }
+  .proof { list-style: none; margin: var(--s2) 0 0; padding: 0; display: grid; }
+  @media (max-width: 1023px) { .tracks { grid-template-columns: 1fr; } }
+</style>

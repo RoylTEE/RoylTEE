@@ -1,5 +1,5 @@
 /* RoylTEE design tokens and shared components. Light ledger paper, ink text, one amber mark.
-   Type: Inter Tight for UI, JetBrains Mono for codes, accounts and amounts. Numbers are tabular everywhere. */
+   Type: Hanken Grotesk for UI, JetBrains Mono for codes, accounts and amounts. Numbers are tabular everywhere. */
 :root {
   /* Color */
   --paper: #f7f6f2; --paper-2: #efede6; --surface: #ffffff; --surface-2: #fbfaf7;
@@ -12,7 +12,7 @@
   --info: #2f5a99; --info-bg: #edf2fa; --info-line: #c7d5ec;
   --sim: #f7d046; --sim-ink: #3a2c00;
   /* Type */
-  --sans: 'Inter Tight Variable', 'Helvetica Neue', Arial, sans-serif;
+  --sans: 'Hanken Grotesk Variable', 'Helvetica Neue', Arial, sans-serif;
   --mono: 'JetBrains Mono Variable', ui-monospace, Menlo, Consolas, monospace;
   --fs-12: .75rem; --fs-14: .875rem; --fs-16: 1rem; --fs-18: 1.125rem; --fs-22: 1.375rem; --fs-28: 1.75rem; --fs-36: 2.25rem; --fs-52: 3.25rem;
   /* Space, 4 px base */

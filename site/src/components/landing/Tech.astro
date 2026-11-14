@@ -1,0 +1,73 @@
+---
+import { REGISTRY, TOKEN, accountUrl } from '../../data/testnet';
+import { AUCTION_FACTS } from '../../data/landing';
+import { AUCTION } from '../../data/auction';
+const chips = ['NEAR testnet', 'NEP-171', 'NEP-177', 'NEP-181', 'NEP-141 mock USDC (Simulated)', 'OutLayer TEE'];
+const passed = AUCTION.verify.checks.filter((c) => c.verdict === 'PASS').length;
+const blocks = [
+  { t: 'Zero-key vaults', tag: 'NEP-171, 177, 181', d: 'Each share is an NFT. It owns a payout vault, a NEAR account created with no access keys. Whoever holds the NFT is the only one who can claim its money.' },
+  { t: 'Escrow in mock USDC', tag: 'NEP-141, Simulated', d: 'One payment is split by basis points into the vaults in a single transaction. Money for a share still waiting for approval is held in escrow, not paid. The token is Mock USDC, with no value.' },
+  { t: 'Dispute freeze', tag: 'Registrar resolves', d: 'If a new registration would take a work above 100 percent, or repeats a work code, a dispute opens. Only the contested money is held. The other shares keep being paid.' },
+  { t: 'Sealed-bid auction in a TEE', tag: 'OutLayer, attested', d: `Bids are encrypted to a key only the TEE holds. After the end time, a module in Intel TDX hardware opens them and prints only the winner and the second price. The attestation checks passed ${passed} of ${AUCTION.verify.checks.length}.` },
+];
+const layers = [
+  { n: 'Web app', t: 'Astro pages on Vercel', d: 'Read NEAR testnet with view calls. Signing goes through a NEAR wallet you connect.' },
+  { n: 'Registry', t: 'Registry contract and vault accounts', d: 'The registry holds the rules. Each share vault is its own account with no keys.', link: [REGISTRY, accountUrl(REGISTRY)] },
+  { n: 'Money', t: 'Mock USDC, NEP-141 (Simulated)', d: 'The payment token. It has no value and stands in for a real stablecoin.', link: [TOKEN, accountUrl(TOKEN)] },
+  { n: 'Auction', t: 'Auction contract and OutLayer TEE module', d: 'Holds a share for sale. The TEE opens sealed bids and attests to what it ran.', link: [AUCTION_FACTS.account, AUCTION_FACTS.accountHref] },
+  { n: 'Proof', t: 'nearblocks explorer', d: 'Anyone can open every account and transaction on this page, no login.' },
+];
+---
+<section class="l-sec" id="tech">
+  <div class="container">
+    <div class="l-split">
+      <div class="l-head">
+        <p class="l-eyebrow">The tech, explained simply</p>
+        <h2 class="l-h2">A share is an NFT that owns a vault</h2>
+        <p class="lead">Four ideas do the work. You can check each one on chain.</p>
+      </div>
+      <figure class="l-art">
+        <img src="/art/hdr-security.webp" width="1584" height="672" alt="Flat retro illustration: a domed vault sealed inside a glass cylinder under a beam of light." loading="lazy" decoding="async" />
+      </figure>
+    </div>
+    <ul class="blocks">
+      {blocks.map((b) => <li><span class="l-tag">{b.tag}</span><h3>{b.t}</h3><p class="muted">{b.d}</p></li>)}
+    </ul>
+    <div class="chips-row"><p class="l-eyebrow">Built on</p><ul class="chips">{chips.map((c) => <li>{c}</li>)}</ul></div>
+
+    <h3 class="stack-h">The layers</h3>
+    <ol class="layers" aria-label="The layers of the system, top to bottom">
+      {layers.map((l) => (
+        <li>
+          <span class="ln mono">{l.n}</span>
+          <div class="lb"><strong>{l.t}</strong><span class="muted">{l.d}</span>{l.link && <a class="acct-link" href={l.link[1]} target="_blank" rel="noopener">{l.link[0]}</a>}</div>
+        </li>
+      ))}
+    </ol>
+    <p class="links"><a class="l-textlink" href="/auction">How the auction ran</a> <a class="l-textlink" href="/whitepaper">Read the whitepaper</a></p>
+  </div>
+</section>
+<style>
+  .blocks { list-style: none; margin: var(--s7) 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--s4); }
+  .blocks li { display: grid; gap: var(--s3); align-content: start; padding: var(--s5); background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-card); box-shadow: var(--shadow-1); }
+  h3 { font-size: var(--fs-18); font-weight: 600; line-height: 1.25; }
+  .blocks p { font-size: var(--fs-14); line-height: 1.55; }
+  .blocks .l-tag { justify-self: start; color: var(--amber-ink); background: var(--amber-tint); border-color: var(--warn-line); }
+  .chips-row { display: flex; align-items: center; gap: var(--s4); flex-wrap: wrap; margin-top: var(--s5); }
+  .chips-row .l-eyebrow { color: var(--dim); }
+  .chips { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .chips li { font-family: var(--mono); font-size: var(--fs-12); letter-spacing: .02em; padding: .35rem .7rem; border: 1px solid var(--edge); border-radius: 999px; background: var(--surface); color: var(--ink-2); }
+  .stack-h { margin-top: var(--s8); margin-bottom: var(--s4); }
+  .layers { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; border: 1px solid var(--edge); border-radius: var(--r-card); overflow: hidden; background: var(--surface); }
+  .layers li { display: grid; grid-template-columns: 9rem 1fr; border-bottom: 1px solid var(--rule); }
+  .layers li:last-child { border-bottom: 0; }
+  .layers li:nth-child(even) { background: var(--surface-2); }
+  .ln { display: flex; align-items: center; padding: var(--s4) var(--s5); background: var(--ink); color: var(--amber); font-size: var(--fs-12); letter-spacing: .06em; text-transform: uppercase; border-bottom: 1px solid #2b2820; }
+  .layers li:last-child .ln { border-bottom: 0; }
+  .lb { display: flex; flex-wrap: wrap; align-items: baseline; gap: .25rem var(--s4); padding: var(--s4) var(--s5); font-size: var(--fs-14); }
+  .lb strong { font-weight: 600; min-width: 16rem; }
+  .lb .muted { flex: 1 1 18rem; }
+  .links { display: flex; flex-wrap: wrap; gap: var(--s5); margin-top: var(--s5); }
+  @media (max-width: 1099px) { .blocks { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 599px) { .blocks { grid-template-columns: 1fr; } .layers li { grid-template-columns: 1fr; } .ln { padding: var(--s2) var(--s4); } .lb { padding: var(--s3) var(--s4); } .lb strong { min-width: 0; } }
+</style>

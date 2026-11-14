@@ -6,10 +6,11 @@ const { current = '' } = Astro.props;
 /* Project site navigation. The registry app has its own menu (src/layouts/App.astro). */
 const links = [
   { key: 'how', t: 'How it works', href: '/#how' },
-  { key: 'trust', t: 'Real and Simulated', href: '/#trust' },
+  { key: 'near', t: 'Why NEAR', href: '/#near' },
+  { key: 'auction', t: 'Auction', href: '/auction' },
   { key: 'verify', t: 'Verify', href: '/verify' },
+  { key: 'whitepaper', t: 'Whitepaper', href: '/whitepaper' },
   { key: 'docs', t: 'Docs', href: '/docs' },
-  { key: 'help', t: 'Help', href: '/help' },
 ];
 ---
 <header class="site-head">
@@ -20,7 +21,7 @@ const links = [
     </nav>
     <div class="head-end">
       <span class="badge ok net">NEAR testnet</span>
-      <a class="btn primary head-cta" href={DASHBOARD_URL}>Open the registry</a>
+      <a class="btn primary head-cta" href={DASHBOARD_URL}>Open the demo dashboard</a>
       <button class="menu-btn" type="button" aria-expanded="false" aria-controls="mobile-menu" data-menu-btn>
         <span class="sr">Menu</span><span class="bars" aria-hidden="true"></span>
       </button>
@@ -28,7 +29,7 @@ const links = [
   </div>
   <nav class="mobile-menu" id="mobile-menu" aria-label="Main" hidden data-menu>
     {links.map((l) => <a href={l.href} aria-current={current === l.key ? 'page' : undefined}>{l.t}</a>)}
-    <a class="btn primary" href={DASHBOARD_URL}>Open the registry</a>
+    <a class="btn primary" href={DASHBOARD_URL}>Open the demo dashboard</a>
   </nav>
 </header>
 <style>
@@ -36,7 +37,7 @@ const links = [
   .head-row { display: flex; align-items: center; gap: var(--s6); min-height: 4rem; }
   .head-logo { text-decoration: none; display: inline-flex; min-height: 2.75rem; align-items: center; }
   .head-nav { display: flex; gap: var(--s1); }
-  .head-nav a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 .8rem; border-radius: var(--r-ctl); text-decoration: none; font-size: var(--fs-14); font-weight: 500; color: var(--muted); }
+  .head-nav a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0 .7rem; border-radius: var(--r-ctl); text-decoration: none; white-space: nowrap; font-size: var(--fs-14); font-weight: 500; color: var(--muted); }
   .head-nav a:hover { color: var(--text); background: var(--paper-2); }
   .head-nav a[aria-current="page"] { color: var(--text); box-shadow: inset 0 -2px 0 var(--ink); border-radius: 0; }
   .head-end { margin-left: auto; display: flex; align-items: center; gap: var(--s3); }
@@ -55,6 +56,7 @@ const links = [
     .head-nav, .head-cta { display: none; }
     .menu-btn { display: block; }
   }
-  @media (max-width: 479px) { .net { display: none; } }
+  @media (max-width: 1199px) { .net { display: none; } .head-row { gap: var(--s4); } }
+  @media (max-width: 479px) { .net { display: none; } .head-row { gap: var(--s3); } }
 </style>
 <script>import '../scripts/nav.ts';</script>

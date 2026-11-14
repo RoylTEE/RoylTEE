@@ -1,0 +1,45 @@
+---
+const steps = [
+  { t: 'Register a vault', d: 'A member records the song, then one share per rightholder in basis points (100 basis points is 1 percent). Each share is minted as an NFT, and the registry opens a payout account for it with no access keys.', m: 'register_work, register_share' },
+  { t: 'Agree the split sheet', d: 'A share registered by someone other than the work\'s registrant is pending until the registrant signs it.', m: 'approve_share' },
+  { t: 'Escrow', d: 'A payment is split by basis points into each vault in one transaction. Money for a pending or disputed share is held, not paid, until it is approved or resolved.', m: 'ft_transfer_call' },
+  { t: 'Sell a catalog', d: 'The share NFT moves to another verified member, directly or through a sealed-bid auction in a TEE. The payout address stays the same and unclaimed money goes with the share.', m: 'nft_transfer' },
+  { t: 'Pay out', d: 'Whoever holds the share NFT at that moment can move its balance to themselves. Nobody else can, and there is no key on the account to steal.', m: 'claim' },
+];
+---
+<section class="l-sec" id="how">
+  <div class="container">
+    <div class="l-head">
+      <p class="l-eyebrow">How it works</p>
+      <h2 class="l-h2">Five steps from a split sheet to a payout</h2>
+      <p class="lead">The contract enforces each step. All five ran on NEAR testnet, and the method names are the real contract calls.</p>
+    </div>
+    <ol class="flow">
+      {steps.map((s, i) => (
+        <li>
+          <span class="n mono" aria-hidden="true">{i + 1}</span>
+          <h3>{s.t}</h3>
+          <p class="muted">{s.d}</p>
+          <code>{s.m}</code>
+        </li>
+      ))}
+    </ol>
+    <p class="flow-foot"><a class="l-textlink" href="/whitepaper">Read the whitepaper</a> <a class="l-textlink" href="/verify">See every claim checked</a></p>
+  </div>
+</section>
+<style>
+  .flow { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--s4); counter-reset: none; }
+  .flow li { position: relative; display: grid; gap: var(--s2); align-content: start; padding: var(--s5) var(--s4) var(--s4); background: var(--surface); border: 1px solid var(--edge); border-radius: var(--r-card); box-shadow: var(--shadow-1); }
+  .flow li:not(:last-child)::after { content: ''; position: absolute; top: 2.15rem; right: calc(-1 * var(--s4) - 1px); width: var(--s4); height: 2px; background: var(--amber); z-index: 1; }
+  .n { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%; background: var(--ink); color: var(--amber); font-weight: 700; font-size: var(--fs-14); margin-bottom: var(--s2); }
+  h3 { font-size: var(--fs-18); font-weight: 600; }
+  p { font-size: var(--fs-14); line-height: 1.5; }
+  code { margin-top: var(--s2); font-family: var(--mono); font-size: var(--fs-12); color: var(--amber-ink); background: var(--amber-tint); padding: .25rem .5rem; border-radius: 4px; justify-self: start; overflow-wrap: anywhere; }
+  .flow-foot { display: flex; flex-wrap: wrap; gap: var(--s5); margin-top: var(--s5); }
+  @media (max-width: 1099px) {
+    .flow { grid-template-columns: 1fr; gap: var(--s5); max-width: 40rem; }
+    .flow li { padding-left: 4.25rem; }
+    .n { position: absolute; left: var(--s4); top: var(--s4); margin: 0; }
+    .flow li:not(:last-child)::after { top: auto; bottom: calc(-1 * var(--s5) - 1px); right: auto; left: calc(var(--s4) + 1.1rem); width: 2px; height: var(--s5); }
+  }
+</style>
